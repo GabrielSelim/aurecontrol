@@ -1,19 +1,53 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z.string().email("E-mail inválido"),
+  password: z.string().min(1, "Senha é obrigatória"),
+});
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const { signIn } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const validation = loginSchema.safeParse({ email, password });
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
     setIsLoading(true);
-    // Simular login - será implementado com Supabase
-    setTimeout(() => setIsLoading(false), 1000);
+
+    const { error } = await signIn(email, password);
+
+    if (error) {
+      if (error.message.includes("Invalid login credentials")) {
+        toast.error("E-mail ou senha incorretos");
+      } else if (error.message.includes("Email not confirmed")) {
+        toast.error("Por favor, confirme seu e-mail antes de fazer login");
+      } else {
+        toast.error("Erro ao fazer login. Tente novamente.");
+      }
+    } else {
+      toast.success("Login realizado com sucesso!");
+      navigate("/dashboard");
+    }
+
+    setIsLoading(false);
   };
 
   return (
@@ -54,6 +88,8 @@ const Login = () => {
                 id="email"
                 type="email"
                 placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 className="h-12"
               />
@@ -62,18 +98,20 @@ const Login = () => {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Senha</Label>
-                <a
-                  href="#"
+                <Link
+                  to="/recuperar-senha"
                   className="text-sm text-primary hover:underline"
                 >
                   Esqueceu a senha?
-                </a>
+                </Link>
               </div>
               <div className="relative">
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                   className="h-12 pr-12"
                 />
