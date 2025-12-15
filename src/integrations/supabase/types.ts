@@ -311,6 +311,29 @@ export type Database = {
     }
     Functions: {
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      handle_invited_user_signup: {
+        Args: {
+          _cpf: string
+          _email: string
+          _full_name: string
+          _invite_token: string
+          _phone: string
+          _user_id: string
+        }
+        Returns: Json
+      }
+      handle_new_user_signup: {
+        Args: {
+          _cnpj: string
+          _company_name: string
+          _cpf: string
+          _email: string
+          _full_name: string
+          _phone: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

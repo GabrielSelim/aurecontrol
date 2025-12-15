@@ -1,10 +1,32 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, ArrowLeft, Building2, User } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { z } from "zod";
+
+const step1Schema = z.object({
+  fullName: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
+  email: z.string().email("E-mail inválido"),
+  cpf: z.string().min(11, "CPF inválido"),
+  phone: z.string().min(10, "Telefone inválido"),
+  password: z
+    .string()
+    .min(8, "A senha deve ter no mínimo 8 caracteres")
+    .regex(/[A-Z]/, "A senha deve conter pelo menos uma letra maiúscula")
+    .regex(/[a-z]/, "A senha deve conter pelo menos uma letra minúscula")
+    .regex(/[0-9]/, "A senha deve conter pelo menos um número")
+    .regex(/[^A-Za-z0-9]/, "A senha deve conter pelo menos um caractere especial"),
+});
+
+const step2Schema = z.object({
+  companyName: z.string().min(2, "Nome da empresa é obrigatório"),
+  cnpj: z.string().min(14, "CNPJ inválido"),
+});
 
 const Registro = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -12,15 +34,104 @@ const Registro = () => {
   const [step, setStep] = useState(1);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  
+  // Form data
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [cnpj, setCnpj] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { signUp } = useAuth();
+  const navigate = useNavigate();
+
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    return numbers
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
+      .slice(0, 14);
+  };
+
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    return numbers
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d)/, "$1-$2")
+      .slice(0, 15);
+  };
+
+  const formatCNPJ = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    return numbers
+      .replace(/(\d{2})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1/$2")
+      .replace(/(\d{4})(\d{1,2})/, "$1-$2")
+      .slice(0, 18);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (step === 1) {
+      const validation = step1Schema.safeParse({
+        fullName,
+        email,
+        cpf: cpf.replace(/\D/g, ""),
+        phone: phone.replace(/\D/g, ""),
+        password,
+      });
+
+      if (!validation.success) {
+        toast.error(validation.error.errors[0].message);
+        return;
+      }
+
       setStep(2);
     } else {
+      const validation = step2Schema.safeParse({
+        companyName,
+        cnpj: cnpj.replace(/\D/g, ""),
+      });
+
+      if (!validation.success) {
+        toast.error(validation.error.errors[0].message);
+        return;
+      }
+
+      if (!acceptedTerms || !acceptedPrivacy) {
+        toast.error("Você precisa aceitar os termos para continuar");
+        return;
+      }
+
       setIsLoading(true);
-      // Simular registro - será implementado com Supabase
-      setTimeout(() => setIsLoading(false), 1000);
+
+      const { error } = await signUp({
+        email,
+        password,
+        fullName,
+        cpf: cpf.replace(/\D/g, ""),
+        phone: phone.replace(/\D/g, ""),
+        companyName,
+        cnpj: cnpj.replace(/\D/g, ""),
+      });
+
+      if (error) {
+        if (error.message.includes("User already registered")) {
+          toast.error("Este e-mail já está cadastrado");
+        } else {
+          toast.error("Erro ao criar conta. Tente novamente.");
+        }
+      } else {
+        toast.success("Conta criada com sucesso!");
+        navigate("/dashboard");
+      }
+
+      setIsLoading(false);
     }
   };
 
@@ -94,6 +205,8 @@ const Registro = () => {
                     id="name"
                     type="text"
                     placeholder="Seu nome completo"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     required
                     className="h-12"
                   />
@@ -105,6 +218,8 @@ const Registro = () => {
                     id="email"
                     type="email"
                     placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                     className="h-12"
                   />
@@ -116,6 +231,8 @@ const Registro = () => {
                     id="cpf"
                     type="text"
                     placeholder="000.000.000-00"
+                    value={cpf}
+                    onChange={(e) => setCpf(formatCPF(e.target.value))}
                     required
                     className="h-12"
                   />
@@ -127,6 +244,8 @@ const Registro = () => {
                     id="phone"
                     type="tel"
                     placeholder="(00) 00000-0000"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
                     required
                     className="h-12"
                   />
@@ -139,6 +258,8 @@ const Registro = () => {
                       id="password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Mínimo 8 caracteres"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                       className="h-12 pr-12"
                     />
@@ -164,6 +285,8 @@ const Registro = () => {
                     id="companyName"
                     type="text"
                     placeholder="Nome da sua empresa"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
                     required
                     className="h-12"
                   />
@@ -175,6 +298,8 @@ const Registro = () => {
                     id="cnpj"
                     type="text"
                     placeholder="00.000.000/0000-00"
+                    value={cnpj}
+                    onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
                     required
                     className="h-12"
                   />
