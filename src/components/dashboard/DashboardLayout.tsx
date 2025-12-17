@@ -16,6 +16,7 @@ import {
   UserPlus,
   ChevronDown,
   Bell,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -149,8 +150,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem onClick={() => navigate("/dashboard/perfil")}>
-              <Settings className="mr-2 h-4 w-4" />
-              Configurações
+              <User className="mr-2 h-4 w-4" />
+              Perfil
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
