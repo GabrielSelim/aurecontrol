@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, ArrowLeft, Loader2, UserPlus } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Loader2, UserPlus, CheckCircle2, XCircle, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -40,6 +40,17 @@ interface InviteData {
   expires_at: string;
 }
 
+interface CNPJValidationResult {
+  valid: boolean;
+  cnpj: string;
+  razao_social?: string;
+  nome_fantasia?: string;
+  situacao?: string;
+  uf?: string;
+  municipio?: string;
+  error?: string;
+}
+
 const Registro = () => {
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("convite");
@@ -47,6 +58,9 @@ const Registro = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingInvite, setIsLoadingInvite] = useState(!!inviteToken);
+  const [isValidatingCNPJ, setIsValidatingCNPJ] = useState(false);
+  const [cnpjValidated, setCnpjValidated] = useState(false);
+  const [cnpjData, setCnpjData] = useState<CNPJValidationResult | null>(null);
   const [step, setStep] = useState(1);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
@@ -123,11 +137,56 @@ const Registro = () => {
     }
   };
 
+  const validateCNPJFromAPI = async (cnpjValue: string) => {
+    const cleanCNPJ = cnpjValue.replace(/\D/g, "");
+    if (cleanCNPJ.length !== 14) return;
+
+    setIsValidatingCNPJ(true);
+    setCnpjValidated(false);
+    setCnpjData(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('validate-cnpj', {
+        body: { cnpj: cleanCNPJ }
+      });
+
+      if (error) throw error;
+
+      setCnpjData(data);
+      
+      if (data.valid) {
+        setCnpjValidated(true);
+        setErrors(prev => ({ ...prev, cnpj: "" }));
+        // Auto-fill company name if empty
+        if (!companyName && (data.nome_fantasia || data.razao_social)) {
+          setCompanyName(data.nome_fantasia || data.razao_social);
+        }
+        toast.success("CNPJ válido! Dados da empresa carregados.");
+      } else {
+        setErrors(prev => ({ ...prev, cnpj: data.error || "CNPJ não encontrado na Receita Federal" }));
+      }
+    } catch (error) {
+      console.error("Error validating CNPJ:", error);
+      setErrors(prev => ({ ...prev, cnpj: "Erro ao validar CNPJ. Tente novamente." }));
+    } finally {
+      setIsValidatingCNPJ(false);
+    }
+  };
+
   const handleCNPJChange = (value: string) => {
     const formatted = formatCNPJ(value);
     setCnpj(formatted);
+    setCnpjValidated(false);
+    setCnpjData(null);
+    
     if (formatted.length === 18) {
-      setErrors(prev => ({ ...prev, cnpj: validateCNPJ(formatted) ? "" : "CNPJ inválido" }));
+      if (!validateCNPJ(formatted)) {
+        setErrors(prev => ({ ...prev, cnpj: "CNPJ inválido (dígitos verificadores incorretos)" }));
+      } else {
+        setErrors(prev => ({ ...prev, cnpj: "" }));
+        // Auto-validate via API when CNPJ is complete and valid algorithmically
+        validateCNPJFromAPI(formatted);
+      }
     } else {
       setErrors(prev => ({ ...prev, cnpj: "" }));
     }
@@ -505,17 +564,68 @@ const Registro = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="cnpj">CNPJ</Label>
-                  <Input
-                    id="cnpj"
-                    type="text"
-                    placeholder="00.000.000/0000-00"
-                    value={cnpj}
-                    onChange={(e) => handleCNPJChange(e.target.value)}
-                    required
-                    maxLength={18}
-                    className={`h-12 ${errors.cnpj ? "border-destructive" : ""}`}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="cnpj"
+                      type="text"
+                      placeholder="00.000.000/0000-00"
+                      value={cnpj}
+                      onChange={(e) => handleCNPJChange(e.target.value)}
+                      required
+                      maxLength={18}
+                      className={`h-12 pr-12 ${
+                        errors.cnpj 
+                          ? "border-destructive" 
+                          : cnpjValidated 
+                            ? "border-green-500" 
+                            : ""
+                      }`}
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      {isValidatingCNPJ && (
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      )}
+                      {!isValidatingCNPJ && cnpjValidated && (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      )}
+                      {!isValidatingCNPJ && errors.cnpj && (
+                        <XCircle className="h-5 w-5 text-destructive" />
+                      )}
+                    </div>
+                  </div>
                   {errors.cnpj && <p className="text-sm text-destructive">{errors.cnpj}</p>}
+                  
+                  {/* Show validated company info */}
+                  {cnpjValidated && cnpjData && (
+                    <div className="mt-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <div className="text-sm space-y-1">
+                          <p className="font-medium text-green-800 dark:text-green-200">
+                            Empresa verificada na Receita Federal
+                          </p>
+                          <p className="text-green-700 dark:text-green-300">
+                            <span className="font-medium">Razão Social:</span> {cnpjData.razao_social}
+                          </p>
+                          {cnpjData.nome_fantasia && cnpjData.nome_fantasia !== cnpjData.razao_social && (
+                            <p className="text-green-700 dark:text-green-300">
+                              <span className="font-medium">Nome Fantasia:</span> {cnpjData.nome_fantasia}
+                            </p>
+                          )}
+                          {cnpjData.situacao && (
+                            <p className="text-green-700 dark:text-green-300">
+                              <span className="font-medium">Situação:</span> {cnpjData.situacao}
+                            </p>
+                          )}
+                          {cnpjData.municipio && cnpjData.uf && (
+                            <p className="text-green-700 dark:text-green-300">
+                              <span className="font-medium">Localização:</span> {cnpjData.municipio}/{cnpjData.uf}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4 pt-4">
@@ -556,8 +666,9 @@ const Registro = () => {
               className="w-full"
               disabled={
                 isLoading ||
+                isValidatingCNPJ ||
                 (inviteData && (!acceptedTerms || !acceptedPrivacy)) ||
-                (!inviteData && step === 2 && (!acceptedTerms || !acceptedPrivacy))
+                (!inviteData && step === 2 && (!acceptedTerms || !acceptedPrivacy || !cnpjValidated))
               }
             >
               {isLoading
