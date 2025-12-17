@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Filter, Users } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Filter, Users, Download } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -181,6 +181,33 @@ const Colaboradores = () => {
     }
   };
 
+  const exportToCSV = () => {
+    const headers = ["Nome", "E-mail", "CPF", "Telefone", "Cargo(s)", "Status"];
+    const rows = filteredColaboradores.map(c => [
+      c.full_name,
+      c.email,
+      c.cpf ? formatCPF(c.cpf) : "",
+      c.phone ? formatPhone(c.phone) : "",
+      c.roles.map(r => getRoleLabel(r.role)).join("; "),
+      c.is_active ? "Ativo" : "Inativo"
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `colaboradores_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    
+    toast.success("Lista exportada com sucesso!");
+  };
+
   const filteredColaboradores = colaboradores.filter((c) => {
     const matchesSearch =
       c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,12 +234,18 @@ const Colaboradores = () => {
             Gerencie os colaboradores da sua empresa
           </p>
         </div>
-        {isAdmin() && (
-          <Button onClick={() => navigate("/dashboard/convites")}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Convidar
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportToCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Exportar
           </Button>
-        )}
+          {isAdmin() && (
+            <Button onClick={() => navigate("/dashboard/convites")}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Convidar
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
