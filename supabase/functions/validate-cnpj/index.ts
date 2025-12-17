@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,8 @@ interface CNPJResponse {
   telefone?: string;
   email?: string;
   error?: string;
+  already_registered?: boolean;
+  existing_company_name?: string;
 }
 
 serve(async (req) => {
@@ -29,7 +32,7 @@ serve(async (req) => {
   }
 
   try {
-    const { cnpj } = await req.json();
+    const { cnpj, check_duplicate = true, exclude_company_id } = await req.json();
 
     if (!cnpj) {
       return new Response(
@@ -48,7 +51,42 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Validating CNPJ: ${cleanCNPJ}`);
+    console.log(`Validating CNPJ: ${cleanCNPJ}, check_duplicate: ${check_duplicate}, exclude_company_id: ${exclude_company_id}`);
+
+    // Check if CNPJ already exists in database
+    if (check_duplicate) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      let query = supabase
+        .from('companies')
+        .select('id, name')
+        .eq('cnpj', cleanCNPJ);
+      
+      // Exclude a specific company (useful for edit scenarios)
+      if (exclude_company_id) {
+        query = query.neq('id', exclude_company_id);
+      }
+
+      const { data: existingCompany, error: dbError } = await query.maybeSingle();
+
+      if (dbError) {
+        console.error('Database error:', dbError);
+      } else if (existingCompany) {
+        console.log(`CNPJ ${cleanCNPJ} already registered: ${existingCompany.name}`);
+        return new Response(
+          JSON.stringify({ 
+            valid: false, 
+            cnpj: cleanCNPJ,
+            already_registered: true,
+            existing_company_name: existingCompany.name,
+            error: `CNPJ já cadastrado para a empresa "${existingCompany.name}"` 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     // Call BrasilAPI to validate CNPJ (free, no API key required)
     const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCNPJ}`, {
@@ -104,6 +142,7 @@ serve(async (req) => {
       cep: data.cep,
       telefone: data.ddd_telefone_1,
       email: data.email,
+      already_registered: false,
     };
 
     return new Response(
