@@ -62,6 +62,7 @@ const Colaboradores = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const [colaboradorToToggle, setColaboradorToToggle] = useState<Colaborador | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -220,13 +221,17 @@ const Colaboradores = () => {
       (statusFilter === "active" && c.is_active) ||
       (statusFilter === "inactive" && !c.is_active);
     
-    return matchesSearch && matchesStatus;
+    const matchesRole =
+      roleFilter === "all" ||
+      c.roles.some(r => r.role === roleFilter);
+    
+    return matchesSearch && matchesStatus && matchesRole;
   });
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, itemsPerPage]);
+  }, [searchTerm, statusFilter, roleFilter, itemsPerPage]);
 
   // Pagination
   const totalPages = Math.ceil(filteredColaboradores.length / itemsPerPage);
@@ -332,14 +337,25 @@ const Colaboradores = () => {
               />
             </div>
             <Select value={statusFilter} onValueChange={(value: "all" | "active" | "inactive") => setStatusFilter(value)}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filtrar por status" />
+              <SelectTrigger className="w-full sm:w-[150px]">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos status</SelectItem>
                 <SelectItem value="active">Ativos</SelectItem>
                 <SelectItem value="inactive">Inativos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectValue placeholder="Cargo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos cargos</SelectItem>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="financeiro">Financeiro</SelectItem>
+                <SelectItem value="gestor">Gestor</SelectItem>
+                <SelectItem value="colaborador">Colaborador</SelectItem>
               </SelectContent>
             </Select>
           </div>
