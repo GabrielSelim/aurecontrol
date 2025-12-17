@@ -211,7 +211,96 @@ const Pagamentos = () => {
     }
   };
 
+  const sendPaymentNotification = async (
+    paymentId: string,
+    email: string,
+    userName: string,
+    amount: number,
+    referenceMonth: string,
+    status: "approved" | "rejected"
+  ) => {
+    try {
+      const formattedAmount = formatCurrency(amount);
+      const formattedMonth = format(new Date(referenceMonth), "MMMM/yyyy", { locale: ptBR });
+      
+      const statusText = status === "approved" ? "Aprovado" : "Rejeitado";
+      const statusColor = status === "approved" ? "#22c55e" : "#ef4444";
+      const statusIcon = status === "approved" ? "✅" : "❌";
+      
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .status-badge { display: inline-block; background: ${statusColor}; color: white; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; }
+    .info-box { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+    .info-row:last-child { border-bottom: none; }
+    .label { color: #666; }
+    .value { font-weight: bold; color: #333; }
+    .amount { font-size: 24px; color: #667eea; }
+    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${statusIcon} Pagamento ${statusText}</h1>
+    </div>
+    <div class="content">
+      <p>Olá <strong>${userName}</strong>,</p>
+      <p>Seu pagamento foi <span class="status-badge">${statusText}</span></p>
+      
+      <div class="info-box">
+        <div class="info-row">
+          <span class="label">Mês de Referência</span>
+          <span class="value">${formattedMonth}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Valor</span>
+          <span class="value amount">${formattedAmount}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Status</span>
+          <span class="value">${statusText}</span>
+        </div>
+      </div>
+      
+      ${status === "approved" 
+        ? "<p>O pagamento foi processado e deve estar disponível em breve.</p>" 
+        : "<p>Entre em contato com o departamento financeiro para mais informações.</p>"}
+      
+      <div class="footer">
+        <p>Este é um email automático do Aure System.</p>
+        <p>Por favor, não responda a este email.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+      `;
+
+      await supabase.functions.invoke("send-email", {
+        body: {
+          to: email,
+          subject: `${statusIcon} Pagamento ${statusText} - ${formattedMonth}`,
+          html,
+          from_name: "Aure System",
+        },
+      });
+    } catch (error) {
+      console.error("Error sending payment notification:", error);
+    }
+  };
+
   const handleApprovePayment = async (paymentId: string) => {
+    const payment = pagamentos.find(p => p.id === paymentId);
+    
     try {
       const { error } = await supabase
         .from("payments")
@@ -226,6 +315,19 @@ const Pagamentos = () => {
       if (error) throw error;
 
       toast.success("Pagamento aprovado!");
+      
+      // Send notification email
+      if (payment?.profile?.email) {
+        sendPaymentNotification(
+          paymentId,
+          payment.profile.email,
+          payment.profile.full_name,
+          Number(payment.amount),
+          payment.reference_month,
+          "approved"
+        );
+      }
+      
       fetchPagamentos();
     } catch (error) {
       console.error("Error approving payment:", error);
@@ -234,6 +336,8 @@ const Pagamentos = () => {
   };
 
   const handleRejectPayment = async (paymentId: string) => {
+    const payment = pagamentos.find(p => p.id === paymentId);
+    
     try {
       const { error } = await supabase
         .from("payments")
@@ -243,6 +347,19 @@ const Pagamentos = () => {
       if (error) throw error;
 
       toast.success("Pagamento rejeitado");
+      
+      // Send notification email
+      if (payment?.profile?.email) {
+        sendPaymentNotification(
+          paymentId,
+          payment.profile.email,
+          payment.profile.full_name,
+          Number(payment.amount),
+          payment.reference_month,
+          "rejected"
+        );
+      }
+      
       fetchPagamentos();
     } catch (error) {
       console.error("Error rejecting payment:", error);
