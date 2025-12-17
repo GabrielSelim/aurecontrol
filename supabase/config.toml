@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.generate-monthly-billings]
 verify_jwt = false
+
+[functions.billing-due-reminder]
+verify_jwt = false
