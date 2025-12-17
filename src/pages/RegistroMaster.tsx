@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
+import { formatCPF, formatPhone, validateCPF, validatePhone } from "@/lib/masks";
 
 const formSchema = z.object({
   fullName: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
@@ -37,24 +38,32 @@ const RegistroMaster = () => {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
 
+  const [errors, setErrors] = useState({
+    cpf: "",
+    phone: "",
+  });
+
   const { signUpAsMasterAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    return numbers
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
-      .slice(0, 14);
+  const handleCPFChange = (value: string) => {
+    const formatted = formatCPF(value);
+    setCpf(formatted);
+    if (formatted.length === 14) {
+      setErrors(prev => ({ ...prev, cpf: validateCPF(formatted) ? "" : "CPF inválido" }));
+    } else {
+      setErrors(prev => ({ ...prev, cpf: "" }));
+    }
   };
 
-  const formatPhone = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    return numbers
-      .replace(/(\d{2})(\d)/, "($1) $2")
-      .replace(/(\d{5})(\d)/, "$1-$2")
-      .slice(0, 15);
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhone(value);
+    setPhone(formatted);
+    if (formatted.length >= 14) {
+      setErrors(prev => ({ ...prev, phone: validatePhone(formatted) ? "" : "Telefone inválido" }));
+    } else {
+      setErrors(prev => ({ ...prev, phone: "" }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,10 +205,12 @@ const RegistroMaster = () => {
                 type="text"
                 placeholder="000.000.000-00"
                 value={cpf}
-                onChange={(e) => setCpf(formatCPF(e.target.value))}
+                onChange={(e) => handleCPFChange(e.target.value)}
                 required
-                className="h-12"
+                maxLength={14}
+                className={`h-12 ${errors.cpf ? "border-destructive" : ""}`}
               />
+              {errors.cpf && <p className="text-sm text-destructive">{errors.cpf}</p>}
             </div>
 
             <div className="space-y-2">
@@ -209,10 +220,12 @@ const RegistroMaster = () => {
                 type="tel"
                 placeholder="(00) 00000-0000"
                 value={phone}
-                onChange={(e) => setPhone(formatPhone(e.target.value))}
+                onChange={(e) => handlePhoneChange(e.target.value)}
                 required
-                className="h-12"
+                maxLength={15}
+                className={`h-12 ${errors.phone ? "border-destructive" : ""}`}
               />
+              {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
             </div>
 
             <div className="space-y-2">

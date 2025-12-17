@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, UserPlus, MoreHorizontal, Mail, Phone } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, Phone } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
+import { formatCPF, formatPhone } from "@/lib/masks";
 
 interface Colaborador {
   id: string;
@@ -112,17 +113,20 @@ const Colaboradores = () => {
     return variants[role] || "outline";
   };
 
-  const formatCPF = (cpf: string | null) => {
+  const displayCPF = (cpf: string | null) => {
     if (!cpf) return "-";
-    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+    // If already formatted, return as is
+    if (cpf.includes(".")) return cpf;
+    // Otherwise format it
+    return formatCPF(cpf);
   };
 
-  const formatPhone = (phone: string | null) => {
+  const displayPhone = (phone: string | null) => {
     if (!phone) return "-";
-    if (phone.length === 11) {
-      return phone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-    }
-    return phone.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+    // If already formatted, return as is
+    if (phone.includes("(")) return phone;
+    // Otherwise format it
+    return formatPhone(phone);
   };
 
   const filteredColaboradores = colaboradores.filter(
@@ -242,11 +246,11 @@ const Colaboradores = () => {
                       <TableCell className="hidden md:table-cell">
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Phone className="h-3 w-3" />
-                          {formatPhone(colaborador.phone)}
+                          {displayPhone(colaborador.phone)}
                         </div>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
-                        <span className="text-sm">{formatCPF(colaborador.cpf)}</span>
+                        <span className="text-sm">{displayCPF(colaborador.cpf)}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

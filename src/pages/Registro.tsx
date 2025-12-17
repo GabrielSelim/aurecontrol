@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
+import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
 
 const step1Schema = z.object({
   fullName: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
@@ -60,6 +61,12 @@ const Registro = () => {
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [cnpj, setCnpj] = useState("");
+  
+  const [errors, setErrors] = useState({
+    cpf: "",
+    phone: "",
+    cnpj: "",
+  });
 
   const { signUp, signUpWithInvite } = useAuth();
   const navigate = useNavigate();
@@ -96,31 +103,34 @@ const Registro = () => {
     fetchInvite();
   }, [inviteToken]);
 
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    return numbers
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
-      .slice(0, 14);
+  const handleCPFChange = (value: string) => {
+    const formatted = formatCPF(value);
+    setCpf(formatted);
+    if (formatted.length === 14) {
+      setErrors(prev => ({ ...prev, cpf: validateCPF(formatted) ? "" : "CPF inválido" }));
+    } else {
+      setErrors(prev => ({ ...prev, cpf: "" }));
+    }
   };
 
-  const formatPhone = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    return numbers
-      .replace(/(\d{2})(\d)/, "($1) $2")
-      .replace(/(\d{5})(\d)/, "$1-$2")
-      .slice(0, 15);
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhone(value);
+    setPhone(formatted);
+    if (formatted.length >= 14) {
+      setErrors(prev => ({ ...prev, phone: validatePhone(formatted) ? "" : "Telefone inválido" }));
+    } else {
+      setErrors(prev => ({ ...prev, phone: "" }));
+    }
   };
 
-  const formatCNPJ = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    return numbers
-      .replace(/(\d{2})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1/$2")
-      .replace(/(\d{4})(\d{1,2})/, "$1-$2")
-      .slice(0, 18);
+  const handleCNPJChange = (value: string) => {
+    const formatted = formatCNPJ(value);
+    setCnpj(formatted);
+    if (formatted.length === 18) {
+      setErrors(prev => ({ ...prev, cnpj: validateCNPJ(formatted) ? "" : "CNPJ inválido" }));
+    } else {
+      setErrors(prev => ({ ...prev, cnpj: "" }));
+    }
   };
 
   const getRoleLabel = (role: string) => {
@@ -396,10 +406,12 @@ const Registro = () => {
                     type="text"
                     placeholder="000.000.000-00"
                     value={cpf}
-                    onChange={(e) => setCpf(formatCPF(e.target.value))}
+                    onChange={(e) => handleCPFChange(e.target.value)}
                     required
-                    className="h-12"
+                    maxLength={14}
+                    className={`h-12 ${errors.cpf ? "border-destructive" : ""}`}
                   />
+                  {errors.cpf && <p className="text-sm text-destructive">{errors.cpf}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -409,10 +421,12 @@ const Registro = () => {
                     type="tel"
                     placeholder="(00) 00000-0000"
                     value={phone}
-                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
                     required
-                    className="h-12"
+                    maxLength={15}
+                    className={`h-12 ${errors.phone ? "border-destructive" : ""}`}
                   />
+                  {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -496,10 +510,12 @@ const Registro = () => {
                     type="text"
                     placeholder="00.000.000/0000-00"
                     value={cnpj}
-                    onChange={(e) => setCnpj(formatCNPJ(e.target.value))}
+                    onChange={(e) => handleCNPJChange(e.target.value)}
                     required
-                    className="h-12"
+                    maxLength={18}
+                    className={`h-12 ${errors.cnpj ? "border-destructive" : ""}`}
                   />
+                  {errors.cnpj && <p className="text-sm text-destructive">{errors.cnpj}</p>}
                 </div>
 
                 <div className="space-y-4 pt-4">
