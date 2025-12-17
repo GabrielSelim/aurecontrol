@@ -14,16 +14,18 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, UserPlus, MoreHorizontal, Phone } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { formatCPF, formatPhone } from "@/lib/masks";
+import { toast } from "sonner";
 
 interface Colaborador {
   id: string;
@@ -127,6 +129,33 @@ const Colaboradores = () => {
     if (phone.includes("(")) return phone;
     // Otherwise format it
     return formatPhone(phone);
+  };
+
+  const toggleColaboradorStatus = async (colaborador: Colaborador) => {
+    try {
+      const newStatus = !colaborador.is_active;
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_active: newStatus })
+        .eq("id", colaborador.id);
+
+      if (error) throw error;
+
+      setColaboradores(prev =>
+        prev.map(c =>
+          c.id === colaborador.id ? { ...c, is_active: newStatus } : c
+        )
+      );
+
+      toast.success(
+        newStatus
+          ? `${colaborador.full_name} foi ativado`
+          : `${colaborador.full_name} foi desativado`
+      );
+    } catch (error) {
+      console.error("Error toggling status:", error);
+      toast.error("Erro ao alterar status do colaborador");
+    }
   };
 
   const filteredColaboradores = colaboradores.filter(
@@ -282,8 +311,22 @@ const Colaboradores = () => {
                                 <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}/editar`)}>
                                   Editar
                                 </DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive">
-                                  Desativar
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => toggleColaboradorStatus(colaborador)}
+                                  className={colaborador.is_active ? "text-destructive" : "text-primary"}
+                                >
+                                  {colaborador.is_active ? (
+                                    <>
+                                      <UserX className="mr-2 h-4 w-4" />
+                                      Desativar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserCheck className="mr-2 h-4 w-4" />
+                                      Ativar
+                                    </>
+                                  )}
                                 </DropdownMenuItem>
                               </>
                             )}
