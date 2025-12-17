@@ -294,88 +294,106 @@ const Colaboradores = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Card 
-              className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "all" ? "ring-2 ring-primary" : ""}`}
-              onClick={() => setStatusFilter("all")}
-            >
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="animate-pulse">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-1">
-                      <p className="text-sm font-medium text-muted-foreground">Total</p>
-                      <Info className="h-3 w-3 text-muted-foreground/50" />
-                    </div>
-                    <p className="text-2xl font-bold">{colaboradores.length}</p>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-8 w-12" />
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-primary" />
-                  </div>
+                  <Skeleton className="h-10 w-10 rounded-full" />
                 </div>
               </CardContent>
             </Card>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Total de colaboradores cadastrados na empresa</p>
-          </TooltipContent>
-        </Tooltip>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "all" ? "ring-2 ring-primary" : ""}`}
+                onClick={() => setStatusFilter("all")}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-muted-foreground">Total</p>
+                        <Info className="h-3 w-3 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-2xl font-bold">{colaboradores.length}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Total de colaboradores cadastrados na empresa</p>
+            </TooltipContent>
+          </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Card 
-              className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "active" ? "ring-2 ring-green-500" : ""}`}
-              onClick={() => setStatusFilter("active")}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-1">
-                      <p className="text-sm font-medium text-muted-foreground">Ativos</p>
-                      <Info className="h-3 w-3 text-muted-foreground/50" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "active" ? "ring-2 ring-green-500" : ""}`}
+                onClick={() => setStatusFilter("active")}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-muted-foreground">Ativos</p>
+                        <Info className="h-3 w-3 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-2xl font-bold text-green-600">{activeCount}</p>
                     </div>
-                    <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+                    <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                      <UserCheck className="h-5 w-5 text-green-600" />
+                    </div>
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                    <UserCheck className="h-5 w-5 text-green-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Colaboradores com acesso ativo ao sistema</p>
-          </TooltipContent>
-        </Tooltip>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Colaboradores com acesso ativo ao sistema</p>
+            </TooltipContent>
+          </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Card 
-              className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "inactive" ? "ring-2 ring-muted-foreground" : ""}`}
-              onClick={() => setStatusFilter("inactive")}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-1">
-                      <p className="text-sm font-medium text-muted-foreground">Inativos</p>
-                      <Info className="h-3 w-3 text-muted-foreground/50" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "inactive" ? "ring-2 ring-muted-foreground" : ""}`}
+                onClick={() => setStatusFilter("inactive")}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-muted-foreground">Inativos</p>
+                        <Info className="h-3 w-3 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-2xl font-bold text-muted-foreground">{inactiveCount}</p>
                     </div>
-                    <p className="text-2xl font-bold text-muted-foreground">{inactiveCount}</p>
+                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                      <UserX className="h-5 w-5 text-muted-foreground" />
+                    </div>
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                    <UserX className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Colaboradores desativados sem acesso ao sistema</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Colaboradores desativados sem acesso ao sistema</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
 
       {/* Search */}
       <Card>
