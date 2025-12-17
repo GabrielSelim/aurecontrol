@@ -14,7 +14,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Filter } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -44,6 +51,7 @@ const Colaboradores = () => {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   useEffect(() => {
     const fetchColaboradores = async () => {
@@ -158,11 +166,18 @@ const Colaboradores = () => {
     }
   };
 
-  const filteredColaboradores = colaboradores.filter(
-    (c) =>
+  const filteredColaboradores = colaboradores.filter((c) => {
+    const matchesSearch =
       c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      c.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && c.is_active) ||
+      (statusFilter === "inactive" && !c.is_active);
+    
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="space-y-6">
@@ -191,8 +206,8 @@ const Colaboradores = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 mb-6">
-            <div className="relative flex-1 max-w-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
+            <div className="relative flex-1 w-full sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome ou e-mail..."
@@ -201,6 +216,17 @@ const Colaboradores = () => {
                 className="pl-10"
               />
             </div>
+            <Select value={statusFilter} onValueChange={(value: "all" | "active" | "inactive") => setStatusFilter(value)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Filtrar por status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="active">Ativos</SelectItem>
+                <SelectItem value="inactive">Inativos</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Table */}
