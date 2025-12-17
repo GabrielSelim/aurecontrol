@@ -274,10 +274,14 @@ const Colaboradores = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver detalhes</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}/editar`)}>
+                              Ver detalhes
+                            </DropdownMenuItem>
                             {isAdmin() && (
                               <>
-                                <DropdownMenuItem>Editar</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}/editar`)}>
+                                  Editar
+                                </DropdownMenuItem>
                                 <DropdownMenuItem className="text-destructive">
                                   Desativar
                                 </DropdownMenuItem>
