@@ -42,7 +42,7 @@ function DashboardRoutes() {
           <Route path="convites" element={<Convites />} />
           <Route path="empresa" element={<Empresa />} />
           <Route path="empresas" element={<Empresas />} />
-          <Route path="assinaturas" element={<div className="text-center py-12 text-muted-foreground">Página de Assinaturas em desenvolvimento</div>} />
+          <Route path="faturamento" element={<div className="text-center py-12 text-muted-foreground">Página de Faturamento em desenvolvimento</div>} />
           <Route path="configuracoes" element={<div className="text-center py-12 text-muted-foreground">Página de Configurações em desenvolvimento</div>} />
         </Routes>
       </DashboardLayout>

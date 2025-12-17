@@ -42,7 +42,7 @@ const adminNavigation = [
 const masterAdminNavigation = [
   { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
   { name: "Empresas", href: "/dashboard/empresas", icon: Building2 },
-  { name: "Assinaturas", href: "/dashboard/assinaturas", icon: CreditCard },
+  { name: "Faturamento", href: "/dashboard/faturamento", icon: CreditCard },
   { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
 ];
 
