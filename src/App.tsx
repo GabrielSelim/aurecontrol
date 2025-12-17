@@ -9,6 +9,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Registro from "./pages/Registro";
+import RegistroMaster from "./pages/RegistroMaster";
 import RecuperarSenha from "./pages/RecuperarSenha";
 import AtualizarSenha from "./pages/AtualizarSenha";
 import DashboardOverview from "./pages/dashboard/DashboardOverview";
@@ -51,6 +52,7 @@ function AppRoutes() {
       <Route path="/" element={<Index />} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/registro" element={<PublicRoute><Registro /></PublicRoute>} />
+      <Route path="/registro-master" element={<PublicRoute><RegistroMaster /></PublicRoute>} />
       <Route path="/recuperar-senha" element={<PublicRoute><RecuperarSenha /></PublicRoute>} />
       <Route path="/atualizar-senha" element={<AtualizarSenha />} />
       <Route path="/dashboard/*" element={<DashboardRoutes />} />

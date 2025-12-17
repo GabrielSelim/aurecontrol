@@ -333,6 +333,16 @@ export type Database = {
         }
         Returns: Json
       }
+      handle_master_admin_signup: {
+        Args: {
+          _cpf: string
+          _email: string
+          _full_name: string
+          _phone: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       handle_new_user_signup: {
         Args: {
           _cnpj: string
