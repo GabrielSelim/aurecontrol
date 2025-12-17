@@ -53,6 +53,94 @@ export type Database = {
         }
         Relationships: []
       }
+      company_billings: {
+        Row: {
+          company_id: string
+          coupon_id: string | null
+          created_at: string | null
+          discount_amount: number | null
+          discount_description: string | null
+          due_date: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          payment_method: string | null
+          payment_proof_url: string | null
+          pj_contracts_count: number
+          promotion_id: string | null
+          reference_month: string
+          status: string
+          subtotal: number
+          total: number
+          unit_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          coupon_id?: string | null
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_description?: string | null
+          due_date: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_proof_url?: string | null
+          pj_contracts_count?: number
+          promotion_id?: string | null
+          reference_month: string
+          status?: string
+          subtotal: number
+          total: number
+          unit_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          coupon_id?: string | null
+          created_at?: string | null
+          discount_amount?: number | null
+          discount_description?: string | null
+          due_date?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_proof_url?: string | null
+          pj_contracts_count?: number
+          promotion_id?: string | null
+          reference_month?: string
+          status?: string
+          subtotal?: number
+          total?: number
+          unit_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_billings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_billings_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "discount_coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_billings_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
           company_id: string
