@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { User, Building2, Lock, Camera, Loader2, Save } from "lucide-react";
+import { formatCPF, formatPhone, validateCPF, validatePhone } from "@/lib/masks";
 
 interface ProfileData {
   full_name: string;
@@ -47,6 +48,11 @@ export default function Perfil() {
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
+  });
+
+  const [errors, setErrors] = useState({
+    cpf: "",
+    phone: "",
   });
 
   useEffect(() => {
@@ -151,8 +157,49 @@ export default function Perfil() {
     }
   };
 
+  const handleCPFChange = (value: string) => {
+    const formatted = formatCPF(value);
+    setProfileData((prev) => ({ ...prev, cpf: formatted }));
+    
+    if (formatted.length === 14) {
+      if (!validateCPF(formatted)) {
+        setErrors((prev) => ({ ...prev, cpf: "CPF inválido" }));
+      } else {
+        setErrors((prev) => ({ ...prev, cpf: "" }));
+      }
+    } else {
+      setErrors((prev) => ({ ...prev, cpf: "" }));
+    }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const formatted = formatPhone(value);
+    setProfileData((prev) => ({ ...prev, phone: formatted }));
+    
+    if (formatted.length >= 14) {
+      if (!validatePhone(formatted)) {
+        setErrors((prev) => ({ ...prev, phone: "Telefone inválido" }));
+      } else {
+        setErrors((prev) => ({ ...prev, phone: "" }));
+      }
+    } else {
+      setErrors((prev) => ({ ...prev, phone: "" }));
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!user) return;
+
+    // Validate before saving
+    if (profileData.cpf && profileData.cpf.length === 14 && !validateCPF(profileData.cpf)) {
+      toast.error("CPF inválido");
+      return;
+    }
+
+    if (profileData.phone && profileData.phone.length >= 14 && !validatePhone(profileData.phone)) {
+      toast.error("Telefone inválido");
+      return;
+    }
     
     setIsSaving(true);
     try {
@@ -325,28 +372,28 @@ export default function Perfil() {
                       <Input
                         id="cpf"
                         value={profileData.cpf || ""}
-                        onChange={(e) =>
-                          setProfileData((prev) => ({
-                            ...prev,
-                            cpf: e.target.value,
-                          }))
-                        }
+                        onChange={(e) => handleCPFChange(e.target.value)}
                         placeholder="000.000.000-00"
+                        maxLength={14}
+                        className={errors.cpf ? "border-destructive" : ""}
                       />
+                      {errors.cpf && (
+                        <p className="text-sm text-destructive">{errors.cpf}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone">Telefone</Label>
                       <Input
                         id="phone"
                         value={profileData.phone || ""}
-                        onChange={(e) =>
-                          setProfileData((prev) => ({
-                            ...prev,
-                            phone: e.target.value,
-                          }))
-                        }
+                        onChange={(e) => handlePhoneChange(e.target.value)}
                         placeholder="(00) 00000-0000"
+                        maxLength={15}
+                        className={errors.phone ? "border-destructive" : ""}
                       />
+                      {errors.phone && (
+                        <p className="text-sm text-destructive">{errors.phone}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex justify-end">
