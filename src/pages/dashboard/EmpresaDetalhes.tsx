@@ -6,6 +6,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -26,6 +37,7 @@ import {
   MapPin,
   Calendar,
   Edit,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -98,6 +110,15 @@ const EmpresaDetalhes = () => {
   const [billings, setBillings] = useState<Billing[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    is_active: true,
+  });
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeContracts: 0,
@@ -297,6 +318,69 @@ const EmpresaDetalhes = () => {
     );
   };
 
+  const openEditDialog = () => {
+    if (company) {
+      setEditForm({
+        name: company.name,
+        email: company.email || "",
+        phone: company.phone || "",
+        address: company.address || "",
+        is_active: company.is_active,
+      });
+      setIsEditOpen(true);
+    }
+  };
+
+  const handleUpdateCompany = async () => {
+    if (!company || !editForm.name.trim()) {
+      toast.error("Nome da empresa é obrigatório");
+      return;
+    }
+
+    if (editForm.name.trim().length > 200) {
+      toast.error("Nome da empresa deve ter no máximo 200 caracteres");
+      return;
+    }
+
+    if (editForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.email.trim())) {
+      toast.error("E-mail inválido");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("companies")
+        .update({
+          name: editForm.name.trim(),
+          email: editForm.email.trim() || null,
+          phone: editForm.phone.trim() || null,
+          address: editForm.address.trim() || null,
+          is_active: editForm.is_active,
+        })
+        .eq("id", company.id);
+
+      if (error) throw error;
+
+      setCompany({
+        ...company,
+        name: editForm.name.trim(),
+        email: editForm.email.trim() || null,
+        phone: editForm.phone.trim() || null,
+        address: editForm.address.trim() || null,
+        is_active: editForm.is_active,
+      });
+
+      toast.success("Empresa atualizada com sucesso");
+      setIsEditOpen(false);
+    } catch (error) {
+      console.error("Error updating company:", error);
+      toast.error("Erro ao atualizar empresa");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -337,7 +421,7 @@ const EmpresaDetalhes = () => {
           <Badge variant={company.is_active ? "default" : "secondary"} className="text-sm">
             {company.is_active ? "Ativa" : "Inativa"}
           </Badge>
-          <Button variant="outline" onClick={() => navigate(`/dashboard/empresas/${id}/editar`)}>
+          <Button variant="outline" onClick={openEditDialog}>
             <Edit className="h-4 w-4 mr-2" />
             Editar
           </Button>
@@ -676,6 +760,83 @@ const EmpresaDetalhes = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Company Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Editar Empresa</DialogTitle>
+            <DialogDescription>
+              Atualize as informações da empresa
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome da Empresa *</Label>
+              <Input
+                id="name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="Nome da empresa"
+                maxLength={200}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <Input
+                id="email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                placeholder="email@empresa.com"
+                maxLength={255}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Telefone</Label>
+              <Input
+                id="phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                placeholder="(00) 00000-0000"
+                maxLength={20}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Endereço</Label>
+              <Input
+                id="address"
+                value={editForm.address}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                placeholder="Endereço completo"
+                maxLength={500}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="is_active">Status da Empresa</Label>
+                <p className="text-sm text-muted-foreground">
+                  {editForm.is_active ? "Empresa ativa" : "Empresa inativa"}
+                </p>
+              </div>
+              <Switch
+                id="is_active"
+                checked={editForm.is_active}
+                onCheckedChange={(checked) => setEditForm({ ...editForm, is_active: checked })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateCompany} disabled={isSaving}>
+              {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
