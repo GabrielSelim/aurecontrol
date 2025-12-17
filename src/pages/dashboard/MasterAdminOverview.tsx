@@ -3,16 +3,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, FileText, CreditCard, Plus, Eye, Settings } from "lucide-react";
+import { Building2, Users, FileText, CreditCard, Plus, Eye, Settings, TrendingUp, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 
 interface GlobalStats {
   totalCompanies: number;
+  activeCompanies: number;
   totalUsers: number;
   totalContracts: number;
-  totalPayments: number;
 }
 
 interface Company {
@@ -24,6 +24,7 @@ interface Company {
   created_at: string;
   _count?: {
     users: number;
+    contracts: number;
   };
 }
 
@@ -38,21 +39,21 @@ const MasterAdminOverview = () => {
     const fetchData = async () => {
       try {
         // Fetch global stats
-        const [companiesResult, usersResult, contractsResult, paymentsResult] = await Promise.all([
+        const [companiesResult, activeCompaniesResult, usersResult, contractsResult] = await Promise.all([
           supabase.from("companies").select("*", { count: "exact", head: true }),
+          supabase.from("companies").select("*", { count: "exact", head: true }).eq("is_active", true),
           supabase.from("profiles").select("*", { count: "exact", head: true }),
           supabase.from("contracts").select("*", { count: "exact", head: true }),
-          supabase.from("payments").select("*", { count: "exact", head: true }),
         ]);
 
         setStats({
           totalCompanies: companiesResult.count || 0,
+          activeCompanies: activeCompaniesResult.count || 0,
           totalUsers: usersResult.count || 0,
           totalContracts: contractsResult.count || 0,
-          totalPayments: paymentsResult.count || 0,
         });
 
-        // Fetch companies list with user count
+        // Fetch companies list with counts
         const { data: companiesData } = await supabase
           .from("companies")
           .select("*")
@@ -60,16 +61,15 @@ const MasterAdminOverview = () => {
           .limit(5);
 
         if (companiesData) {
-          // Get user counts for each company
           const companiesWithCounts = await Promise.all(
             companiesData.map(async (company) => {
-              const { count } = await supabase
-                .from("profiles")
-                .select("*", { count: "exact", head: true })
-                .eq("company_id", company.id);
+              const [usersResult, contractsResult] = await Promise.all([
+                supabase.from("profiles").select("*", { count: "exact", head: true }).eq("company_id", company.id),
+                supabase.from("contracts").select("*", { count: "exact", head: true }).eq("company_id", company.id),
+              ]);
               return {
                 ...company,
-                _count: { users: count || 0 },
+                _count: { users: usersResult.count || 0, contracts: contractsResult.count || 0 },
               };
             })
           );
@@ -103,7 +103,7 @@ const MasterAdminOverview = () => {
             Olá, {profile?.full_name?.split(" ")[0]}!
           </h1>
           <p className="text-muted-foreground mt-1">
-            Painel de administração global do sistema
+            Painel de administração do sistema Aure
           </p>
         </div>
         <Button onClick={() => navigate("/dashboard/empresas/nova")}>
@@ -116,7 +116,7 @@ const MasterAdminOverview = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Empresas</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Empresas</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -133,7 +133,24 @@ const MasterAdminOverview = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuários</CardTitle>
+            <CardTitle className="text-sm font-medium">Empresas Ativas</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats?.activeCompanies}</div>
+                <p className="text-xs text-muted-foreground">Com assinatura ativa</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -142,7 +159,7 @@ const MasterAdminOverview = () => {
             ) : (
               <>
                 <div className="text-2xl font-bold">{stats?.totalUsers}</div>
-                <p className="text-xs text-muted-foreground">Total de usuários</p>
+                <p className="text-xs text-muted-foreground">Em todas as empresas</p>
               </>
             )}
           </CardContent>
@@ -150,7 +167,7 @@ const MasterAdminOverview = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Contratos</CardTitle>
+            <CardTitle className="text-sm font-medium">Total de Contratos</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -159,24 +176,7 @@ const MasterAdminOverview = () => {
             ) : (
               <>
                 <div className="text-2xl font-bold">{stats?.totalContracts}</div>
-                <p className="text-xs text-muted-foreground">Em todo o sistema</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pagamentos</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{stats?.totalPayments}</div>
-                <p className="text-xs text-muted-foreground">Registrados</p>
+                <p className="text-xs text-muted-foreground">Gerenciados no sistema</p>
               </>
             )}
           </CardContent>
@@ -233,13 +233,13 @@ const MasterAdminOverview = () => {
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {formatCNPJ(company.cnpj)} • {company._count?.users || 0} usuários
+                        {formatCNPJ(company.cnpj)} • {company._count?.users || 0} usuários • {company._count?.contracts || 0} contratos
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-muted-foreground mr-4">
-                      Criada em {formatDate(company.created_at || "")}
+                      {formatDate(company.created_at || "")}
                     </p>
                     <Button
                       variant="ghost"
@@ -247,13 +247,6 @@ const MasterAdminOverview = () => {
                       onClick={() => navigate(`/dashboard/empresas/${company.id}`)}
                     >
                       <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate(`/dashboard/empresas/${company.id}/editar`)}
-                    >
-                      <Settings className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -264,42 +257,43 @@ const MasterAdminOverview = () => {
       </Card>
 
       {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Ações Rápidas</CardTitle>
-          <CardDescription>Gerencie o sistema de forma eficiente</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button
-            onClick={() => navigate("/dashboard/empresas")}
-            className="flex flex-col items-center justify-center p-4 rounded-lg border border-border hover:bg-muted transition-colors"
-          >
-            <Building2 className="h-8 w-8 text-primary mb-2" />
-            <span className="text-sm font-medium">Gerenciar Empresas</span>
-          </button>
-          <button
-            onClick={() => navigate("/dashboard/usuarios")}
-            className="flex flex-col items-center justify-center p-4 rounded-lg border border-border hover:bg-muted transition-colors"
-          >
-            <Users className="h-8 w-8 text-primary mb-2" />
-            <span className="text-sm font-medium">Todos os Usuários</span>
-          </button>
-          <button
-            onClick={() => navigate("/dashboard/contratos")}
-            className="flex flex-col items-center justify-center p-4 rounded-lg border border-border hover:bg-muted transition-colors"
-          >
-            <FileText className="h-8 w-8 text-primary mb-2" />
-            <span className="text-sm font-medium">Todos os Contratos</span>
-          </button>
-          <button
-            onClick={() => navigate("/dashboard/pagamentos")}
-            className="flex flex-col items-center justify-center p-4 rounded-lg border border-border hover:bg-muted transition-colors"
-          >
-            <CreditCard className="h-8 w-8 text-primary mb-2" />
-            <span className="text-sm font-medium">Todos os Pagamentos</span>
-          </button>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Ações Rápidas</CardTitle>
+            <CardDescription>Gerencie o sistema</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => navigate("/dashboard/empresas")}
+              className="flex flex-col items-center justify-center p-4 rounded-lg border border-border hover:bg-muted transition-colors"
+            >
+              <Building2 className="h-8 w-8 text-primary mb-2" />
+              <span className="text-sm font-medium">Gerenciar Empresas</span>
+            </button>
+            <button
+              onClick={() => navigate("/dashboard/assinaturas")}
+              className="flex flex-col items-center justify-center p-4 rounded-lg border border-border hover:bg-muted transition-colors"
+            >
+              <CreditCard className="h-8 w-8 text-primary mb-2" />
+              <span className="text-sm font-medium">Ver Assinaturas</span>
+            </button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Alertas do Sistema</CardTitle>
+            <CardDescription>Notificações importantes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-6 text-muted-foreground">
+              <AlertCircle className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p className="text-sm">Nenhum alerta no momento</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
