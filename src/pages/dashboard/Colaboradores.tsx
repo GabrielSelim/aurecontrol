@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Filter } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Filter, Users } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -194,6 +194,9 @@ const Colaboradores = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const activeCount = colaboradores.filter(c => c.is_active).length;
+  const inactiveCount = colaboradores.filter(c => !c.is_active).length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -210,6 +213,49 @@ const Colaboradores = () => {
             Convidar
           </Button>
         )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total</p>
+                <p className="text-2xl font-bold">{colaboradores.length}</p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Ativos</p>
+                <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+                <UserCheck className="h-5 w-5 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Inativos</p>
+                <p className="text-2xl font-bold text-muted-foreground">{inactiveCount}</p>
+              </div>
+              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                <UserX className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Search */}
