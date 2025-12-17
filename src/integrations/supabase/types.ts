@@ -126,6 +126,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "company_billings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "company_billings_coupon_id_fkey"
             columns: ["coupon_id"]
             isOneToOne: false
@@ -202,6 +209,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -296,6 +310,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "invites_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notification_logs: {
@@ -335,6 +356,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -400,10 +428,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payments_contract_id_fkey"
             columns: ["contract_id"]
             isOneToOne: false
             referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -487,6 +529,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -583,9 +632,180 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      companies_secure: {
+        Row: {
+          address: string | null
+          cnpj: string | null
+          created_at: string | null
+          email: string | null
+          id: string | null
+          is_active: boolean | null
+          logo_url: string | null
+          name: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: never
+          cnpj?: string | null
+          created_at?: string | null
+          email?: never
+          id?: string | null
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string | null
+          phone?: never
+          updated_at?: string | null
+        }
+        Update: {
+          address?: never
+          cnpj?: string | null
+          created_at?: string | null
+          email?: never
+          id?: string | null
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string | null
+          phone?: never
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      contracts_secure: {
+        Row: {
+          company_id: string | null
+          contract_type: Database["public"]["Enums"]["contract_type"] | null
+          created_at: string | null
+          created_by: string | null
+          department: string | null
+          document_url: string | null
+          end_date: string | null
+          hourly_rate: number | null
+          id: string | null
+          job_title: string | null
+          notes: string | null
+          salary: number | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["contract_status"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"] | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          document_url?: string | null
+          end_date?: string | null
+          hourly_rate?: never
+          id?: string | null
+          job_title?: string | null
+          notes?: string | null
+          salary?: never
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["contract_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          contract_type?: Database["public"]["Enums"]["contract_type"] | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          document_url?: string | null
+          end_date?: string | null
+          hourly_rate?: never
+          id?: string | null
+          job_title?: string | null
+          notes?: string | null
+          salary?: never
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["contract_status"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles_secure: {
+        Row: {
+          avatar_url: string | null
+          company_id: string | null
+          cpf: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          phone: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          company_id?: string | null
+          cpf?: never
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          phone?: never
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          company_id?: string | null
+          cpf?: never
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          phone?: never
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      can_view_sensitive_profile_data: {
+        Args: { _target_company_id: string; _user_id: string }
+        Returns: boolean
+      }
       get_invite_by_token: {
         Args: { _token: string }
         Returns: {
@@ -638,6 +858,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin_or_financeiro: { Args: { _user_id: string }; Returns: boolean }
       is_company_admin: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
