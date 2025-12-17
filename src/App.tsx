@@ -14,6 +14,7 @@ import RecuperarSenha from "./pages/RecuperarSenha";
 import AtualizarSenha from "./pages/AtualizarSenha";
 import DashboardHome from "./pages/dashboard/DashboardHome";
 import Colaboradores from "./pages/dashboard/Colaboradores";
+import ColaboradorEditar from "./pages/dashboard/ColaboradorEditar";
 import Contratos from "./pages/dashboard/Contratos";
 import Pagamentos from "./pages/dashboard/Pagamentos";
 import Convites from "./pages/dashboard/Convites";
@@ -42,6 +43,7 @@ function DashboardRoutes() {
         <Routes>
           <Route index element={<DashboardHome />} />
           <Route path="colaboradores" element={<Colaboradores />} />
+          <Route path="colaboradores/:id/editar" element={<ColaboradorEditar />} />
           <Route path="contratos" element={<Contratos />} />
           <Route path="pagamentos" element={<Pagamentos />} />
           <Route path="convites" element={<Convites />} />
