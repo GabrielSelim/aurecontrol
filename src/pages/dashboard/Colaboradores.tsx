@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Users, Download, ChevronLeft, ChevronRight, ArrowUpDown, X, Info } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Users, Download, ChevronLeft, ChevronRight, ArrowUpDown, X, Info, LayoutGrid, List, Mail, Building2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -56,6 +56,7 @@ interface Colaborador {
   is_active: boolean;
   created_at: string;
   roles: { role: string }[];
+  department: string | null;
 }
 
 const Colaboradores = () => {
@@ -66,11 +67,13 @@ const Colaboradores = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"name" | "email" | "created_at">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [colaboradorToToggle, setColaboradorToToggle] = useState<Colaborador | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
   useEffect(() => {
     const fetchColaboradores = async () => {
@@ -85,22 +88,31 @@ const Colaboradores = () => {
 
         if (error) throw error;
 
-        // Fetch roles for each profile
-        const colaboradoresWithRoles = await Promise.all(
+        // Fetch roles and contracts for each profile
+        const colaboradoresWithRolesAndDept = await Promise.all(
           (profiles || []).map(async (p) => {
-            const { data: roles } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", p.user_id);
+            const [rolesRes, contractsRes] = await Promise.all([
+              supabase
+                .from("user_roles")
+                .select("role")
+                .eq("user_id", p.user_id),
+              supabase
+                .from("contracts")
+                .select("department")
+                .eq("user_id", p.user_id)
+                .eq("status", "active")
+                .limit(1)
+            ]);
 
             return {
               ...p,
-              roles: roles || [],
+              roles: rolesRes.data || [],
+              department: contractsRes.data?.[0]?.department || null,
             };
           })
         );
 
-        setColaboradores(colaboradoresWithRoles);
+        setColaboradores(colaboradoresWithRolesAndDept);
       } catch (error) {
         console.error("Error fetching colaboradores:", error);
       } finally {
@@ -230,8 +242,15 @@ const Colaboradores = () => {
       roleFilter === "all" ||
       c.roles.some(r => r.role === roleFilter);
     
-    return matchesSearch && matchesStatus && matchesRole;
+    const matchesDepartment =
+      departmentFilter === "all" ||
+      c.department === departmentFilter;
+    
+    return matchesSearch && matchesStatus && matchesRole && matchesDepartment;
   });
+
+  // Get unique departments for filter
+  const departments = [...new Set(colaboradores.map(c => c.department).filter(Boolean))] as string[];
 
   // Sort collaborators
   const sortedColaboradores = [...filteredColaboradores].sort((a, b) => {
@@ -249,15 +268,16 @@ const Colaboradores = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, roleFilter, sortBy, sortOrder, itemsPerPage]);
+  }, [searchTerm, statusFilter, roleFilter, departmentFilter, sortBy, sortOrder, itemsPerPage]);
 
   // Check if any filter is active
-  const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || roleFilter !== "all" || sortBy !== "name" || sortOrder !== "asc";
+  const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || roleFilter !== "all" || departmentFilter !== "all" || sortBy !== "name" || sortOrder !== "asc";
 
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
     setRoleFilter("all");
+    setDepartmentFilter("all");
     setSortBy("name");
     setSortOrder("asc");
   };
@@ -441,6 +461,20 @@ const Colaboradores = () => {
                   <SelectItem value="colaborador">Colaborador</SelectItem>
                 </SelectContent>
               </Select>
+              {departments.length > 0 && (
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <SelectTrigger className="w-full sm:w-[160px]">
+                    <Building2 className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Departamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos departamentos</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Select value={`${sortBy}-${sortOrder}`} onValueChange={(value) => {
                 const [field, order] = value.split("-") as ["name" | "email" | "created_at", "asc" | "desc"];
                 setSortBy(field);
@@ -459,6 +493,24 @@ const Colaboradores = () => {
                   <SelectItem value="created_at-asc">Mais antigos</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="flex items-center border rounded-md">
+                <Button
+                  variant={viewMode === "table" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("table")}
+                  className="rounded-r-none"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("grid")}
+                  className="rounded-l-none"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
                   <X className="h-4 w-4" />
@@ -468,142 +520,248 @@ const Colaboradores = () => {
             </div>
           </div>
 
-          {/* Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Colaborador</TableHead>
-                  <TableHead className="hidden md:table-cell">Contato</TableHead>
-                  <TableHead className="hidden lg:table-cell">CPF</TableHead>
-                  <TableHead>Cargo</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Skeleton className="h-10 w-10 rounded-full" />
-                          <div className="space-y-1">
-                            <Skeleton className="h-4 w-32" />
-                            <Skeleton className="h-3 w-40" />
+          {/* Table View */}
+          {viewMode === "table" && (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Colaborador</TableHead>
+                    <TableHead className="hidden md:table-cell">Contato</TableHead>
+                    <TableHead className="hidden lg:table-cell">CPF</TableHead>
+                    <TableHead>Cargo</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                            <div className="space-y-1">
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-3 w-40" />
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-20" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-6 w-16" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-8 w-8" />
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <Skeleton className="h-4 w-28" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-20" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-6 w-16" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-8 w-8" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : sortedColaboradores.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="h-32 text-center">
+                        <p className="text-muted-foreground">
+                          Nenhum colaborador encontrado
+                        </p>
                       </TableCell>
                     </TableRow>
-                  ))
-                ) : sortedColaboradores.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center">
-                      <p className="text-muted-foreground">
-                        Nenhum colaborador encontrado
-                      </p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedColaboradores.map((colaborador) => (
-                    <TableRow key={colaborador.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarFallback className="bg-primary/10 text-primary">
+                  ) : (
+                    paginatedColaboradores.map((colaborador) => (
+                      <TableRow key={colaborador.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                {getInitials(colaborador.full_name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{colaborador.full_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {colaborador.email}
+                              </p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Phone className="h-3 w-3" />
+                            {displayPhone(colaborador.phone)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <span className="text-sm">{displayCPF(colaborador.cpf)}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {colaborador.roles.map((r, i) => (
+                              <Badge key={i} variant={getRoleBadgeVariant(r.role)}>
+                                {getRoleLabel(r.role)}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={colaborador.is_active ? "default" : "secondary"}>
+                            {colaborador.is_active ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}`)}>
+                                Ver detalhes
+                              </DropdownMenuItem>
+                              {isAdmin() && (
+                                <>
+                                  <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}/editar`)}>
+                                    Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => setColaboradorToToggle(colaborador)}
+                                    className={colaborador.is_active ? "text-destructive" : "text-primary"}
+                                  >
+                                    {colaborador.is_active ? (
+                                      <>
+                                        <UserX className="mr-2 h-4 w-4" />
+                                        Desativar
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserCheck className="mr-2 h-4 w-4" />
+                                        Ativar
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Grid View */}
+          {viewMode === "grid" && (
+            <div>
+              {isLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardContent className="pt-6">
+                        <div className="flex flex-col items-center text-center space-y-3">
+                          <Skeleton className="h-16 w-16 rounded-full" />
+                          <Skeleton className="h-5 w-32" />
+                          <Skeleton className="h-4 w-40" />
+                          <div className="flex gap-2">
+                            <Skeleton className="h-6 w-20" />
+                            <Skeleton className="h-6 w-16" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : sortedColaboradores.length === 0 ? (
+                <div className="h-32 flex items-center justify-center text-muted-foreground">
+                  Nenhum colaborador encontrado
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {paginatedColaboradores.map((colaborador) => (
+                    <Card 
+                      key={colaborador.id} 
+                      className="hover:shadow-md transition-shadow cursor-pointer group"
+                      onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}`)}
+                    >
+                      <CardContent className="pt-6">
+                        <div className="flex flex-col items-center text-center space-y-3">
+                          <Avatar className="h-16 w-16">
+                            <AvatarFallback className="bg-primary/10 text-primary text-xl">
                               {getInitials(colaborador.full_name)}
                             </AvatarFallback>
                           </Avatar>
                           <div>
                             <p className="font-medium">{colaborador.full_name}</p>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                              <Mail className="h-3 w-3" />
                               {colaborador.email}
                             </p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          {displayPhone(colaborador.phone)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        <span className="text-sm">{displayCPF(colaborador.cpf)}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {colaborador.roles.map((r, i) => (
-                            <Badge key={i} variant={getRoleBadgeVariant(r.role)}>
-                              {getRoleLabel(r.role)}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={colaborador.is_active ? "default" : "secondary"}>
-                          {colaborador.is_active ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}`)}>
-                              Ver detalhes
-                            </DropdownMenuItem>
-                            {isAdmin() && (
-                              <>
-                                <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}/editar`)}>
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={() => setColaboradorToToggle(colaborador)}
-                                  className={colaborador.is_active ? "text-destructive" : "text-primary"}
-                                >
-                                  {colaborador.is_active ? (
-                                    <>
-                                      <UserX className="mr-2 h-4 w-4" />
-                                      Desativar
-                                    </>
-                                  ) : (
-                                    <>
-                                      <UserCheck className="mr-2 h-4 w-4" />
-                                      Ativar
-                                    </>
-                                  )}
-                                </DropdownMenuItem>
-                              </>
+                            {colaborador.phone && (
+                              <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
+                                <Phone className="h-3 w-3" />
+                                {displayPhone(colaborador.phone)}
+                              </p>
                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                            {colaborador.department && (
+                              <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
+                                <Building2 className="h-3 w-3" />
+                                {colaborador.department}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap justify-center gap-1">
+                            {colaborador.roles.map((r, i) => (
+                              <Badge key={i} variant={getRoleBadgeVariant(r.role)}>
+                                {getRoleLabel(r.role)}
+                              </Badge>
+                            ))}
+                          </div>
+                          <Badge variant={colaborador.is_active ? "default" : "secondary"}>
+                            {colaborador.is_active ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </div>
+                        <div className="mt-4 pt-4 border-t flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {isAdmin() && (
+                            <>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/dashboard/colaboradores/${colaborador.id}/editar`);
+                                }}
+                              >
+                                Editar
+                              </Button>
+                              <Button 
+                                variant={colaborador.is_active ? "destructive" : "default"} 
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setColaboradorToToggle(colaborador);
+                                }}
+                              >
+                                {colaborador.is_active ? "Desativar" : "Ativar"}
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Pagination */}
           {sortedColaboradores.length > 0 && (
