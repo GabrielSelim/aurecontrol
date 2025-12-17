@@ -12,12 +12,13 @@ import Registro from "./pages/Registro";
 import RegistroMaster from "./pages/RegistroMaster";
 import RecuperarSenha from "./pages/RecuperarSenha";
 import AtualizarSenha from "./pages/AtualizarSenha";
-import DashboardOverview from "./pages/dashboard/DashboardOverview";
+import DashboardHome from "./pages/dashboard/DashboardHome";
 import Colaboradores from "./pages/dashboard/Colaboradores";
 import Contratos from "./pages/dashboard/Contratos";
 import Pagamentos from "./pages/dashboard/Pagamentos";
 import Convites from "./pages/dashboard/Convites";
 import Empresa from "./pages/dashboard/Empresa";
+import Empresas from "./pages/dashboard/Empresas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,12 +35,14 @@ function DashboardRoutes() {
     <ProtectedRoute>
       <DashboardLayout>
         <Routes>
-          <Route index element={<DashboardOverview />} />
+          <Route index element={<DashboardHome />} />
           <Route path="colaboradores" element={<Colaboradores />} />
           <Route path="contratos" element={<Contratos />} />
           <Route path="pagamentos" element={<Pagamentos />} />
           <Route path="convites" element={<Convites />} />
           <Route path="empresa" element={<Empresa />} />
+          <Route path="empresas" element={<Empresas />} />
+          <Route path="usuarios" element={<Colaboradores />} />
         </Routes>
       </DashboardLayout>
     </ProtectedRoute>

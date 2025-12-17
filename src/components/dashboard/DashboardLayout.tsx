@@ -30,7 +30,7 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const navigation = [
+const adminNavigation = [
   { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
   { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
   { name: "Contratos", href: "/dashboard/contratos", icon: FileText },
@@ -39,11 +39,21 @@ const navigation = [
   { name: "Empresa", href: "/dashboard/empresa", icon: Building2 },
 ];
 
+const masterAdminNavigation = [
+  { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Empresas", href: "/dashboard/empresas", icon: Building2 },
+  { name: "Usuários", href: "/dashboard/usuarios", icon: Users },
+  { name: "Contratos", href: "/dashboard/contratos", icon: FileText },
+  { name: "Pagamentos", href: "/dashboard/pagamentos", icon: CreditCard },
+];
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, roles, signOut, isAdmin } = useAuth();
+  const { profile, roles, signOut, isAdmin, hasRole } = useAuth();
+
+  const isMasterAdmin = hasRole("master_admin");
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
@@ -70,13 +80,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     navigate("/");
   };
 
-  const filteredNavigation = navigation.filter((item) => {
-    // Only admins can see company and invites
-    if (["/dashboard/empresa", "/dashboard/convites"].includes(item.href)) {
-      return isAdmin();
-    }
-    return true;
-  });
+  const filteredNavigation = isMasterAdmin
+    ? masterAdminNavigation
+    : adminNavigation.filter((item) => {
+        // Only admins can see company and invites
+        if (["/dashboard/empresa", "/dashboard/convites"].includes(item.href)) {
+          return isAdmin();
+        }
+        return true;
+      });
 
   const Sidebar = () => (
     <div className="flex h-full flex-col bg-card border-r border-border">
