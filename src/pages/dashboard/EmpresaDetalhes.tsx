@@ -38,8 +38,24 @@ import {
   Calendar,
   Edit,
   Loader2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatCNPJ as formatCNPJMask, validateCNPJ } from "@/lib/masks";
+
+interface CNPJValidationResult {
+  valid: boolean;
+  cnpj: string;
+  razao_social?: string;
+  nome_fantasia?: string;
+  situacao?: string;
+  uf?: string;
+  municipio?: string;
+  error?: string;
+  already_registered?: boolean;
+  existing_company_name?: string;
+}
 
 interface Company {
   id: string;
@@ -114,11 +130,17 @@ const EmpresaDetalhes = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
+    cnpj: "",
     email: "",
     phone: "",
     address: "",
     is_active: true,
   });
+  const [isValidatingCNPJ, setIsValidatingCNPJ] = useState(false);
+  const [cnpjValidated, setCnpjValidated] = useState(false);
+  const [cnpjData, setCnpjData] = useState<CNPJValidationResult | null>(null);
+  const [cnpjError, setCnpjError] = useState("");
+  const [originalCnpj, setOriginalCnpj] = useState("");
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeContracts: 0,
@@ -322,12 +344,88 @@ const EmpresaDetalhes = () => {
     if (company) {
       setEditForm({
         name: company.name,
+        cnpj: formatCNPJMask(company.cnpj),
         email: company.email || "",
         phone: company.phone || "",
         address: company.address || "",
         is_active: company.is_active,
       });
+      setOriginalCnpj(company.cnpj);
+      setCnpjValidated(true); // Current CNPJ is considered valid
+      setCnpjError("");
+      setCnpjData(null);
       setIsEditOpen(true);
+    }
+  };
+
+  const validateCNPJFromAPI = async (cnpjValue: string) => {
+    const cleanCNPJ = cnpjValue.replace(/\D/g, "");
+    if (cleanCNPJ.length !== 14) return;
+
+    // If CNPJ hasn't changed, no need to validate
+    if (cleanCNPJ === originalCnpj) {
+      setCnpjValidated(true);
+      setCnpjError("");
+      setCnpjData(null);
+      return;
+    }
+
+    setIsValidatingCNPJ(true);
+    setCnpjValidated(false);
+    setCnpjData(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('validate-cnpj', {
+        body: { 
+          cnpj: cleanCNPJ,
+          check_duplicate: true,
+          exclude_company_id: company?.id 
+        }
+      });
+
+      if (error) throw error;
+
+      setCnpjData(data);
+      
+      if (data.valid) {
+        setCnpjValidated(true);
+        setCnpjError("");
+        toast.success("CNPJ válido!");
+      } else {
+        setCnpjError(data.error || "CNPJ inválido");
+      }
+    } catch (error) {
+      console.error("Error validating CNPJ:", error);
+      setCnpjError("Erro ao validar CNPJ. Tente novamente.");
+    } finally {
+      setIsValidatingCNPJ(false);
+    }
+  };
+
+  const handleCNPJChange = (value: string) => {
+    const formatted = formatCNPJMask(value);
+    setEditForm({ ...editForm, cnpj: formatted });
+    setCnpjValidated(false);
+    setCnpjData(null);
+    
+    const cleanCNPJ = formatted.replace(/\D/g, "");
+    
+    // If CNPJ hasn't changed from original, mark as valid
+    if (cleanCNPJ === originalCnpj) {
+      setCnpjValidated(true);
+      setCnpjError("");
+      return;
+    }
+    
+    if (formatted.length === 18) {
+      if (!validateCNPJ(formatted)) {
+        setCnpjError("CNPJ inválido (dígitos verificadores incorretos)");
+      } else {
+        setCnpjError("");
+        validateCNPJFromAPI(formatted);
+      }
+    } else {
+      setCnpjError("");
     }
   };
 
@@ -342,6 +440,18 @@ const EmpresaDetalhes = () => {
       return;
     }
 
+    const cleanCNPJ = editForm.cnpj.replace(/\D/g, "");
+    if (cleanCNPJ.length !== 14) {
+      toast.error("CNPJ inválido");
+      return;
+    }
+
+    // If CNPJ changed, it must be validated
+    if (cleanCNPJ !== originalCnpj && !cnpjValidated) {
+      toast.error("Aguarde a validação do CNPJ");
+      return;
+    }
+
     if (editForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.email.trim())) {
       toast.error("E-mail inválido");
       return;
@@ -353,6 +463,7 @@ const EmpresaDetalhes = () => {
         .from("companies")
         .update({
           name: editForm.name.trim(),
+          cnpj: cleanCNPJ,
           email: editForm.email.trim() || null,
           phone: editForm.phone.trim() || null,
           address: editForm.address.trim() || null,
@@ -365,6 +476,7 @@ const EmpresaDetalhes = () => {
       setCompany({
         ...company,
         name: editForm.name.trim(),
+        cnpj: cleanCNPJ,
         email: editForm.email.trim() || null,
         phone: editForm.phone.trim() || null,
         address: editForm.address.trim() || null,
@@ -782,6 +894,54 @@ const EmpresaDetalhes = () => {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="cnpj">CNPJ *</Label>
+              <div className="relative">
+                <Input
+                  id="cnpj"
+                  value={editForm.cnpj}
+                  onChange={(e) => handleCNPJChange(e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                  className={`pr-12 ${
+                    cnpjError 
+                      ? "border-destructive" 
+                      : cnpjValidated 
+                        ? "border-green-500" 
+                        : ""
+                  }`}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {isValidatingCNPJ && (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  )}
+                  {!isValidatingCNPJ && cnpjValidated && (
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  )}
+                  {!isValidatingCNPJ && cnpjError && (
+                    <XCircle className="h-5 w-5 text-destructive" />
+                  )}
+                </div>
+              </div>
+              {cnpjError && <p className="text-sm text-destructive">{cnpjError}</p>}
+              
+              {/* Show validated company info */}
+              {cnpjValidated && cnpjData && cnpjData.razao_social && (
+                <div className="mt-2 p-2 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs space-y-0.5">
+                      <p className="font-medium text-green-800 dark:text-green-200">
+                        Verificado na Receita Federal
+                      </p>
+                      <p className="text-green-700 dark:text-green-300">
+                        {cnpjData.razao_social}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
@@ -830,7 +990,10 @@ const EmpresaDetalhes = () => {
             <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSaving}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdateCompany} disabled={isSaving}>
+            <Button 
+              onClick={handleUpdateCompany} 
+              disabled={isSaving || isValidatingCNPJ || !cnpjValidated || !!cnpjError}
+            >
               {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Salvar
             </Button>
