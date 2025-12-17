@@ -262,7 +262,10 @@ const Colaboradores = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "all" ? "ring-2 ring-primary" : ""}`}
+          onClick={() => setStatusFilter("all")}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -275,7 +278,10 @@ const Colaboradores = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "active" ? "ring-2 ring-green-500" : ""}`}
+          onClick={() => setStatusFilter("active")}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -288,7 +294,10 @@ const Colaboradores = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === "inactive" ? "ring-2 ring-muted-foreground" : ""}`}
+          onClick={() => setStatusFilter("inactive")}
+        >
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
