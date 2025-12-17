@@ -23,6 +23,7 @@ import {
   XCircle,
   Copy,
   Trash2,
+  Send,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -99,6 +100,71 @@ const Convites = () => {
     }
   };
 
+  const sendInviteEmail = async (inviteEmail: string, token: string, roleName: string) => {
+    const inviteLink = `${window.location.origin}/registro?convite=${token}`;
+    const companyName = profile?.full_name ? `equipe de ${profile.full_name}` : "nossa equipe";
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .header h1 { color: white; margin: 0; font-size: 24px; }
+          .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+          .button { display: inline-block; background: #667eea; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          .role-badge { display: inline-block; background: #e0e7ff; color: #4338ca; padding: 4px 12px; border-radius: 20px; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎉 Você foi convidado!</h1>
+          </div>
+          <div class="content">
+            <p>Olá!</p>
+            <p>Você foi convidado para fazer parte da <strong>${companyName}</strong> no sistema Aure.</p>
+            <p>Seu cargo será: <span class="role-badge">${roleName}</span></p>
+            <p>Clique no botão abaixo para aceitar o convite e criar sua conta:</p>
+            <p style="text-align: center;">
+              <a href="${inviteLink}" class="button">Aceitar Convite</a>
+            </p>
+            <p style="font-size: 12px; color: #666;">
+              Ou copie este link: <br>
+              <a href="${inviteLink}">${inviteLink}</a>
+            </p>
+            <p style="font-size: 12px; color: #999;">Este convite expira em 7 dias.</p>
+          </div>
+          <div class="footer">
+            <p>Aure System - Gestão de Colaboradores</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    try {
+      const { error } = await supabase.functions.invoke("send-email", {
+        body: {
+          to: inviteEmail,
+          subject: `Convite para ${companyName} - Aure System`,
+          html,
+          from_name: "Aure System",
+        },
+      });
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error("Error sending invite email:", error);
+      return false;
+    }
+  };
+
   const handleCreateInvite = async () => {
     if (!profile?.company_id || !email || !role) {
       toast.error("Preencha todos os campos");
@@ -123,16 +189,29 @@ const Convites = () => {
         return;
       }
 
-      const { error } = await supabase.from("invites").insert({
-        email,
-        role: role as "admin" | "colaborador" | "financeiro" | "gestor" | "master_admin",
-        company_id: profile.company_id,
-        invited_by: profile.user_id,
-      });
+      const { data: newInvite, error } = await supabase
+        .from("invites")
+        .insert({
+          email,
+          role: role as "admin" | "colaborador" | "financeiro" | "gestor" | "master_admin",
+          company_id: profile.company_id,
+          invited_by: profile.user_id,
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
-      toast.success("Convite criado com sucesso!");
+      // Send email
+      const roleName = getRoleLabel(role);
+      const emailSent = await sendInviteEmail(email, newInvite.token, roleName);
+
+      if (emailSent) {
+        toast.success("Convite enviado por e-mail!");
+      } else {
+        toast.success("Convite criado! (E-mail não pôde ser enviado)");
+      }
+
       setIsDialogOpen(false);
       setEmail("");
       setRole("");
@@ -149,6 +228,25 @@ const Convites = () => {
     const link = `${window.location.origin}/registro?convite=${token}`;
     navigator.clipboard.writeText(link);
     toast.success("Link copiado!");
+  };
+
+  const handleResendEmail = async (convite: Invite) => {
+    try {
+      toast.loading("Reenviando email...");
+      const roleName = getRoleLabel(convite.role);
+      const emailSent = await sendInviteEmail(convite.email, convite.token, roleName);
+      
+      toast.dismiss();
+      if (emailSent) {
+        toast.success("E-mail reenviado com sucesso!");
+      } else {
+        toast.error("Erro ao reenviar e-mail");
+      }
+    } catch (error) {
+      toast.dismiss();
+      console.error("Error resending email:", error);
+      toast.error("Erro ao reenviar e-mail");
+    }
   };
 
   const handleCancelInvite = async (inviteId: string) => {
@@ -410,6 +508,10 @@ const Convites = () => {
                             <DropdownMenuContent align="end">
                               {status === "pending" && (
                                 <>
+                                  <DropdownMenuItem onClick={() => handleResendEmail(convite)}>
+                                    <Send className="mr-2 h-4 w-4" />
+                                    Reenviar e-mail
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem onClick={() => handleCopyLink(convite.token)}>
                                     <Copy className="mr-2 h-4 w-4" />
                                     Copiar link
