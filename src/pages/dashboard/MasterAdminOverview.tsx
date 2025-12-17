@@ -11,8 +11,8 @@ import { useNavigate } from "react-router-dom";
 interface GlobalStats {
   totalCompanies: number;
   activeCompanies: number;
-  totalUsers: number;
-  totalContracts: number;
+  totalPJContracts: number;
+  estimatedRevenue: number;
 }
 
 interface Company {
@@ -24,7 +24,7 @@ interface Company {
   created_at: string;
   _count?: {
     users: number;
-    contracts: number;
+    pjContracts: number;
   };
 }
 
@@ -38,19 +38,22 @@ const MasterAdminOverview = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch global stats
-        const [companiesResult, activeCompaniesResult, usersResult, contractsResult] = await Promise.all([
+        // Fetch global stats - focusing on PJ contracts for billing
+        const [companiesResult, activeCompaniesResult, pjContractsResult] = await Promise.all([
           supabase.from("companies").select("*", { count: "exact", head: true }),
           supabase.from("companies").select("*", { count: "exact", head: true }).eq("is_active", true),
-          supabase.from("profiles").select("*", { count: "exact", head: true }),
-          supabase.from("contracts").select("*", { count: "exact", head: true }),
+          supabase.from("contracts").select("*", { count: "exact", head: true }).eq("contract_type", "PJ").eq("status", "active"),
         ]);
+
+        const totalPJContracts = pjContractsResult.count || 0;
+        // Exemplo: R$ 49,90 por contrato PJ ativo
+        const pricePerContract = 49.90;
 
         setStats({
           totalCompanies: companiesResult.count || 0,
           activeCompanies: activeCompaniesResult.count || 0,
-          totalUsers: usersResult.count || 0,
-          totalContracts: contractsResult.count || 0,
+          totalPJContracts: totalPJContracts,
+          estimatedRevenue: totalPJContracts * pricePerContract,
         });
 
         // Fetch companies list with counts
@@ -63,13 +66,13 @@ const MasterAdminOverview = () => {
         if (companiesData) {
           const companiesWithCounts = await Promise.all(
             companiesData.map(async (company) => {
-              const [usersResult, contractsResult] = await Promise.all([
+              const [usersResult, pjContractsResult] = await Promise.all([
                 supabase.from("profiles").select("*", { count: "exact", head: true }).eq("company_id", company.id),
-                supabase.from("contracts").select("*", { count: "exact", head: true }).eq("company_id", company.id),
+                supabase.from("contracts").select("*", { count: "exact", head: true }).eq("company_id", company.id).eq("contract_type", "PJ").eq("status", "active"),
               ]);
               return {
                 ...company,
-                _count: { users: usersResult.count || 0, contracts: contractsResult.count || 0 },
+                _count: { users: usersResult.count || 0, pjContracts: pjContractsResult.count || 0 },
               };
             })
           );
@@ -92,6 +95,13 @@ const MasterAdminOverview = () => {
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("pt-BR");
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
   };
 
   return (
@@ -148,35 +158,37 @@ const MasterAdminOverview = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-primary/5 border-primary/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Contratos PJ Ativos</CardTitle>
+            <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <div className="text-2xl font-bold">{stats?.totalUsers}</div>
-                <p className="text-xs text-muted-foreground">Em todas as empresas</p>
+                <div className="text-2xl font-bold text-primary">{stats?.totalPJContracts}</div>
+                <p className="text-xs text-muted-foreground">Base de faturamento</p>
               </>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-green-500/5 border-green-500/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Contratos</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Receita Estimada</CardTitle>
+            <CreditCard className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-8 w-24" />
             ) : (
               <>
-                <div className="text-2xl font-bold">{stats?.totalContracts}</div>
-                <p className="text-xs text-muted-foreground">Gerenciados no sistema</p>
+                <div className="text-2xl font-bold text-green-600">
+                  {formatCurrency(stats?.estimatedRevenue || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground">R$ 49,90 por contrato PJ</p>
               </>
             )}
           </CardContent>
@@ -233,7 +245,7 @@ const MasterAdminOverview = () => {
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {formatCNPJ(company.cnpj)} • {company._count?.users || 0} usuários • {company._count?.contracts || 0} contratos
+                        {formatCNPJ(company.cnpj)} • {company._count?.users || 0} usuários • <span className="text-primary font-medium">{company._count?.pjContracts || 0} contratos PJ</span>
                       </p>
                     </div>
                   </div>
@@ -272,11 +284,11 @@ const MasterAdminOverview = () => {
               <span className="text-sm font-medium">Gerenciar Empresas</span>
             </button>
             <button
-              onClick={() => navigate("/dashboard/assinaturas")}
+              onClick={() => navigate("/dashboard/faturamento")}
               className="flex flex-col items-center justify-center p-4 rounded-lg border border-border hover:bg-muted transition-colors"
             >
               <CreditCard className="h-8 w-8 text-primary mb-2" />
-              <span className="text-sm font-medium">Ver Assinaturas</span>
+              <span className="text-sm font-medium">Ver Faturamento</span>
             </button>
           </CardContent>
         </Card>
