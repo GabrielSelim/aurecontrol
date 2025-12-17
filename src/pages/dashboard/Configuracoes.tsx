@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Settings, CreditCard, Tag, Percent, Package, Plus, Pencil, Trash2, Save } from "lucide-react";
+import { Settings, CreditCard, Tag, Percent, Package, Plus, Pencil, Trash2, Save, Bell } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -62,11 +62,13 @@ interface Promotion {
 
 const Configuracoes = () => {
   const [basePrice, setBasePrice] = useState<number>(49.90);
+  const [reminderDays, setReminderDays] = useState<number>(3);
   const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingReminder, setIsSavingReminder] = useState(false);
 
   // Dialog states
   const [tierDialogOpen, setTierDialogOpen] = useState(false);
@@ -82,8 +84,9 @@ const Configuracoes = () => {
 
   const fetchData = async () => {
     try {
-      const [settingsResult, tiersResult, couponsResult, promotionsResult] = await Promise.all([
+      const [settingsResult, reminderResult, tiersResult, couponsResult, promotionsResult] = await Promise.all([
         supabase.from("system_settings").select("*").eq("key", "pj_contract_price").maybeSingle(),
+        supabase.from("system_settings").select("*").eq("key", "billing_reminder_days").maybeSingle(),
         supabase.from("pricing_tiers").select("*").order("min_contracts"),
         supabase.from("discount_coupons").select("*").order("created_at", { ascending: false }),
         supabase.from("promotions").select("*").order("created_at", { ascending: false }),
@@ -92,6 +95,11 @@ const Configuracoes = () => {
       if (settingsResult.data) {
         const value = settingsResult.data.value as { amount: number };
         setBasePrice(value.amount);
+      }
+
+      if (reminderResult.data) {
+        const value = reminderResult.data.value as { days: number };
+        setReminderDays(value.days);
       }
 
       if (tiersResult.data) setPricingTiers(tiersResult.data);
@@ -120,6 +128,36 @@ const Configuracoes = () => {
       toast.error("Erro ao salvar preço base");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const saveReminderDays = async () => {
+    setIsSavingReminder(true);
+    try {
+      const { data: existing } = await supabase
+        .from("system_settings")
+        .select("id")
+        .eq("key", "billing_reminder_days")
+        .maybeSingle();
+
+      if (existing) {
+        const { error } = await supabase
+          .from("system_settings")
+          .update({ value: { days: reminderDays } })
+          .eq("key", "billing_reminder_days");
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("system_settings")
+          .insert({ key: "billing_reminder_days", value: { days: reminderDays }, description: "Dias de antecedência para lembrete de vencimento" });
+        if (error) throw error;
+      }
+      toast.success("Configuração de lembrete atualizada!");
+    } catch (error) {
+      console.error("Error saving reminder days:", error);
+      toast.error("Erro ao salvar configuração");
+    } finally {
+      setIsSavingReminder(false);
     }
   };
 
@@ -265,7 +303,7 @@ const Configuracoes = () => {
       </div>
 
       <Tabs defaultValue="pricing" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="pricing" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
             Preço Base
@@ -281,6 +319,10 @@ const Configuracoes = () => {
           <TabsTrigger value="promotions" className="flex items-center gap-2">
             <Percent className="h-4 w-4" />
             Promoções
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notificações
           </TabsTrigger>
         </TabsList>
 
@@ -533,6 +575,67 @@ const Configuracoes = () => {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Notificações */}
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Configurações de Notificações
+              </CardTitle>
+              <CardDescription>
+                Configure quando e como as notificações automáticas são enviadas
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="reminderDays" className="text-base font-medium">
+                    Lembrete de Vencimento de Faturas
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1 mb-3">
+                    Quantos dias antes do vencimento o sistema deve enviar lembretes por email
+                  </p>
+                  <div className="flex items-end gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="reminderDays"
+                          type="number"
+                          min="1"
+                          max="30"
+                          value={reminderDays}
+                          onChange={(e) => setReminderDays(parseInt(e.target.value) || 3)}
+                          className="w-24"
+                        />
+                        <span className="text-muted-foreground">dias antes</span>
+                      </div>
+                    </div>
+                    <Button onClick={saveReminderDays} disabled={isSavingReminder}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isSavingReminder ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h4 className="font-medium mb-2">Tipos de Notificações Automáticas</h4>
+                  <ul className="text-sm text-muted-foreground space-y-2">
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                      <strong>Fatura Gerada:</strong> Enviada quando uma nova fatura é criada (1º do mês)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-amber-500" />
+                      <strong>Lembrete de Vencimento:</strong> Enviada {reminderDays} dia(s) antes do vencimento (diariamente às 8h)
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

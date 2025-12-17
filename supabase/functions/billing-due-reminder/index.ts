@@ -40,10 +40,21 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get billings due in 3 days or less that are still pending
+    // Get reminder days configuration
+    const { data: reminderConfig } = await supabaseClient
+      .from("system_settings")
+      .select("value")
+      .eq("key", "billing_reminder_days")
+      .maybeSingle();
+
+    const reminderDays = (reminderConfig?.value as { days: number })?.days || 3;
+
+    // Get billings due in X days or less that are still pending
     const today = new Date();
-    const threeDaysFromNow = new Date(today);
-    threeDaysFromNow.setDate(today.getDate() + 3);
+    const reminderDate = new Date(today);
+    reminderDate.setDate(today.getDate() + reminderDays);
+
+    console.log(`Checking for billings due within ${reminderDays} days (until ${reminderDate.toISOString().split('T')[0]})`);
 
     const { data: pendingBillings, error: billingsError } = await supabaseClient
       .from("company_billings")
@@ -56,7 +67,7 @@ const handler = async (req: Request): Promise<Response> => {
         )
       `)
       .eq("status", "pending")
-      .lte("due_date", threeDaysFromNow.toISOString().split('T')[0])
+      .lte("due_date", reminderDate.toISOString().split('T')[0])
       .gte("due_date", today.toISOString().split('T')[0]);
 
     if (billingsError) {
