@@ -28,6 +28,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
   signUpWithInvite: (data: InviteSignUpData) => Promise<{ error: Error | null }>;
+  signUpAsMasterAdmin: (data: MasterAdminSignUpData) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (password: string) => Promise<{ error: Error | null }>;
@@ -52,6 +53,14 @@ interface InviteSignUpData {
   cpf: string;
   phone: string;
   inviteToken: string;
+}
+
+interface MasterAdminSignUpData {
+  email: string;
+  password: string;
+  fullName: string;
+  cpf: string;
+  phone: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -201,6 +210,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signUpAsMasterAdmin = async (data: MasterAdminSignUpData) => {
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("Erro ao criar usuário");
+
+      // Call the master admin signup function
+      const { error: signupError } = await supabase.rpc("handle_master_admin_signup", {
+        _user_id: authData.user.id,
+        _email: data.email,
+        _full_name: data.fullName,
+        _cpf: data.cpf,
+        _phone: data.phone,
+      });
+
+      if (signupError) throw signupError;
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
@@ -238,6 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signUpWithInvite,
+        signUpAsMasterAdmin,
         signOut,
         resetPassword,
         updatePassword,
