@@ -19,34 +19,55 @@ interface PricingTier {
   price_per_contract: number;
 }
 
-interface AdminProfile {
-  email: string;
-  full_name: string;
+async function logNotification(
+  supabase: any,
+  companyId: string,
+  recipientEmail: string,
+  notificationType: string,
+  subject: string,
+  status: string,
+  metadata?: Record<string, unknown>
+) {
+  try {
+    await supabase.from("notification_logs").insert({
+      company_id: companyId,
+      recipient_email: recipientEmail,
+      notification_type: notificationType,
+      subject: subject,
+      status: status,
+      metadata: metadata,
+    });
+  } catch (error) {
+    console.error("Failed to log notification:", error);
+  }
 }
 
 async function sendBillingNotification(
   client: SMTPClient,
+  supabase: any,
   gmailUser: string,
   to: string,
+  companyId: string,
   companyName: string,
   referenceMonth: string,
   contractsCount: number,
   total: number,
   dueDate: string
 ): Promise<boolean> {
+  const formattedTotal = new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(total);
+
+  const formattedMonth = new Date(referenceMonth + "-01").toLocaleDateString('pt-BR', {
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const formattedDueDate = new Date(dueDate).toLocaleDateString('pt-BR');
+  const subject = `Nova Fatura - ${companyName} - ${formattedMonth}`;
+
   try {
-    const formattedTotal = new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(total);
-
-    const formattedMonth = new Date(referenceMonth + "-01").toLocaleDateString('pt-BR', {
-      month: 'long',
-      year: 'numeric'
-    });
-
-    const formattedDueDate = new Date(dueDate).toLocaleDateString('pt-BR');
-
     const html = `
       <!DOCTYPE html>
       <html>
@@ -64,7 +85,6 @@ async function sendBillingNotification(
           .value { font-weight: bold; color: #333; }
           .total { font-size: 24px; color: #667eea; }
           .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
-          .cta { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
         </style>
       </head>
       <body>
@@ -110,15 +130,23 @@ async function sendBillingNotification(
     await client.send({
       from: `Aure System <${gmailUser}>`,
       to: to,
-      subject: `Nova Fatura - ${companyName} - ${formattedMonth}`,
+      subject: subject,
       content: "auto",
       html: html,
     });
 
     console.log(`Notification email sent to ${to}`);
+    await logNotification(supabase, companyId, to, "billing_generated", subject, "sent", {
+      reference_month: referenceMonth,
+      contracts_count: contractsCount,
+      total: total,
+    });
     return true;
   } catch (error) {
     console.error(`Failed to send email to ${to}:`, error);
+    await logNotification(supabase, companyId, to, "billing_generated", subject, "failed", {
+      error: String(error),
+    });
     return false;
   }
 }
@@ -312,8 +340,10 @@ serve(async (req: Request) => {
           for (const email of adminEmails) {
             const sent = await sendBillingNotification(
               smtpClient,
+              supabase,
               gmailUser,
               email,
+              company.id,
               company.name,
               referenceMonth,
               contractsCount,
