@@ -27,6 +27,7 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
+  signUpWithInvite: (data: InviteSignUpData) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (password: string) => Promise<{ error: Error | null }>;
@@ -42,6 +43,15 @@ interface SignUpData {
   phone: string;
   companyName: string;
   cnpj: string;
+}
+
+interface InviteSignUpData {
+  email: string;
+  password: string;
+  fullName: string;
+  cpf: string;
+  phone: string;
+  inviteToken: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -157,6 +167,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signUpWithInvite = async (data: InviteSignUpData) => {
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("Erro ao criar usuário");
+
+      // Call the invited user signup function
+      const { error: signupError } = await supabase.rpc("handle_invited_user_signup", {
+        _user_id: authData.user.id,
+        _email: data.email,
+        _full_name: data.fullName,
+        _cpf: data.cpf,
+        _phone: data.phone,
+        _invite_token: data.inviteToken,
+      });
+
+      if (signupError) throw signupError;
+
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
@@ -193,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         signIn,
         signUp,
+        signUpWithInvite,
         signOut,
         resetPassword,
         updatePassword,
