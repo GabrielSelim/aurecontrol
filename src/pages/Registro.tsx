@@ -1,13 +1,15 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Loader2, UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Badge } from "@/components/ui/badge";
 
 const step1Schema = z.object({
   fullName: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
@@ -28,12 +30,27 @@ const step2Schema = z.object({
   cnpj: z.string().min(14, "CNPJ inválido"),
 });
 
+interface InviteData {
+  id: string;
+  email: string;
+  company_id: string;
+  role: string;
+  status: string;
+  expires_at: string;
+}
+
 const Registro = () => {
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("convite");
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingInvite, setIsLoadingInvite] = useState(!!inviteToken);
   const [step, setStep] = useState(1);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [inviteData, setInviteData] = useState<InviteData | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   
   // Form data
   const [fullName, setFullName] = useState("");
@@ -44,8 +61,40 @@ const Registro = () => {
   const [companyName, setCompanyName] = useState("");
   const [cnpj, setCnpj] = useState("");
 
-  const { signUp } = useAuth();
+  const { signUp, signUpWithInvite } = useAuth();
   const navigate = useNavigate();
+
+  // Fetch invite data if token is present
+  useEffect(() => {
+    const fetchInvite = async () => {
+      if (!inviteToken) return;
+
+      try {
+        const { data, error } = await supabase.rpc("get_invite_by_token", {
+          _token: inviteToken,
+        });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          setInviteError("Convite inválido ou expirado");
+          setIsLoadingInvite(false);
+          return;
+        }
+
+        const invite = data[0] as InviteData;
+        setInviteData(invite);
+        setEmail(invite.email);
+      } catch (error) {
+        console.error("Error fetching invite:", error);
+        setInviteError("Erro ao carregar convite");
+      } finally {
+        setIsLoadingInvite(false);
+      }
+    };
+
+    fetchInvite();
+  }, [inviteToken]);
 
   const formatCPF = (value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -74,9 +123,68 @@ const Registro = () => {
       .slice(0, 18);
   };
 
+  const getRoleLabel = (role: string) => {
+    const labels: Record<string, string> = {
+      admin: "Administrador",
+      financeiro: "Financeiro",
+      gestor: "Gestor",
+      colaborador: "Colaborador",
+    };
+    return labels[role] || role;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // For invited users, only personal data is needed (no company step)
+    if (inviteData) {
+      const validation = step1Schema.safeParse({
+        fullName,
+        email,
+        cpf: cpf.replace(/\D/g, ""),
+        phone: phone.replace(/\D/g, ""),
+        password,
+      });
+
+      if (!validation.success) {
+        toast.error(validation.error.errors[0].message);
+        return;
+      }
+
+      if (!acceptedTerms || !acceptedPrivacy) {
+        toast.error("Você precisa aceitar os termos para continuar");
+        return;
+      }
+
+      setIsLoading(true);
+
+      const { error } = await signUpWithInvite({
+        email,
+        password,
+        fullName,
+        cpf: cpf.replace(/\D/g, ""),
+        phone: phone.replace(/\D/g, ""),
+        inviteToken: inviteToken!,
+      });
+
+      if (error) {
+        if (error.message.includes("User already registered")) {
+          toast.error("Este e-mail já está cadastrado");
+        } else if (error.message.includes("Invalid or expired invite")) {
+          toast.error("Convite inválido ou expirado");
+        } else {
+          toast.error("Erro ao criar conta. Tente novamente.");
+        }
+      } else {
+        toast.success("Conta criada com sucesso!");
+        navigate("/dashboard");
+      }
+
+      setIsLoading(false);
+      return;
+    }
+
+    // Regular signup flow (with company)
     if (step === 1) {
       const validation = step1Schema.safeParse({
         fullName,
@@ -135,6 +243,36 @@ const Registro = () => {
     }
   };
 
+  // Show loading state while fetching invite
+  if (isLoadingInvite) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Carregando convite...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state for invalid invite
+  if (inviteToken && inviteError) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-8">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+            <UserPlus className="h-8 w-8 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Convite Inválido</h1>
+          <p className="text-muted-foreground mb-6">{inviteError}</p>
+          <Link to="/">
+            <Button variant="outline">Voltar para o início</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-hero flex">
       {/* Left Side - Visual */}
@@ -147,18 +285,24 @@ const Registro = () => {
 
         <div className="relative text-center max-w-lg">
           <h2 className="text-3xl font-bold text-primary-foreground mb-4">
-            Comece a gerenciar sua empresa hoje
+            {inviteData
+              ? "Você foi convidado!"
+              : "Comece a gerenciar sua empresa hoje"}
           </h2>
           <p className="text-primary-foreground/80 text-lg mb-8">
-            Crie sua conta em minutos e tenha acesso a todos os recursos do Aure.
+            {inviteData
+              ? `Complete seu cadastro para fazer parte da equipe como ${getRoleLabel(inviteData.role)}.`
+              : "Crie sua conta em minutos e tenha acesso a todos os recursos do Aure."}
           </p>
           
-          {/* Steps Preview */}
-          <div className="flex items-center justify-center gap-4">
-            <StepIndicator number={1} label="Dados Pessoais" active={step === 1} completed={step > 1} />
-            <div className="w-12 h-0.5 bg-primary-foreground/30" />
-            <StepIndicator number={2} label="Empresa" active={step === 2} completed={step > 2} />
-          </div>
+          {/* Steps Preview - only for regular signup */}
+          {!inviteData && (
+            <div className="flex items-center justify-center gap-4">
+              <StepIndicator number={1} label="Dados Pessoais" active={step === 1} completed={step > 1} />
+              <div className="w-12 h-0.5 bg-primary-foreground/30" />
+              <StepIndicator number={2} label="Empresa" active={step === 2} completed={step > 2} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -167,11 +311,11 @@ const Registro = () => {
         <div className="w-full max-w-md py-8">
           {/* Back Link */}
           <button
-            onClick={() => (step > 1 ? setStep(step - 1) : null)}
+            onClick={() => (step > 1 && !inviteData ? setStep(step - 1) : null)}
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            {step > 1 ? "Voltar" : <Link to="/">Voltar para o início</Link>}
+            {step > 1 && !inviteData ? "Voltar" : <Link to="/">Voltar para o início</Link>}
           </button>
 
           {/* Logo */}
@@ -185,18 +329,32 @@ const Registro = () => {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              {step === 1 ? "Criar sua conta" : "Dados da empresa"}
+              {inviteData
+                ? "Complete seu cadastro"
+                : step === 1
+                ? "Criar sua conta"
+                : "Dados da empresa"}
             </h1>
             <p className="text-muted-foreground">
-              {step === 1
+              {inviteData
+                ? "Preencha seus dados pessoais para aceitar o convite"
+                : step === 1
                 ? "Preencha seus dados pessoais para começar"
                 : "Informe os dados da sua empresa"}
             </p>
+            {inviteData && (
+              <div className="mt-4 flex items-center gap-2">
+                <Badge variant="secondary">{getRoleLabel(inviteData.role)}</Badge>
+                <span className="text-sm text-muted-foreground">
+                  Você será adicionado como {getRoleLabel(inviteData.role).toLowerCase()}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {step === 1 ? (
+            {(step === 1 || inviteData) ? (
               <>
                 {/* Step 1: Personal Data */}
                 <div className="space-y-2">
@@ -221,8 +379,14 @@ const Registro = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={!!inviteData}
                     className="h-12"
                   />
+                  {inviteData && (
+                    <p className="text-xs text-muted-foreground">
+                      E-mail definido pelo convite
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -275,6 +439,39 @@ const Registro = () => {
                     Mín. 8 caracteres com maiúscula, minúscula, número e especial
                   </p>
                 </div>
+
+                {/* Terms for invited users */}
+                {inviteData && (
+                  <div className="space-y-4 pt-4">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="terms"
+                        checked={acceptedTerms}
+                        onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
+                      />
+                      <label htmlFor="terms" className="text-sm text-muted-foreground leading-tight cursor-pointer">
+                        Li e aceito os{" "}
+                        <a href="#" className="text-primary hover:underline">
+                          Termos de Uso
+                        </a>
+                      </label>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="privacy"
+                        checked={acceptedPrivacy}
+                        onCheckedChange={(checked) => setAcceptedPrivacy(checked as boolean)}
+                      />
+                      <label htmlFor="privacy" className="text-sm text-muted-foreground leading-tight cursor-pointer">
+                        Li e aceito a{" "}
+                        <a href="#" className="text-primary hover:underline">
+                          Política de Privacidade
+                        </a>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -341,9 +538,19 @@ const Registro = () => {
               type="submit"
               size="lg"
               className="w-full"
-              disabled={isLoading || (step === 2 && (!acceptedTerms || !acceptedPrivacy))}
+              disabled={
+                isLoading ||
+                (inviteData && (!acceptedTerms || !acceptedPrivacy)) ||
+                (!inviteData && step === 2 && (!acceptedTerms || !acceptedPrivacy))
+              }
             >
-              {isLoading ? "Criando conta..." : step === 1 ? "Continuar" : "Criar minha conta"}
+              {isLoading
+                ? "Criando conta..."
+                : inviteData
+                ? "Aceitar convite e criar conta"
+                : step === 1
+                ? "Continuar"
+                : "Criar minha conta"}
             </Button>
           </form>
 

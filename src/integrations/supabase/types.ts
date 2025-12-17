@@ -310,6 +310,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_invite_by_token: {
+        Args: { _token: string }
+        Returns: {
+          company_id: string
+          email: string
+          expires_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: Database["public"]["Enums"]["invite_status"]
+        }[]
+      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       handle_invited_user_signup: {
         Args: {
