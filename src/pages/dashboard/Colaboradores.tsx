@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Filter, Users, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Users, Download, ChevronLeft, ChevronRight, ArrowUpDown, X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -52,6 +52,7 @@ interface Colaborador {
   cpf: string | null;
   phone: string | null;
   is_active: boolean;
+  created_at: string;
   roles: { role: string }[];
 }
 
@@ -63,6 +64,8 @@ const Colaboradores = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"name" | "email" | "created_at">("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [colaboradorToToggle, setColaboradorToToggle] = useState<Colaborador | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -228,15 +231,39 @@ const Colaboradores = () => {
     return matchesSearch && matchesStatus && matchesRole;
   });
 
+  // Sort collaborators
+  const sortedColaboradores = [...filteredColaboradores].sort((a, b) => {
+    let comparison = 0;
+    if (sortBy === "name") {
+      comparison = a.full_name.localeCompare(b.full_name);
+    } else if (sortBy === "email") {
+      comparison = a.email.localeCompare(b.email);
+    } else if (sortBy === "created_at") {
+      comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    }
+    return sortOrder === "asc" ? comparison : -comparison;
+  });
+
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, roleFilter, itemsPerPage]);
+  }, [searchTerm, statusFilter, roleFilter, sortBy, sortOrder, itemsPerPage]);
+
+  // Check if any filter is active
+  const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || roleFilter !== "all" || sortBy !== "name" || sortOrder !== "asc";
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setRoleFilter("all");
+    setSortBy("name");
+    setSortOrder("asc");
+  };
 
   // Pagination
-  const totalPages = Math.ceil(filteredColaboradores.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedColaboradores.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedColaboradores = filteredColaboradores.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedColaboradores = sortedColaboradores.slice(startIndex, startIndex + itemsPerPage);
 
   const activeCount = colaboradores.filter(c => c.is_active).length;
   const inactiveCount = colaboradores.filter(c => !c.is_active).length;
@@ -326,38 +353,64 @@ const Colaboradores = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
-            <div className="relative flex-1 w-full sm:max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome ou e-mail..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="relative flex-1 w-full sm:max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome ou e-mail..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(value: "all" | "active" | "inactive") => setStatusFilter(value)}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos status</SelectItem>
+                  <SelectItem value="active">Ativos</SelectItem>
+                  <SelectItem value="inactive">Inativos</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-full sm:w-[150px]">
+                  <SelectValue placeholder="Cargo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos cargos</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="financeiro">Financeiro</SelectItem>
+                  <SelectItem value="gestor">Gestor</SelectItem>
+                  <SelectItem value="colaborador">Colaborador</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={`${sortBy}-${sortOrder}`} onValueChange={(value) => {
+                const [field, order] = value.split("-") as ["name" | "email" | "created_at", "asc" | "desc"];
+                setSortBy(field);
+                setSortOrder(order);
+              }}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <ArrowUpDown className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Ordenar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name-asc">Nome (A-Z)</SelectItem>
+                  <SelectItem value="name-desc">Nome (Z-A)</SelectItem>
+                  <SelectItem value="email-asc">E-mail (A-Z)</SelectItem>
+                  <SelectItem value="email-desc">E-mail (Z-A)</SelectItem>
+                  <SelectItem value="created_at-desc">Mais recentes</SelectItem>
+                  <SelectItem value="created_at-asc">Mais antigos</SelectItem>
+                </SelectContent>
+              </Select>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+                  <X className="h-4 w-4" />
+                  Limpar filtros
+                </Button>
+              )}
             </div>
-            <Select value={statusFilter} onValueChange={(value: "all" | "active" | "inactive") => setStatusFilter(value)}>
-              <SelectTrigger className="w-full sm:w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos status</SelectItem>
-                <SelectItem value="active">Ativos</SelectItem>
-                <SelectItem value="inactive">Inativos</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full sm:w-[160px]">
-                <SelectValue placeholder="Cargo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos cargos</SelectItem>
-                <SelectItem value="admin">Administrador</SelectItem>
-                <SelectItem value="financeiro">Financeiro</SelectItem>
-                <SelectItem value="gestor">Gestor</SelectItem>
-                <SelectItem value="colaborador">Colaborador</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Table */}
@@ -403,7 +456,7 @@ const Colaboradores = () => {
                       </TableCell>
                     </TableRow>
                   ))
-                ) : filteredColaboradores.length === 0 ? (
+                ) : sortedColaboradores.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="h-32 text-center">
                       <p className="text-muted-foreground">
@@ -498,11 +551,11 @@ const Colaboradores = () => {
           </div>
 
           {/* Pagination */}
-          {filteredColaboradores.length > 0 && (
+          {sortedColaboradores.length > 0 && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4">
               <div className="flex items-center gap-2">
                 <p className="text-sm text-muted-foreground">
-                  Mostrando {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredColaboradores.length)} de {filteredColaboradores.length}
+                  Mostrando {startIndex + 1}-{Math.min(startIndex + itemsPerPage, sortedColaboradores.length)} de {sortedColaboradores.length}
                 </p>
                 <Select value={String(itemsPerPage)} onValueChange={(value) => setItemsPerPage(Number(value))}>
                   <SelectTrigger className="w-[100px] h-8">
