@@ -20,6 +20,7 @@ import Convites from "./pages/dashboard/Convites";
 import Empresa from "./pages/dashboard/Empresa";
 import Empresas from "./pages/dashboard/Empresas";
 import Configuracoes from "./pages/dashboard/Configuracoes";
+import Faturamento from "./pages/dashboard/Faturamento";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,7 +44,7 @@ function DashboardRoutes() {
           <Route path="convites" element={<Convites />} />
           <Route path="empresa" element={<Empresa />} />
           <Route path="empresas" element={<Empresas />} />
-          <Route path="faturamento" element={<div className="text-center py-12 text-muted-foreground">Página de Faturamento em desenvolvimento</div>} />
+          <Route path="faturamento" element={<Faturamento />} />
           <Route path="configuracoes" element={<Configuracoes />} />
         </Routes>
       </DashboardLayout>
