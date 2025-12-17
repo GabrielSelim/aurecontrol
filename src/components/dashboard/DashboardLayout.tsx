@@ -42,9 +42,8 @@ const adminNavigation = [
 const masterAdminNavigation = [
   { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
   { name: "Empresas", href: "/dashboard/empresas", icon: Building2 },
-  { name: "Usuários", href: "/dashboard/usuarios", icon: Users },
-  { name: "Contratos", href: "/dashboard/contratos", icon: FileText },
-  { name: "Pagamentos", href: "/dashboard/pagamentos", icon: CreditCard },
+  { name: "Assinaturas", href: "/dashboard/assinaturas", icon: CreditCard },
+  { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
 ];
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
