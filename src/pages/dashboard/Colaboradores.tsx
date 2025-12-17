@@ -303,7 +303,7 @@ const Colaboradores = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}/editar`)}>
+                            <DropdownMenuItem onClick={() => navigate(`/dashboard/colaboradores/${colaborador.id}`)}>
                               Ver detalhes
                             </DropdownMenuItem>
                             {isAdmin() && (
