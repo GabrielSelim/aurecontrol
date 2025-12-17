@@ -44,6 +44,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { formatCPF, formatPhone } from "@/lib/masks";
 import { toast } from "sonner";
+import { ColaboradoresChart } from "@/components/dashboard/ColaboradoresChart";
 
 interface Colaborador {
   id: string;
@@ -394,6 +395,9 @@ const Colaboradores = () => {
           </Tooltip>
         </div>
       )}
+
+      {/* Evolution Chart */}
+      <ColaboradoresChart colaboradores={colaboradores} isLoading={isLoading} />
 
       {/* Search */}
       <Card>
