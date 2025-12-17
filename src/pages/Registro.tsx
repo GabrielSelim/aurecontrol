@@ -53,7 +53,7 @@ interface CNPJValidationResult {
 
 const Registro = () => {
   const [searchParams] = useSearchParams();
-  const inviteToken = searchParams.get("convite");
+  const inviteToken = searchParams.get("token") || searchParams.get("convite");
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
