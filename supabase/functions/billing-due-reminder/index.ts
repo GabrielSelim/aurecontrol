@@ -6,6 +6,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function logNotification(
+  supabase: any,
+  companyId: string,
+  recipientEmail: string,
+  notificationType: string,
+  subject: string,
+  status: string,
+  metadata?: Record<string, unknown>
+) {
+  try {
+    await supabase.from("notification_logs").insert({
+      company_id: companyId,
+      recipient_email: recipientEmail,
+      notification_type: notificationType,
+      subject: subject,
+      status: status,
+      metadata: metadata,
+    });
+  } catch (error) {
+    console.error("Failed to log notification:", error);
+  }
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -153,7 +176,6 @@ const handler = async (req: Request): Promise<Response> => {
     .value { font-weight: bold; color: #111827; }
     .total { font-size: 24px; color: #059669; }
     .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
-    .cta { display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
   </style>
 </head>
 <body>
@@ -211,9 +233,21 @@ const handler = async (req: Request): Promise<Response> => {
             html: htmlContent,
           });
           console.log(`Reminder sent to ${email} for billing ${billing.id}`);
+          
+          await logNotification(supabaseClient, company.id, email, "billing_due_reminder", subject, "sent", {
+            billing_id: billing.id,
+            days_until_due: daysUntilDue,
+            total: billing.total,
+          });
+          
           remindersSent++;
         } catch (emailError) {
           console.error(`Failed to send reminder to ${email}:`, emailError);
+          
+          await logNotification(supabaseClient, company.id, email, "billing_due_reminder", subject, "failed", {
+            billing_id: billing.id,
+            error: String(emailError),
+          });
         }
       }
     }

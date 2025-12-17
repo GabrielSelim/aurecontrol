@@ -22,6 +22,7 @@ import Empresas from "./pages/dashboard/Empresas";
 import Configuracoes from "./pages/dashboard/Configuracoes";
 import Faturamento from "./pages/dashboard/Faturamento";
 import EmpresaDetalhes from "./pages/dashboard/EmpresaDetalhes";
+import Notificacoes from "./pages/dashboard/Notificacoes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ function DashboardRoutes() {
           <Route path="empresas/:id" element={<EmpresaDetalhes />} />
           <Route path="faturamento" element={<Faturamento />} />
           <Route path="configuracoes" element={<Configuracoes />} />
+          <Route path="notificacoes" element={<Notificacoes />} />
         </Routes>
       </DashboardLayout>
     </ProtectedRoute>

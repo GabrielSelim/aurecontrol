@@ -15,6 +15,7 @@ import {
   Menu,
   UserPlus,
   ChevronDown,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -43,6 +44,7 @@ const masterAdminNavigation = [
   { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
   { name: "Empresas", href: "/dashboard/empresas", icon: Building2 },
   { name: "Faturamento", href: "/dashboard/faturamento", icon: CreditCard },
+  { name: "Notificações", href: "/dashboard/notificacoes", icon: Bell },
   { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
 ];
 
