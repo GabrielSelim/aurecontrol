@@ -22,6 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -52,6 +62,7 @@ const Colaboradores = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [colaboradorToToggle, setColaboradorToToggle] = useState<Colaborador | null>(null);
 
   useEffect(() => {
     const fetchColaboradores = async () => {
@@ -139,30 +150,34 @@ const Colaboradores = () => {
     return formatPhone(phone);
   };
 
-  const toggleColaboradorStatus = async (colaborador: Colaborador) => {
+  const confirmToggleStatus = async () => {
+    if (!colaboradorToToggle) return;
+    
     try {
-      const newStatus = !colaborador.is_active;
+      const newStatus = !colaboradorToToggle.is_active;
       const { error } = await supabase
         .from("profiles")
         .update({ is_active: newStatus })
-        .eq("id", colaborador.id);
+        .eq("id", colaboradorToToggle.id);
 
       if (error) throw error;
 
       setColaboradores(prev =>
         prev.map(c =>
-          c.id === colaborador.id ? { ...c, is_active: newStatus } : c
+          c.id === colaboradorToToggle.id ? { ...c, is_active: newStatus } : c
         )
       );
 
       toast.success(
         newStatus
-          ? `${colaborador.full_name} foi ativado`
-          : `${colaborador.full_name} foi desativado`
+          ? `${colaboradorToToggle.full_name} foi ativado`
+          : `${colaboradorToToggle.full_name} foi desativado`
       );
     } catch (error) {
       console.error("Error toggling status:", error);
       toast.error("Erro ao alterar status do colaborador");
+    } finally {
+      setColaboradorToToggle(null);
     }
   };
 
@@ -339,7 +354,7 @@ const Colaboradores = () => {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
-                                  onClick={() => toggleColaboradorStatus(colaborador)}
+                                  onClick={() => setColaboradorToToggle(colaborador)}
                                   className={colaborador.is_active ? "text-destructive" : "text-primary"}
                                 >
                                   {colaborador.is_active ? (
@@ -367,6 +382,31 @@ const Colaboradores = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={!!colaboradorToToggle} onOpenChange={(open) => !open && setColaboradorToToggle(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {colaboradorToToggle?.is_active ? "Desativar colaborador?" : "Ativar colaborador?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {colaboradorToToggle?.is_active
+                ? `Tem certeza que deseja desativar ${colaboradorToToggle?.full_name}? O colaborador não poderá mais acessar o sistema.`
+                : `Tem certeza que deseja ativar ${colaboradorToToggle?.full_name}? O colaborador poderá acessar o sistema novamente.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmToggleStatus}
+              className={colaboradorToToggle?.is_active ? "bg-destructive hover:bg-destructive/90" : ""}
+            >
+              {colaboradorToToggle?.is_active ? "Desativar" : "Ativar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
