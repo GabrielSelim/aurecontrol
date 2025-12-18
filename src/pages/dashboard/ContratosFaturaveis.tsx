@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -22,6 +29,7 @@ import {
   Building2,
   Calendar,
   Users,
+  Filter,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -44,17 +52,37 @@ interface BillableContract {
   } | null;
 }
 
+interface Company {
+  id: string;
+  name: string;
+}
+
 const ContratosFaturaveis = () => {
   const navigate = useNavigate();
   const [contracts, setContracts] = useState<BillableContract[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState<string>("all");
   const [pricePerContract, setPricePerContract] = useState<number>(0);
 
   useEffect(() => {
     fetchBillableContracts();
     fetchPricing();
+    fetchCompanies();
   }, []);
+
+  const fetchCompanies = async () => {
+    const { data } = await supabase
+      .from("companies")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name");
+    
+    if (data) {
+      setCompanies(data);
+    }
+  };
 
   const fetchPricing = async () => {
     const { data } = await supabase
@@ -132,11 +160,13 @@ const ContratosFaturaveis = () => {
 
   const filteredContracts = contracts.filter(contract => {
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchesSearch = (
       contract.profile?.full_name?.toLowerCase().includes(searchLower) ||
       contract.company?.name?.toLowerCase().includes(searchLower) ||
       contract.job_title?.toLowerCase().includes(searchLower)
     );
+    const matchesCompany = selectedCompany === "all" || contract.company_id === selectedCompany;
+    return matchesSearch && matchesCompany;
   });
 
   const totalEstimatedRevenue = filteredContracts.length * pricePerContract;
@@ -245,8 +275,8 @@ const ContratosFaturaveis = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-4">
-            <div className="relative max-w-sm">
+          <div className="mb-4 flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome, empresa ou cargo..."
@@ -254,6 +284,22 @@ const ContratosFaturaveis = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filtrar por empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as empresas</SelectItem>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
