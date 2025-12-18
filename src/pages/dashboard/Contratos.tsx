@@ -175,6 +175,8 @@ const Contratos = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [witnessCount, setWitnessCount] = useState("0");
   const [selectedRepresentativeId, setSelectedRepresentativeId] = useState("");
+  // Validation state
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchContratos();
@@ -405,14 +407,25 @@ const Contratos = () => {
   };
 
   const handleCreateContract = async () => {
-    if (!profile?.company_id || !selectedUserId || !contractType || !jobTitle || !startDate) {
-      toast.error("Preencha todos os campos obrigatórios");
+    // Validate required fields
+    const errors: Record<string, boolean> = {};
+    if (!selectedUserId) errors.colaborador = true;
+    if (!contractType) errors.tipoContrato = true;
+    if (!jobTitle) errors.cargo = true;
+    if (!startDate) errors.dataInicio = true;
+    if (contractType === "PJ" && !selectedTemplateId) errors.template = true;
+    if (contractType === "PJ" && !selectedRepresentativeId) errors.representante = true;
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error("Preencha todos os campos obrigatórios destacados em vermelho");
       return;
     }
 
-    // PJ contracts require template selection
-    if (contractType === "PJ" && !selectedTemplateId) {
-      toast.error("Selecione um template de contrato para contratos PJ");
+    setValidationErrors({});
+
+    if (!profile?.company_id) {
+      toast.error("Erro: empresa não identificada");
       return;
     }
 
@@ -423,12 +436,6 @@ const Contratos = () => {
         toast.error("O colaborador selecionado não possui dados de empresa PJ cadastrados (CNPJ e Razão Social). Atualize o cadastro do colaborador antes de criar um contrato PJ.");
         return;
       }
-    }
-
-    // PJ contracts require representative selection
-    if (contractType === "PJ" && !selectedRepresentativeId) {
-      toast.error("Selecione um administrador para representar a empresa no contrato");
-      return;
     }
 
     // PJ contracts require representative to have complete data
@@ -598,6 +605,7 @@ const Contratos = () => {
     setSelectedTemplateId("");
     setWitnessCount("0");
     setSelectedRepresentativeId("");
+    setValidationErrors({});
   };
 
   const handleTerminateContract = async () => {
@@ -769,19 +777,37 @@ const Contratos = () => {
               </DialogHeader>
               <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
                 <div className="space-y-2">
-                  <Label>Colaborador *</Label>
-                  <ProfileCombobox
-                    profiles={profiles}
-                    value={selectedUserId}
-                    onChange={setSelectedUserId}
-                    placeholder="Selecione um colaborador"
-                  />
+                  <Label className={validationErrors.colaborador ? "text-destructive" : ""}>
+                    Colaborador <span className="text-destructive">*</span>
+                  </Label>
+                  <div className={validationErrors.colaborador ? "ring-2 ring-destructive rounded-md" : ""}>
+                    <ProfileCombobox
+                      profiles={profiles}
+                      value={selectedUserId}
+                      onChange={(value) => {
+                        setSelectedUserId(value);
+                        if (value) setValidationErrors(prev => ({ ...prev, colaborador: false }));
+                      }}
+                      placeholder="Selecione um colaborador"
+                    />
+                  </div>
+                  {validationErrors.colaborador && (
+                    <p className="text-xs text-destructive">Selecione um colaborador</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Tipo de Contrato *</Label>
-                    <Select value={contractType} onValueChange={setContractType}>
-                      <SelectTrigger>
+                    <Label className={validationErrors.tipoContrato ? "text-destructive" : ""}>
+                      Tipo de Contrato <span className="text-destructive">*</span>
+                    </Label>
+                    <Select 
+                      value={contractType} 
+                      onValueChange={(value) => {
+                        setContractType(value);
+                        if (value) setValidationErrors(prev => ({ ...prev, tipoContrato: false }));
+                      }}
+                    >
+                      <SelectTrigger className={validationErrors.tipoContrato ? "ring-2 ring-destructive" : ""}>
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
@@ -791,14 +817,26 @@ const Contratos = () => {
                         <SelectItem value="temporario">Temporário</SelectItem>
                       </SelectContent>
                     </Select>
+                    {validationErrors.tipoContrato && (
+                      <p className="text-xs text-destructive">Selecione o tipo</p>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Data de Início *</Label>
+                    <Label className={validationErrors.dataInicio ? "text-destructive" : ""}>
+                      Data de Início <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       type="date"
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        if (e.target.value) setValidationErrors(prev => ({ ...prev, dataInicio: false }));
+                      }}
+                      className={validationErrors.dataInicio ? "ring-2 ring-destructive" : ""}
                     />
+                    {validationErrors.dataInicio && (
+                      <p className="text-xs text-destructive">Informe a data</p>
+                    )}
                   </div>
                 </div>
                 {/* Contract Type Info */}
@@ -834,9 +872,17 @@ const Contratos = () => {
                     
                     {/* Template Selection */}
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Template do Contrato *</Label>
-                      <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                        <SelectTrigger>
+                      <Label className={`text-xs ${validationErrors.template ? "text-destructive" : "text-muted-foreground"}`}>
+                        Template do Contrato <span className="text-destructive">*</span>
+                      </Label>
+                      <Select 
+                        value={selectedTemplateId} 
+                        onValueChange={(value) => {
+                          setSelectedTemplateId(value);
+                          if (value) setValidationErrors(prev => ({ ...prev, template: false }));
+                        }}
+                      >
+                        <SelectTrigger className={validationErrors.template ? "ring-2 ring-destructive" : ""}>
                           <SelectValue placeholder="Selecione um template" />
                         </SelectTrigger>
                         <SelectContent>
@@ -852,13 +898,24 @@ const Contratos = () => {
                           Nenhum template disponível. Crie um template primeiro.
                         </p>
                       )}
+                      {validationErrors.template && (
+                        <p className="text-xs text-destructive">Selecione um template</p>
+                      )}
                     </div>
 
                     {/* Company Representative Selection */}
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Representante da Empresa (Assinante) *</Label>
-                      <Select value={selectedRepresentativeId} onValueChange={setSelectedRepresentativeId}>
-                        <SelectTrigger>
+                      <Label className={`text-xs ${validationErrors.representante ? "text-destructive" : "text-muted-foreground"}`}>
+                        Representante da Empresa (Assinante) <span className="text-destructive">*</span>
+                      </Label>
+                      <Select 
+                        value={selectedRepresentativeId} 
+                        onValueChange={(value) => {
+                          setSelectedRepresentativeId(value);
+                          if (value) setValidationErrors(prev => ({ ...prev, representante: false }));
+                        }}
+                      >
+                        <SelectTrigger className={validationErrors.representante ? "ring-2 ring-destructive" : ""}>
                           <SelectValue placeholder="Selecione o administrador assinante" />
                         </SelectTrigger>
                         <SelectContent>
@@ -873,6 +930,9 @@ const Contratos = () => {
                         <p className="text-xs text-muted-foreground">
                           Nenhum administrador encontrado.
                         </p>
+                      )}
+                      {validationErrors.representante && (
+                        <p className="text-xs text-destructive">Selecione um representante</p>
                       )}
                       {selectedRepresentativeId && (() => {
                         const selectedAdmin = adminProfiles.find(a => a.user_id === selectedRepresentativeId);
@@ -966,12 +1026,22 @@ const Contratos = () => {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label>Cargo *</Label>
-                  <JobTitleCombobox
-                    value={jobTitle}
-                    onChange={setJobTitle}
-                    placeholder="Selecione ou digite um cargo"
-                  />
+                  <Label className={validationErrors.cargo ? "text-destructive" : ""}>
+                    Cargo <span className="text-destructive">*</span>
+                  </Label>
+                  <div className={validationErrors.cargo ? "ring-2 ring-destructive rounded-md" : ""}>
+                    <JobTitleCombobox
+                      value={jobTitle}
+                      onChange={(value) => {
+                        setJobTitle(value);
+                        if (value) setValidationErrors(prev => ({ ...prev, cargo: false }));
+                      }}
+                      placeholder="Selecione ou digite um cargo"
+                    />
+                  </div>
+                  {validationErrors.cargo && (
+                    <p className="text-xs text-destructive">Informe o cargo</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Salário</Label>
