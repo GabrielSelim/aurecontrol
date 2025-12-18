@@ -48,6 +48,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { JobTitleCombobox } from "@/components/JobTitleCombobox";
 
 interface Contract {
   id: string;
@@ -303,10 +304,10 @@ const Contratos = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Cargo *</Label>
-                  <Input
-                    placeholder="Ex: Desenvolvedor"
+                  <JobTitleCombobox
                     value={jobTitle}
-                    onChange={(e) => setJobTitle(e.target.value)}
+                    onChange={setJobTitle}
+                    placeholder="Selecione ou digite um cargo"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
