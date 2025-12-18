@@ -66,7 +66,7 @@ interface Announcement {
   id: string;
   title: string;
   message: string;
-  target_type: "all" | "company" | "role";
+  target_type: "all" | "company" | "role" | "company_role";
   target_company_id: string | null;
   target_roles: string[];
   priority: "low" | "normal" | "high" | "urgent";
@@ -864,6 +864,11 @@ const Configuracoes = () => {
                                   ROLE_OPTIONS.find(o => o.value === r)?.label || r
                                 ).join(", ")}</>
                               )}
+                              {announcement.target_type === "company_role" && (
+                                <><Building2 className="h-3 w-3" /> {announcement.company_name || "Empresa"} - {announcement.target_roles?.map(r => 
+                                  ROLE_OPTIONS.find(o => o.value === r)?.label || r
+                                ).join(", ")}</>
+                              )}
                             </span>
                             <span>
                               Criada em {new Date(announcement.created_at).toLocaleDateString("pt-BR")}
@@ -1322,7 +1327,7 @@ function AnnouncementDialog({
 }) {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
-  const [targetType, setTargetType] = useState<"all" | "company" | "role">("all");
+  const [targetType, setTargetType] = useState<"all" | "company" | "role" | "company_role">("all");
   const [targetCompanyId, setTargetCompanyId] = useState<string>("");
   const [targetRoles, setTargetRoles] = useState<string[]>([]);
   const [priority, setPriority] = useState<"low" | "normal" | "high" | "urgent">("normal");
@@ -1364,12 +1369,15 @@ function AnnouncementDialog({
       return;
     }
 
+    const needsCompany = targetType === "company" || targetType === "company_role";
+    const needsRoles = targetType === "role" || targetType === "company_role";
+
     onSave({
       title: title.trim(),
       message: message.trim(),
       target_type: targetType,
-      target_company_id: targetType === "company" ? targetCompanyId || null : null,
-      target_roles: targetType === "role" ? targetRoles : [],
+      target_company_id: needsCompany ? targetCompanyId || null : null,
+      target_roles: needsRoles ? targetRoles : [],
       priority,
       is_active: isActive,
       expires_at: expiresAt || null,
@@ -1413,13 +1421,14 @@ function AnnouncementDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os usuários</SelectItem>
-                <SelectItem value="company">Empresa específica</SelectItem>
-                <SelectItem value="role">Cargos específicos</SelectItem>
+                <SelectItem value="company">Empresa específica (todos os cargos)</SelectItem>
+                <SelectItem value="role">Cargos específicos (todas as empresas)</SelectItem>
+                <SelectItem value="company_role">Empresa + Cargos específicos</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {targetType === "company" && (
+          {(targetType === "company" || targetType === "company_role") && (
             <div className="space-y-2">
               <Label>Selecione a Empresa</Label>
               <Select value={targetCompanyId} onValueChange={setTargetCompanyId}>
@@ -1437,7 +1446,7 @@ function AnnouncementDialog({
             </div>
           )}
 
-          {targetType === "role" && (
+          {(targetType === "role" || targetType === "company_role") && (
             <div className="space-y-2">
               <Label>Selecione os Cargos</Label>
               <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg">
