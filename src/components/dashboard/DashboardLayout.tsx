@@ -17,6 +17,8 @@ import {
   ChevronDown,
   Bell,
   User,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -27,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -56,6 +59,7 @@ const masterAdminNavigation = [
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { profile, roles, signOut, isAdmin, hasRole } = useAuth();
@@ -130,21 +134,76 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const filteredNavigation = getNavigationForRole();
 
-  const Sidebar = () => (
-    <div className="flex h-full flex-col bg-card border-r border-border">
+  const Sidebar = ({ collapsed = false, showCollapseButton = false }: { collapsed?: boolean; showCollapseButton?: boolean }) => (
+    <div className={cn(
+      "flex h-full flex-col bg-card border-r border-border transition-all duration-300",
+      collapsed ? "w-16" : "w-72"
+    )}>
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2 px-6 border-b border-border">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+      <div className={cn(
+        "flex h-16 items-center gap-2 border-b border-border transition-all duration-300",
+        collapsed ? "px-3 justify-center" : "px-6"
+      )}>
+        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
           <span className="text-primary-foreground font-bold text-sm">A</span>
         </div>
-        <span className="font-bold text-xl text-foreground">Aure</span>
+        {!collapsed && <span className="font-bold text-xl text-foreground">Aure</span>}
       </div>
 
+      {/* Collapse Button */}
+      {showCollapseButton && (
+        <div className={cn(
+          "flex py-2 border-b border-border",
+          collapsed ? "px-2 justify-center" : "px-3 justify-end"
+        )}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsCollapsed(!collapsed)}
+            className="h-8 w-8"
+          >
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      )}
+
       {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
+      <ScrollArea className={cn(
+        "flex-1 py-4 transition-all duration-300",
+        collapsed ? "px-2" : "px-3"
+      )}>
         <nav className="space-y-1">
           {filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href;
+            
+            if (collapsed) {
+              return (
+                <Tooltip key={item.name} delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to={item.href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={cn(
+                        "flex items-center justify-center rounded-lg p-2.5 transition-colors",
+                        isActive
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      )}
+                    >
+                      <item.icon className="h-5 w-5" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="font-medium">
+                    {item.name}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+            
             return (
               <Link
                 key={item.name}
@@ -166,25 +225,48 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </ScrollArea>
 
       {/* User Info */}
-      <div className="border-t border-border p-4">
+      <div className={cn(
+        "border-t border-border transition-all duration-300",
+        collapsed ? "p-2" : "p-4"
+      )}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg p-2 hover:bg-muted transition-colors">
-              <Avatar className="h-9 w-9">
-                <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                  {profile?.full_name ? getInitials(profile.full_name) : "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {profile?.full_name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {roles.map((r) => getRoleLabel(r.role)).join(", ")}
-                </p>
-              </div>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </button>
+            {collapsed ? (
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <button className="flex w-full items-center justify-center rounded-lg p-2 hover:bg-muted transition-colors">
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                        {profile?.full_name ? getInitials(profile.full_name) : "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p className="font-medium">{profile?.full_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {roles.map((r) => getRoleLabel(r.role)).join(", ")}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <button className="flex w-full items-center gap-3 rounded-lg p-2 hover:bg-muted transition-colors">
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                    {profile?.full_name ? getInitials(profile.full_name) : "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {profile?.full_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {roles.map((r) => getRoleLabel(r.role)).join(", ")}
+                  </p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem onClick={() => navigate("/dashboard/perfil")}>
@@ -212,12 +294,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </Sheet>
 
       {/* Desktop Sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-72">
-        <Sidebar />
+      <div className={cn(
+        "hidden lg:fixed lg:inset-y-0 lg:flex transition-all duration-300",
+        isCollapsed ? "lg:w-16" : "lg:w-72"
+      )}>
+        <Sidebar collapsed={isCollapsed} showCollapseButton />
       </div>
 
       {/* Main Content */}
-      <div className="lg:pl-72">
+      <div className={cn(
+        "transition-all duration-300",
+        isCollapsed ? "lg:pl-16" : "lg:pl-72"
+      )}>
         {/* Mobile Header */}
         <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-background px-4 lg:hidden">
           <Button
