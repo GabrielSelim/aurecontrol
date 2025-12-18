@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { User, Building2, Lock, Camera, Loader2, Save } from "lucide-react";
-import { formatCPF, formatPhone, validateCPF, validatePhone } from "@/lib/masks";
+import { User, Building2, Lock, Camera, Loader2, Save, Briefcase } from "lucide-react";
+import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
 
 interface ProfileData {
   full_name: string;
@@ -17,6 +17,9 @@ interface ProfileData {
   cpf: string | null;
   phone: string | null;
   avatar_url: string | null;
+  pj_cnpj: string | null;
+  pj_razao_social: string | null;
+  pj_nome_fantasia: string | null;
 }
 
 interface CompanyData {
@@ -32,6 +35,7 @@ export default function Perfil() {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingPJ, setIsSavingPJ] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [profileData, setProfileData] = useState<ProfileData>({
@@ -40,6 +44,9 @@ export default function Perfil() {
     cpf: null,
     phone: null,
     avatar_url: null,
+    pj_cnpj: null,
+    pj_razao_social: null,
+    pj_nome_fantasia: null,
   });
 
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
@@ -53,6 +60,7 @@ export default function Perfil() {
   const [errors, setErrors] = useState({
     cpf: "",
     phone: "",
+    pj_cnpj: "",
   });
 
   useEffect(() => {
@@ -60,9 +68,12 @@ export default function Perfil() {
       setProfileData({
         full_name: profile.full_name,
         email: profile.email,
-        cpf: profile.cpf,
-        phone: profile.phone,
+        cpf: profile.cpf ? formatCPF(profile.cpf) : null,
+        phone: profile.phone ? formatPhone(profile.phone) : null,
         avatar_url: profile.avatar_url,
+        pj_cnpj: profile.pj_cnpj ? formatCNPJ(profile.pj_cnpj) : null,
+        pj_razao_social: profile.pj_razao_social,
+        pj_nome_fantasia: profile.pj_nome_fantasia,
       });
       fetchCompany();
     }
@@ -99,10 +110,26 @@ export default function Perfil() {
       master_admin: "Master Admin",
       admin: "Administrador",
       financeiro: "Financeiro",
+      juridico: "Jurídico",
       gestor: "Gestor",
       colaborador: "Colaborador",
     };
     return labels[role] || role;
+  };
+
+  const handlePJCNPJChange = (value: string) => {
+    const formatted = formatCNPJ(value);
+    setProfileData((prev) => ({ ...prev, pj_cnpj: formatted }));
+    
+    if (formatted.length === 18) {
+      if (!validateCNPJ(formatted)) {
+        setErrors((prev) => ({ ...prev, pj_cnpj: "CNPJ inválido" }));
+      } else {
+        setErrors((prev) => ({ ...prev, pj_cnpj: "" }));
+      }
+    } else {
+      setErrors((prev) => ({ ...prev, pj_cnpj: "" }));
+    }
   };
 
   const handleAvatarClick = () => {
@@ -222,6 +249,36 @@ export default function Perfil() {
     }
   };
 
+  const handleSavePJData = async () => {
+    if (!user) return;
+
+    // Validate CNPJ if provided
+    if (profileData.pj_cnpj && profileData.pj_cnpj.length === 18 && !validateCNPJ(profileData.pj_cnpj)) {
+      toast.error("CNPJ inválido");
+      return;
+    }
+    
+    setIsSavingPJ(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          pj_cnpj: profileData.pj_cnpj?.replace(/\D/g, "") || null,
+          pj_razao_social: profileData.pj_razao_social || null,
+          pj_nome_fantasia: profileData.pj_nome_fantasia || null,
+        })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      toast.success("Dados PJ atualizados com sucesso!");
+    } catch (error) {
+      console.error("Error updating PJ data:", error);
+      toast.error("Erro ao atualizar dados PJ");
+    } finally {
+      setIsSavingPJ(false);
+    }
+  };
+
   const handleChangePassword = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast.error("As senhas não coincidem");
@@ -320,10 +377,14 @@ export default function Perfil() {
         {/* Main Content */}
         <div className="flex-1">
           <Tabs defaultValue="personal" className="space-y-4">
-            <TabsList>
+            <TabsList className="flex-wrap">
               <TabsTrigger value="personal" className="gap-2">
                 <User className="h-4 w-4" />
                 Dados Pessoais
+              </TabsTrigger>
+              <TabsTrigger value="pj" className="gap-2">
+                <Briefcase className="h-4 w-4" />
+                Dados PJ
               </TabsTrigger>
               <TabsTrigger value="company" className="gap-2">
                 <Building2 className="h-4 w-4" />
@@ -404,6 +465,73 @@ export default function Perfil() {
                         <Save className="mr-2 h-4 w-4" />
                       )}
                       Salvar Alterações
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="pj">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Dados de Pessoa Jurídica</CardTitle>
+                  <CardDescription>
+                    Preencha se você presta serviços como PJ (CNPJ próprio)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="pj_cnpj">CNPJ</Label>
+                      <Input
+                        id="pj_cnpj"
+                        value={profileData.pj_cnpj || ""}
+                        onChange={(e) => handlePJCNPJChange(e.target.value)}
+                        placeholder="00.000.000/0000-00"
+                        maxLength={18}
+                        className={errors.pj_cnpj ? "border-destructive" : ""}
+                      />
+                      {errors.pj_cnpj && (
+                        <p className="text-sm text-destructive">{errors.pj_cnpj}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pj_razao_social">Razão Social</Label>
+                      <Input
+                        id="pj_razao_social"
+                        value={profileData.pj_razao_social || ""}
+                        onChange={(e) =>
+                          setProfileData((prev) => ({
+                            ...prev,
+                            pj_razao_social: e.target.value,
+                          }))
+                        }
+                        placeholder="Nome oficial da empresa"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="pj_nome_fantasia">Nome Fantasia</Label>
+                      <Input
+                        id="pj_nome_fantasia"
+                        value={profileData.pj_nome_fantasia || ""}
+                        onChange={(e) =>
+                          setProfileData((prev) => ({
+                            ...prev,
+                            pj_nome_fantasia: e.target.value,
+                          }))
+                        }
+                        placeholder="Nome comercial (opcional)"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button onClick={handleSavePJData} disabled={isSavingPJ}>
+                      {isSavingPJ ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      Salvar Dados PJ
                     </Button>
                   </div>
                 </CardContent>

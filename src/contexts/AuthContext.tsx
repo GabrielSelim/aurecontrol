@@ -13,6 +13,9 @@ interface Profile {
   avatar_url: string | null;
   company_id: string | null;
   is_active: boolean;
+  pj_cnpj: string | null;
+  pj_razao_social: string | null;
+  pj_nome_fantasia: string | null;
 }
 
 interface UserRole {
