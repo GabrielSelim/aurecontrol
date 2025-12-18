@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -21,11 +22,13 @@ import {
   Clock,
   AlertCircle,
   Pen,
+  Move,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { SignaturePad } from "@/components/contracts/SignaturePad";
+import { SignaturePositionEditor } from "@/components/contracts/SignaturePositionEditor";
 
 interface ContractDocument {
   id: string;
@@ -48,6 +51,10 @@ interface ContractSignature {
   signer_document: string | null;
   signed_at: string | null;
   signature_image_url: string | null;
+  position_x: number;
+  position_y: number;
+  position_width: number;
+  position_height: number;
 }
 
 interface Contract {
@@ -64,13 +71,16 @@ interface Contract {
 const ContratoDocumento = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile, user } = useAuth();
+  const { profile, user, roles } = useAuth();
   const [document, setDocument] = useState<ContractDocument | null>(null);
   const [contract, setContract] = useState<Contract | null>(null);
   const [signatures, setSignatures] = useState<ContractSignature[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
   const [signingAs, setSigningAs] = useState<ContractSignature | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("documento");
+  
+  const isAdmin = roles?.some(r => r.role === "admin" || r.role === "master_admin");
 
   useEffect(() => {
     if (id) {
@@ -338,98 +348,136 @@ const ContratoDocumento = () => {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Document */}
-        <Card className="lg:col-span-2">
-          <CardContent className="p-6">
-            <div
-              className="prose prose-sm max-w-none bg-white text-black p-8 rounded-lg border"
-              dangerouslySetInnerHTML={{ __html: document.document_html }}
-            />
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="documento">
+            <FileText className="h-4 w-4 mr-2" />
+            Documento
+          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="posicionar">
+              <Move className="h-4 w-4 mr-2" />
+              Posicionar Assinaturas
+            </TabsTrigger>
+          )}
+        </TabsList>
 
-        {/* Signatures Panel */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Assinaturas</CardTitle>
-              <CardDescription>
-                Status das assinaturas do contrato
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {signatures.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nenhuma assinatura configurada
-                </p>
-              ) : (
-                signatures.map((signature) => (
-                  <div
-                    key={signature.id}
-                    className="p-4 border rounded-lg space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">
-                        {getSignerTypeLabel(signature.signer_type)}
-                        {signature.signer_type === "witness" && ` ${signature.signer_order}`}
-                      </span>
-                      {signature.signed_at ? (
-                        <Badge variant="secondary" className="bg-green-500/10 text-green-600">
-                          <Check className="mr-1 h-3 w-3" />
-                          Assinado
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Pendente</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm">{signature.signer_name}</p>
-                    <p className="text-xs text-muted-foreground">{signature.signer_email}</p>
-                    
-                    {signature.signed_at && signature.signature_image_url && (
-                      <div className="mt-2">
-                        <img
-                          src={signature.signature_image_url}
-                          alt="Assinatura"
-                          className="max-w-[150px] h-auto border rounded"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {format(new Date(signature.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                        </p>
-                      </div>
-                    )}
-
-                    {canSign(signature) && (
-                      <Button
-                        size="sm"
-                        className="w-full mt-2"
-                        onClick={() => handleSign(signature)}
-                      >
-                        <Pen className="mr-2 h-4 w-4" />
-                        Assinar
-                      </Button>
-                    )}
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          {document.completed_at && (
-            <Card className="bg-green-500/10 border-green-500/30">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-green-600">
-                  <Check className="h-5 w-5" />
-                  <span className="font-medium">Contrato Totalmente Assinado</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Concluído em {format(new Date(document.completed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                </p>
+        <TabsContent value="documento" className="mt-6">
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Document */}
+            <Card className="lg:col-span-2">
+              <CardContent className="p-6">
+                <div
+                  className="prose prose-sm max-w-none bg-white text-black p-8 rounded-lg border"
+                  dangerouslySetInnerHTML={{ __html: document.document_html }}
+                />
               </CardContent>
             </Card>
-          )}
-        </div>
-      </div>
+
+            {/* Signatures Panel */}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Assinaturas</CardTitle>
+                  <CardDescription>
+                    Status das assinaturas do contrato
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {signatures.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhuma assinatura configurada
+                    </p>
+                  ) : (
+                    signatures.map((signature) => (
+                      <div
+                        key={signature.id}
+                        className="p-4 border rounded-lg space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            {getSignerTypeLabel(signature.signer_type)}
+                            {signature.signer_type === "witness" && ` ${signature.signer_order}`}
+                          </span>
+                          {signature.signed_at ? (
+                            <Badge variant="secondary" className="bg-green-500/10 text-green-600">
+                              <Check className="mr-1 h-3 w-3" />
+                              Assinado
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Pendente</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm">{signature.signer_name}</p>
+                        <p className="text-xs text-muted-foreground">{signature.signer_email}</p>
+                        
+                        {signature.signed_at && signature.signature_image_url && (
+                          <div className="mt-2">
+                            <img
+                              src={signature.signature_image_url}
+                              alt="Assinatura"
+                              className="max-w-[150px] h-auto border rounded"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(signature.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                            </p>
+                          </div>
+                        )}
+
+                        {canSign(signature) && (
+                          <Button
+                            size="sm"
+                            className="w-full mt-2"
+                            onClick={() => handleSign(signature)}
+                          >
+                            <Pen className="mr-2 h-4 w-4" />
+                            Assinar
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              {document.completed_at && (
+                <Card className="bg-green-500/10 border-green-500/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2 text-green-600">
+                      <Check className="h-5 w-5" />
+                      <span className="font-medium">Contrato Totalmente Assinado</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Concluído em {format(new Date(document.completed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="posicionar" className="mt-6">
+            <SignaturePositionEditor
+              documentHtml={document.document_html}
+              signatures={signatures.map(s => ({
+                id: s.id,
+                signer_type: s.signer_type,
+                signer_name: s.signer_name,
+                signer_order: s.signer_order,
+                position_x: s.position_x,
+                position_y: s.position_y,
+                position_width: s.position_width,
+                position_height: s.position_height,
+                signed_at: s.signed_at,
+              }))}
+              documentId={document.id}
+              onPositionsUpdated={fetchDocumentData}
+            />
+          </TabsContent>
+        )}
+      </Tabs>
 
       {/* Signature Dialog */}
       <Dialog open={signatureDialogOpen} onOpenChange={setSignatureDialogOpen}>
