@@ -18,6 +18,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -233,7 +234,7 @@ const Empresas = () => {
               {filteredCompanies.map((company) => (
                   <TableRow 
                     key={company.id} 
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer transition-colors duration-200 hover:bg-primary/5 hover:shadow-sm"
                     onClick={() => navigate(`/dashboard/empresas/${company.id}`)}
                   >
                     <TableCell>
@@ -340,6 +341,36 @@ const Empresas = () => {
                   </TableRow>
                 ))}
               </TableBody>
+              <TableFooter className="bg-muted/30">
+                <TableRow>
+                  <TableCell colSpan={3} className="font-semibold">
+                    Total ({filteredCompanies.length} empresa{filteredCompanies.length !== 1 ? 's' : ''})
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="default" className="bg-blue-600">
+                      <FileText className="h-3 w-3 mr-1" />
+                      {filteredCompanies.reduce((acc, c) => acc + (c._count?.pjContracts || 0), 0)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="secondary">
+                      <Briefcase className="h-3 w-3 mr-1" />
+                      {filteredCompanies.reduce((acc, c) => acc + (c._count?.otherContracts || 0), 0)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="font-bold text-green-600 dark:text-green-400">
+                      {formatCurrency(
+                        filteredCompanies.reduce(
+                          (acc, c) => acc + calculateEstimatedRevenue(c._count?.pjContracts || 0),
+                          0
+                        )
+                      )}
+                    </span>
+                  </TableCell>
+                  <TableCell colSpan={2}></TableCell>
+                </TableRow>
+              </TableFooter>
             </Table>
           )}
         </CardContent>
