@@ -71,6 +71,7 @@ const Colaboradores = () => {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
+  const [contractTypeFilter, setContractTypeFilter] = useState<"all" | "pj" | "clt" | "none">("all");
   const [sortBy, setSortBy] = useState<"name" | "email" | "created_at">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [colaboradorToToggle, setColaboradorToToggle] = useState<Colaborador | null>(null);
@@ -253,8 +254,14 @@ const Colaboradores = () => {
     const matchesDepartment =
       departmentFilter === "all" ||
       c.department === departmentFilter;
+
+    const matchesContractType =
+      contractTypeFilter === "all" ||
+      (contractTypeFilter === "pj" && c.contract_type === "pj") ||
+      (contractTypeFilter === "clt" && c.contract_type === "clt") ||
+      (contractTypeFilter === "none" && !c.has_contract);
     
-    return matchesSearch && matchesStatus && matchesRole && matchesDepartment;
+    return matchesSearch && matchesStatus && matchesRole && matchesDepartment && matchesContractType;
   });
 
   // Get unique departments for filter
@@ -276,16 +283,17 @@ const Colaboradores = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, roleFilter, departmentFilter, sortBy, sortOrder, itemsPerPage]);
+  }, [searchTerm, statusFilter, roleFilter, departmentFilter, contractTypeFilter, sortBy, sortOrder, itemsPerPage]);
 
   // Check if any filter is active
-  const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || roleFilter !== "all" || departmentFilter !== "all" || sortBy !== "name" || sortOrder !== "asc";
+  const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || roleFilter !== "all" || departmentFilter !== "all" || contractTypeFilter !== "all" || sortBy !== "name" || sortOrder !== "asc";
 
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
     setRoleFilter("all");
     setDepartmentFilter("all");
+    setContractTypeFilter("all");
     setSortBy("name");
     setSortOrder("asc");
   };
@@ -297,6 +305,9 @@ const Colaboradores = () => {
 
   const activeCount = colaboradores.filter(c => c.is_active).length;
   const inactiveCount = colaboradores.filter(c => !c.is_active).length;
+  const pjCount = colaboradores.filter(c => c.contract_type === "pj").length;
+  const cltCount = colaboradores.filter(c => c.contract_type === "clt").length;
+  const noContractCount = colaboradores.filter(c => !c.has_contract).length;
 
   return (
     <div className="space-y-6">
@@ -324,8 +335,8 @@ const Colaboradores = () => {
 
       {/* Stats */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -340,7 +351,7 @@ const Colaboradores = () => {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           <Tooltip>
             <TooltipTrigger asChild>
               <Card 
@@ -421,6 +432,60 @@ const Colaboradores = () => {
               <p>Colaboradores desativados sem acesso ao sistema</p>
             </TooltipContent>
           </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-md ${contractTypeFilter === "pj" ? "ring-2 ring-blue-500" : ""}`}
+                onClick={() => setContractTypeFilter(contractTypeFilter === "pj" ? "all" : "pj")}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-muted-foreground">PJ</p>
+                        <Info className="h-3 w-3 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">{pjCount}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Colaboradores com contrato PJ ativo</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-md ${contractTypeFilter === "clt" ? "ring-2 ring-purple-500" : ""}`}
+                onClick={() => setContractTypeFilter(contractTypeFilter === "clt" ? "all" : "clt")}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium text-muted-foreground">CLT</p>
+                        <Info className="h-3 w-3 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-2xl font-bold text-purple-600">{cltCount}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Briefcase className="h-5 w-5 text-purple-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Colaboradores com contrato CLT ativo</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       )}
 
@@ -467,6 +532,18 @@ const Colaboradores = () => {
                   <SelectItem value="financeiro">Financeiro</SelectItem>
                   <SelectItem value="gestor">Gestor</SelectItem>
                   <SelectItem value="colaborador">Colaborador</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={contractTypeFilter} onValueChange={(value: "all" | "pj" | "clt" | "none") => setContractTypeFilter(value)}>
+                <SelectTrigger className="w-full sm:w-[150px]">
+                  <FileText className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Contrato" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos contratos</SelectItem>
+                  <SelectItem value="pj">PJ</SelectItem>
+                  <SelectItem value="clt">CLT</SelectItem>
+                  <SelectItem value="none">Sem contrato</SelectItem>
                 </SelectContent>
               </Select>
               {departments.length > 0 && (
