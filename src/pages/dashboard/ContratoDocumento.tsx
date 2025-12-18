@@ -53,6 +53,7 @@ interface ContractSignature {
   signature_image_url: string | null;
   position_x: number;
   position_y: number;
+  position_page: number;
   position_width: number;
   position_height: number;
 }
@@ -261,29 +262,139 @@ const ContratoDocumento = () => {
   };
 
   const handleDownloadPDF = () => {
-    // For now, we'll use the browser's print functionality
     const printWindow = window.open("", "_blank");
     if (printWindow && document) {
+      // Group signatures by page
+      const signaturesByPage: Record<number, ContractSignature[]> = {};
+      signatures.forEach(sig => {
+        const page = sig.position_page || 1;
+        if (!signaturesByPage[page]) signaturesByPage[page] = [];
+        signaturesByPage[page].push(sig);
+      });
+
+      // Generate signature overlays for positioned signatures
+      const generateSignatureOverlay = (sig: ContractSignature) => {
+        const hasSignature = sig.signed_at && sig.signature_image_url;
+        return `
+          <div style="
+            position: absolute;
+            left: ${sig.position_x}%;
+            top: ${sig.position_y}%;
+            transform: translate(-50%, -50%);
+            width: ${sig.position_width}px;
+            height: ${sig.position_height}px;
+            border: 1px dashed ${hasSignature ? '#22c55e' : '#9ca3af'};
+            border-radius: 4px;
+            padding: 4px;
+            box-sizing: border-box;
+            background: ${hasSignature ? 'rgba(34, 197, 94, 0.05)' : 'rgba(156, 163, 175, 0.05)'};
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+          ">
+            ${hasSignature ? `
+              <img src="${sig.signature_image_url}" alt="Assinatura" style="max-width: 90%; max-height: 50px; object-fit: contain;" />
+              <div style="font-size: 8px; color: #666; margin-top: 2px;">${sig.signer_name}</div>
+              <div style="font-size: 7px; color: #999;">${format(new Date(sig.signed_at!), "dd/MM/yyyy HH:mm", { locale: ptBR })}</div>
+            ` : `
+              <div style="font-size: 9px; color: #999; text-align: center;">
+                <div>${getSignerTypeLabel(sig.signer_type)}</div>
+                <div style="font-size: 8px; margin-top: 2px;">${sig.signer_name}</div>
+                <div style="font-size: 7px; color: #ccc; margin-top: 4px;">Pendente</div>
+              </div>
+            `}
+          </div>
+        `;
+      };
+
+      // Get all pages that have signatures
+      const maxPage = Math.max(...signatures.map(s => s.position_page || 1), 1);
+
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
           <title>Contrato - ${contract?.job_title}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 40px; }
-            .signature-line { margin-top: 10px; }
+            @page {
+              size: A4;
+              margin: 20mm;
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0;
+              padding: 0;
+            }
+            .page {
+              position: relative;
+              min-height: 100vh;
+              padding: 40px;
+              box-sizing: border-box;
+              page-break-after: always;
+            }
+            .page:last-child {
+              page-break-after: auto;
+            }
+            .document-content {
+              position: relative;
+            }
+            .signatures-overlay {
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              pointer-events: none;
+            }
+            .signature-summary {
+              margin-top: 40px;
+              padding-top: 20px;
+              border-top: 1px solid #ddd;
+            }
+            .signature-item {
+              margin: 15px 0;
+              padding: 10px;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+            }
             img { max-width: 200px; height: auto; }
+            @media print {
+              .page { min-height: auto; }
+            }
           </style>
         </head>
         <body>
-          ${document.document_html}
-          <div style="margin-top: 40px;">
-            <h3>Assinaturas:</h3>
+          <div class="page">
+            <div class="document-content">
+              ${document.document_html}
+            </div>
+            <div class="signatures-overlay">
+              ${(signaturesByPage[1] || []).map(generateSignatureOverlay).join('')}
+            </div>
+          </div>
+          
+          ${maxPage > 1 ? Array.from({ length: maxPage - 1 }, (_, i) => i + 2).map(page => `
+            <div class="page">
+              <div class="signatures-overlay" style="position: relative; height: 100vh;">
+                ${(signaturesByPage[page] || []).map(generateSignatureOverlay).join('')}
+              </div>
+            </div>
+          `).join('') : ''}
+          
+          <div class="signature-summary">
+            <h3 style="margin-bottom: 20px;">Resumo das Assinaturas</h3>
             ${signatures.map(s => `
-              <div style="margin: 20px 0; padding: 10px; border: 1px solid #ddd;">
-                <p><strong>${getSignerTypeLabel(s.signer_type)}:</strong> ${s.signer_name}</p>
-                ${s.signature_image_url ? `<img src="${s.signature_image_url}" alt="Assinatura" />` : '<p style="color: #999;">Pendente</p>'}
-                ${s.signed_at ? `<p style="font-size: 12px; color: #666;">Assinado em: ${format(new Date(s.signed_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>` : ''}
+              <div class="signature-item">
+                <p style="margin: 0 0 5px 0;"><strong>${getSignerTypeLabel(s.signer_type)}:</strong> ${s.signer_name}</p>
+                <p style="margin: 0; font-size: 12px; color: #666;">Posição: Página ${s.position_page || 1}</p>
+                ${s.signed_at ? `
+                  <p style="margin: 5px 0 0 0; font-size: 12px; color: #22c55e;">
+                    ✓ Assinado em: ${format(new Date(s.signed_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                  </p>
+                ` : `
+                  <p style="margin: 5px 0 0 0; font-size: 12px; color: #999;">⏳ Pendente</p>
+                `}
               </div>
             `).join('')}
           </div>
@@ -468,6 +579,7 @@ const ContratoDocumento = () => {
                 signer_order: s.signer_order,
                 position_x: s.position_x,
                 position_y: s.position_y,
+                position_page: s.position_page,
                 position_width: s.position_width,
                 position_height: s.position_height,
                 signed_at: s.signed_at,

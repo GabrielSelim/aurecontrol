@@ -2,17 +2,19 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Move, Save, RotateCcw, Eye, EyeOff } from "lucide-react";
+import { Move, Save, RotateCcw, Eye, EyeOff, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface SignaturePosition {
+export interface SignaturePosition {
   id: string;
   signer_type: string;
   signer_name: string;
   signer_order: number;
   position_x: number;
   position_y: number;
+  position_page: number;
   position_width: number;
   position_height: number;
   signed_at: string | null;
@@ -24,6 +26,7 @@ interface SignaturePositionEditorProps {
   documentId: string;
   onPositionsUpdated: () => void;
   readOnly?: boolean;
+  totalPages?: number;
 }
 
 const getSignerTypeLabel = (type: string) => {
@@ -44,19 +47,38 @@ const getSignerColor = (type: string) => {
   return colors[type] || "bg-gray-500/20 border-gray-500";
 };
 
+// Estimate number of pages based on document content
+const estimatePageCount = (html: string): number => {
+  // A4 page at 96 DPI = ~1122px height with margins
+  // Rough estimate: ~3000 characters per page
+  const textContent = html.replace(/<[^>]*>/g, '');
+  const estimatedPages = Math.max(1, Math.ceil(textContent.length / 3000));
+  return Math.min(estimatedPages, 10); // Cap at 10 pages
+};
+
 export function SignaturePositionEditor({
   documentHtml,
   signatures,
   documentId,
   onPositionsUpdated,
   readOnly = false,
+  totalPages: propTotalPages,
 }: SignaturePositionEditorProps) {
   const [positions, setPositions] = useState<SignaturePosition[]>([]);
   const [isDragging, setIsDragging] = useState<string | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(propTotalPages || 1);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number } | null>(null);
+
+  useEffect(() => {
+    // Estimate page count from document
+    if (!propTotalPages) {
+      setTotalPages(estimatePageCount(documentHtml));
+    }
+  }, [documentHtml, propTotalPages]);
 
   useEffect(() => {
     // Initialize positions from signatures
@@ -64,12 +86,13 @@ export function SignaturePositionEditor({
       signatures.map((sig) => ({
         ...sig,
         position_x: sig.position_x ?? 50,
-        position_y: sig.position_y ?? 0,
+        position_y: sig.position_y ?? 80,
+        position_page: sig.position_page ?? totalPages,
         position_width: sig.position_width ?? 200,
         position_height: sig.position_height ?? 80,
       }))
     );
-  }, [signatures]);
+  }, [signatures, totalPages]);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, signatureId: string) => {
@@ -173,16 +196,25 @@ export function SignaturePositionEditor({
   }, []);
 
   const handleResetPositions = () => {
-    // Distribute signatures evenly at the bottom
+    // Distribute signatures evenly at the bottom of the last page
     const total = signatures.length;
     setPositions(
       signatures.map((sig, index) => ({
         ...sig,
         position_x: ((index + 1) / (total + 1)) * 100,
         position_y: 85,
+        position_page: totalPages,
         position_width: sig.position_width ?? 200,
         position_height: sig.position_height ?? 80,
       }))
+    );
+  };
+
+  const handlePageChange = (signatureId: string, page: number) => {
+    setPositions((prev) =>
+      prev.map((p) =>
+        p.id === signatureId ? { ...p, position_page: page } : p
+      )
     );
   };
 
@@ -196,6 +228,7 @@ export function SignaturePositionEditor({
           .update({
             position_x: pos.position_x,
             position_y: pos.position_y,
+            position_page: pos.position_page,
             position_width: pos.position_width,
             position_height: pos.position_height,
           })
@@ -213,6 +246,10 @@ export function SignaturePositionEditor({
       setIsSaving(false);
     }
   };
+
+  const signaturesOnCurrentPage = positions.filter(
+    (sig) => sig.position_page === currentPage
+  );
 
   return (
     <Card>
@@ -263,18 +300,91 @@ export function SignaturePositionEditor({
         </div>
       </CardHeader>
       <CardContent>
+        {/* Page navigation */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mb-4 p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                Página {currentPage} de {totalPages}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Signature page assignments */}
+        {!readOnly && (
+          <div className="mb-4 space-y-2">
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Atribuir assinaturas às páginas:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {positions.map((sig) => (
+                <div
+                  key={sig.id}
+                  className={`flex items-center justify-between p-2 rounded-lg border ${getSignerColor(sig.signer_type)}`}
+                >
+                  <span className="text-xs font-medium truncate mr-2">
+                    {getSignerTypeLabel(sig.signer_type)}
+                    {sig.signer_type === "witness" ? ` ${sig.signer_order}` : ""}
+                  </span>
+                  <Select
+                    value={String(sig.position_page)}
+                    onValueChange={(value) => handlePageChange(sig.id, parseInt(value))}
+                  >
+                    <SelectTrigger className="w-24 h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <SelectItem key={page} value={String(page)}>
+                          Página {page}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Legend */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {positions.map((sig) => (
-            <Badge
-              key={sig.id}
-              variant="outline"
-              className={getSignerColor(sig.signer_type)}
-            >
-              {getSignerTypeLabel(sig.signer_type)}
-              {sig.signer_type === "witness" ? ` ${sig.signer_order}` : ""}: {sig.signer_name}
-            </Badge>
-          ))}
+          {signaturesOnCurrentPage.length > 0 ? (
+            signaturesOnCurrentPage.map((sig) => (
+              <Badge
+                key={sig.id}
+                variant="outline"
+                className={getSignerColor(sig.signer_type)}
+              >
+                {getSignerTypeLabel(sig.signer_type)}
+                {sig.signer_type === "witness" ? ` ${sig.signer_order}` : ""}: {sig.signer_name}
+              </Badge>
+            ))
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              Nenhuma assinatura nesta página
+            </span>
+          )}
         </div>
 
         {/* Document with signature overlays */}
@@ -293,9 +403,9 @@ export function SignaturePositionEditor({
             dangerouslySetInnerHTML={{ __html: documentHtml }}
           />
 
-          {/* Signature position overlays */}
+          {/* Signature position overlays - only show signatures on current page */}
           {showOverlay &&
-            positions.map((sig) => (
+            signaturesOnCurrentPage.map((sig) => (
               <div
                 key={sig.id}
                 className={`absolute border-2 border-dashed rounded-lg transition-shadow ${
@@ -337,8 +447,8 @@ export function SignaturePositionEditor({
         {/* Help text */}
         {!readOnly && (
           <p className="text-sm text-muted-foreground mt-3">
-            💡 Dica: Arraste cada caixa de assinatura para a posição desejada no documento.
-            As posições serão salvas e usadas quando o documento for impresso ou exportado.
+            💡 Dica: Use os seletores acima para atribuir cada assinatura a uma página específica.
+            Depois, arraste as caixas para posicioná-las na visualização do documento.
           </p>
         )}
       </CardContent>
