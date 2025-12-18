@@ -152,6 +152,39 @@ const ContratoDetalhes = () => {
     setWitnessEmail(witness.signer_email);
   };
 
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const sendWitnessNotificationEmail = async (name: string, email: string) => {
+    try {
+      const contractorName = profile?.full_name || "Contratado";
+      
+      await supabase.functions.invoke("send-email", {
+        body: {
+          to: email,
+          subject: "Você foi adicionado como testemunha em um contrato - Aure System",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Olá ${name},</h2>
+              <p>Você foi adicionado como <strong>testemunha</strong> em um contrato PJ no sistema Aure.</p>
+              <p><strong>Contrato de:</strong> ${contractorName}</p>
+              <p>Em breve você receberá instruções para assinar o documento.</p>
+              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+              <p style="color: #666; font-size: 12px;">Este é um email automático do sistema Aure.</p>
+            </div>
+          `,
+          from_name: "Aure System",
+        },
+      });
+      console.log("Email notification sent to witness:", email);
+    } catch (error) {
+      console.error("Error sending witness notification email:", error);
+      // Don't throw - email failure shouldn't block the main operation
+    }
+  };
+
   const handleSaveWitness = async () => {
     if (!editingWitness) return;
     
@@ -159,6 +192,15 @@ const ContratoDetalhes = () => {
       toast({
         title: "Erro",
         description: "Nome e email são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isValidEmail(witnessEmail.trim())) {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira um email válido",
         variant: "destructive",
       });
       return;
@@ -176,9 +218,12 @@ const ContratoDetalhes = () => {
 
       if (error) throw error;
 
+      // Send email notification to the witness
+      await sendWitnessNotificationEmail(witnessName.trim(), witnessEmail.trim());
+
       toast({
         title: "Sucesso",
-        description: "Testemunha atualizada com sucesso",
+        description: "Testemunha atualizada e notificada por email",
       });
 
       setEditingWitness(null);
@@ -626,7 +671,11 @@ const ContratoDetalhes = () => {
                 value={witnessEmail}
                 onChange={(e) => setWitnessEmail(e.target.value)}
                 placeholder="email@exemplo.com"
+                className={witnessEmail && !isValidEmail(witnessEmail) ? "border-destructive" : ""}
               />
+              {witnessEmail && !isValidEmail(witnessEmail) && (
+                <p className="text-sm text-destructive">Email inválido</p>
+              )}
             </div>
           </div>
           <DialogFooter>
