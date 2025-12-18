@@ -15,10 +15,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Mail, Phone, FileText, CreditCard, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Pencil, Mail, Phone, FileText, CreditCard, Loader2, UserCog } from "lucide-react";
 import { formatCPF, formatPhone } from "@/lib/masks";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface ColaboradorData {
   id: string;
@@ -57,12 +74,18 @@ interface Payment {
 const ColaboradorDetalhes = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, hasRole } = useAuth();
 
   const [isLoading, setIsLoading] = useState(true);
   const [colaborador, setColaborador] = useState<ColaboradorData | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState("");
+  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+
+  // Verificar se o usuário pode alterar papéis (Admin ou Gestor)
+  const canChangeRoles = hasRole("master_admin") || hasRole("admin") || hasRole("gestor");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -140,10 +163,75 @@ const ColaboradorDetalhes = () => {
       master_admin: "Master Admin",
       admin: "Administrador",
       financeiro: "Financeiro",
+      juridico: "Jurídico",
       gestor: "Gestor",
       colaborador: "Colaborador",
     };
     return labels[role] || role;
+  };
+
+  const handleOpenRoleDialog = () => {
+    if (colaborador && colaborador.roles.length > 0) {
+      setSelectedRole(colaborador.roles[0].role);
+    }
+    setIsRoleDialogOpen(true);
+  };
+
+  const handleUpdateRole = async () => {
+    if (!colaborador || !selectedRole) return;
+
+    setIsUpdatingRole(true);
+    try {
+      // Remover papéis antigos (exceto master_admin que não pode ser alterado)
+      const { error: deleteError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", colaborador.user_id)
+        .neq("role", "master_admin");
+
+      if (deleteError) throw deleteError;
+
+      // Inserir novo papel
+      const { error: insertError } = await supabase
+        .from("user_roles")
+        .insert({
+          user_id: colaborador.user_id,
+          role: selectedRole as "admin" | "financeiro" | "juridico" | "gestor" | "colaborador",
+        });
+
+      if (insertError) throw insertError;
+
+      // Atualizar estado local
+      setColaborador({
+        ...colaborador,
+        roles: [{ role: selectedRole }],
+      });
+
+      toast.success("Papel do colaborador atualizado com sucesso");
+      setIsRoleDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating role:", error);
+      toast.error("Erro ao atualizar papel do colaborador");
+    } finally {
+      setIsUpdatingRole(false);
+    }
+  };
+
+  // Papéis disponíveis para seleção (Gestor só pode atribuir colaborador e financeiro)
+  const getAvailableRoles = () => {
+    const baseRoles = [
+      { value: "colaborador", label: "Colaborador" },
+      { value: "financeiro", label: "Financeiro" },
+      { value: "juridico", label: "Jurídico" },
+      { value: "gestor", label: "Gestor" },
+    ];
+
+    // Apenas Admin e Master Admin podem promover a Admin
+    if (hasRole("master_admin") || hasRole("admin")) {
+      baseRoles.push({ value: "admin", label: "Administrador" });
+    }
+
+    return baseRoles;
   };
 
   const getContractStatusBadge = (status: string) => {
@@ -228,12 +316,23 @@ const ColaboradorDetalhes = () => {
                     {colaborador.is_active ? "Ativo" : "Inativo"}
                   </Badge>
                 </div>
-                <div className="flex flex-wrap gap-1 mt-2">
+                <div className="flex flex-wrap items-center gap-2 mt-2">
                   {colaborador.roles.map((r, i) => (
                     <Badge key={i} variant="outline">
                       {getRoleLabel(r.role)}
                     </Badge>
                   ))}
+                  {canChangeRoles && !colaborador.roles.some(r => r.role === "master_admin") && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2 text-xs"
+                      onClick={handleOpenRoleDialog}
+                    >
+                      <UserCog className="h-3 w-3 mr-1" />
+                      Alterar papel
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -373,6 +472,52 @@ const ColaboradorDetalhes = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      {/* Dialog para alterar papel */}
+      <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Alterar Papel do Colaborador</DialogTitle>
+            <DialogDescription>
+              Selecione o novo papel para {colaborador.full_name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Papel Atual</Label>
+              <div className="flex flex-wrap gap-1">
+                {colaborador.roles.map((r, i) => (
+                  <Badge key={i} variant="outline">
+                    {getRoleLabel(r.role)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Novo Papel</Label>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um papel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAvailableRoles().map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRoleDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateRole} disabled={isUpdatingRole || !selectedRole}>
+              {isUpdatingRole ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
