@@ -154,8 +154,12 @@ export type Database = {
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at: string | null
           created_by: string | null
+          deliverable_description: string | null
           department: string | null
           document_url: string | null
+          duration_type: string | null
+          duration_unit: string | null
+          duration_value: number | null
           end_date: string | null
           hourly_rate: number | null
           id: string
@@ -172,8 +176,12 @@ export type Database = {
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at?: string | null
           created_by?: string | null
+          deliverable_description?: string | null
           department?: string | null
           document_url?: string | null
+          duration_type?: string | null
+          duration_unit?: string | null
+          duration_value?: number | null
           end_date?: string | null
           hourly_rate?: number | null
           id?: string
@@ -190,8 +198,12 @@ export type Database = {
           contract_type?: Database["public"]["Enums"]["contract_type"]
           created_at?: string | null
           created_by?: string | null
+          deliverable_description?: string | null
           department?: string | null
           document_url?: string | null
+          duration_type?: string | null
+          duration_unit?: string | null
+          duration_value?: number | null
           end_date?: string | null
           hourly_rate?: number | null
           id?: string
