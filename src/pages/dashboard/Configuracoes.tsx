@@ -8,8 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Settings, CreditCard, Tag, Percent, Package, Plus, Pencil, Trash2, Save, Bell, FileText } from "lucide-react";
+import { Settings, CreditCard, Tag, Percent, Package, Plus, Pencil, Trash2, Save, Bell, FileText, MessageSquare, Send, Building2, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +62,33 @@ interface Promotion {
   applies_to: "all" | "new_companies" | "existing_companies";
 }
 
+interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  target_type: "all" | "company" | "role";
+  target_company_id: string | null;
+  target_roles: string[];
+  priority: "low" | "normal" | "high" | "urgent";
+  is_active: boolean;
+  created_at: string;
+  expires_at: string | null;
+  company_name?: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
+}
+
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Administrador" },
+  { value: "financeiro", label: "Financeiro" },
+  { value: "gestor", label: "Gestor" },
+  { value: "colaborador", label: "Colaborador" },
+  { value: "juridico", label: "Jurídico" },
+];
+
 const Configuracoes = () => {
   const [basePrice, setBasePrice] = useState<number>(49.90);
   const [reminderDays, setReminderDays] = useState<number>(3);
@@ -67,6 +96,8 @@ const Configuracoes = () => {
   const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingReminder, setIsSavingReminder] = useState(false);
@@ -76,9 +107,11 @@ const Configuracoes = () => {
   const [tierDialogOpen, setTierDialogOpen] = useState(false);
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
   const [promotionDialogOpen, setPromotionDialogOpen] = useState(false);
+  const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<PricingTier | null>(null);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -86,13 +119,15 @@ const Configuracoes = () => {
 
   const fetchData = async () => {
     try {
-      const [settingsResult, reminderResult, contractAlertResult, tiersResult, couponsResult, promotionsResult] = await Promise.all([
+      const [settingsResult, reminderResult, contractAlertResult, tiersResult, couponsResult, promotionsResult, announcementsResult, companiesResult] = await Promise.all([
         supabase.from("system_settings").select("*").eq("key", "pj_contract_price").maybeSingle(),
         supabase.from("system_settings").select("*").eq("key", "billing_reminder_days").maybeSingle(),
         supabase.from("system_settings").select("*").eq("key", "contract_expiration_alert_days").maybeSingle(),
         supabase.from("pricing_tiers").select("*").order("min_contracts"),
         supabase.from("discount_coupons").select("*").order("created_at", { ascending: false }),
         supabase.from("promotions").select("*").order("created_at", { ascending: false }),
+        supabase.from("system_announcements").select("*, companies(name)").order("created_at", { ascending: false }),
+        supabase.from("companies").select("id, name").eq("is_active", true).order("name"),
       ]);
 
       if (settingsResult.data) {
@@ -113,6 +148,13 @@ const Configuracoes = () => {
       if (tiersResult.data) setPricingTiers(tiersResult.data);
       if (couponsResult.data) setCoupons(couponsResult.data as Coupon[]);
       if (promotionsResult.data) setPromotions(promotionsResult.data as Promotion[]);
+      if (announcementsResult.data) {
+        setAnnouncements(announcementsResult.data.map((a: any) => ({
+          ...a,
+          company_name: a.companies?.name,
+        })));
+      }
+      if (companiesResult.data) setCompanies(companiesResult.data);
     } catch (error) {
       console.error("Error fetching settings:", error);
       toast.error("Erro ao carregar configurações");
@@ -306,6 +348,64 @@ const Configuracoes = () => {
     }
   };
 
+  // Announcement functions
+  const saveAnnouncement = async (announcement: Partial<Announcement>) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const dataToSave = {
+        ...announcement,
+        created_by: userData.user?.id,
+      };
+      delete (dataToSave as any).company_name;
+
+      if (editingAnnouncement) {
+        const { error } = await supabase
+          .from("system_announcements")
+          .update(dataToSave)
+          .eq("id", editingAnnouncement.id);
+        if (error) throw error;
+        toast.success("Mensagem atualizada!");
+      } else {
+        const { error } = await supabase.from("system_announcements").insert([dataToSave as any]);
+        if (error) throw error;
+        toast.success("Mensagem enviada!");
+      }
+      fetchData();
+      setAnnouncementDialogOpen(false);
+      setEditingAnnouncement(null);
+    } catch (error) {
+      console.error("Error saving announcement:", error);
+      toast.error("Erro ao salvar mensagem");
+    }
+  };
+
+  const deleteAnnouncement = async (id: string) => {
+    try {
+      const { error } = await supabase.from("system_announcements").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Mensagem removida!");
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting announcement:", error);
+      toast.error("Erro ao remover mensagem");
+    }
+  };
+
+  const toggleAnnouncementStatus = async (id: string, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from("system_announcements")
+        .update({ is_active: isActive })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success(isActive ? "Mensagem ativada!" : "Mensagem desativada!");
+      fetchData();
+    } catch (error) {
+      console.error("Error toggling announcement:", error);
+      toast.error("Erro ao atualizar status");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -324,31 +424,35 @@ const Configuracoes = () => {
           Configurações do Sistema
         </h1>
         <p className="text-muted-foreground mt-1">
-          Gerencie preços, pacotes, cupons e promoções
+          Gerencie preços, pacotes, cupons, promoções e mensagens
         </p>
       </div>
 
       <Tabs defaultValue="pricing" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="pricing" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
-            Preço Base
+            <span className="hidden sm:inline">Preço Base</span>
           </TabsTrigger>
           <TabsTrigger value="tiers" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Pacotes
+            <span className="hidden sm:inline">Pacotes</span>
           </TabsTrigger>
           <TabsTrigger value="coupons" className="flex items-center gap-2">
             <Tag className="h-4 w-4" />
-            Cupons
+            <span className="hidden sm:inline">Cupons</span>
           </TabsTrigger>
           <TabsTrigger value="promotions" className="flex items-center gap-2">
             <Percent className="h-4 w-4" />
-            Promoções
+            <span className="hidden sm:inline">Promoções</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
-            Notificações
+            <span className="hidden sm:inline">Notificações</span>
+          </TabsTrigger>
+          <TabsTrigger value="messages" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">Mensagens</span>
           </TabsTrigger>
         </TabsList>
 
@@ -698,6 +802,107 @@ const Configuracoes = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Mensagens Tab */}
+        <TabsContent value="messages">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Mensagens do Sistema</CardTitle>
+                <CardDescription>
+                  Envie comunicados para usuários do sistema
+                </CardDescription>
+              </div>
+              <Button onClick={() => { setEditingAnnouncement(null); setAnnouncementDialogOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Mensagem
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {announcements.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma mensagem enviada</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {announcements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className="p-4 rounded-lg border border-border"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="font-medium">{announcement.title}</h4>
+                            <Badge variant={announcement.is_active ? "default" : "secondary"}>
+                              {announcement.is_active ? "Ativa" : "Inativa"}
+                            </Badge>
+                            <Badge variant="outline" className={
+                              announcement.priority === "urgent" ? "border-red-500 text-red-500" :
+                              announcement.priority === "high" ? "border-orange-500 text-orange-500" :
+                              announcement.priority === "low" ? "border-muted-foreground" : ""
+                            }>
+                              {announcement.priority === "urgent" ? "Urgente" :
+                               announcement.priority === "high" ? "Alta" :
+                               announcement.priority === "low" ? "Baixa" : "Normal"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                            {announcement.message}
+                          </p>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              {announcement.target_type === "all" && (
+                                <><Users className="h-3 w-3" /> Todos os usuários</>
+                              )}
+                              {announcement.target_type === "company" && (
+                                <><Building2 className="h-3 w-3" /> {announcement.company_name || "Empresa"}</>
+                              )}
+                              {announcement.target_type === "role" && (
+                                <><Users className="h-3 w-3" /> {announcement.target_roles?.map(r => 
+                                  ROLE_OPTIONS.find(o => o.value === r)?.label || r
+                                ).join(", ")}</>
+                              )}
+                            </span>
+                            <span>
+                              Criada em {new Date(announcement.created_at).toLocaleDateString("pt-BR")}
+                            </span>
+                            {announcement.expires_at && (
+                              <span>
+                                Expira em {new Date(announcement.expires_at).toLocaleDateString("pt-BR")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Switch
+                            checked={announcement.is_active}
+                            onCheckedChange={(checked) => toggleAnnouncementStatus(announcement.id, checked)}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => { setEditingAnnouncement(announcement); setAnnouncementDialogOpen(true); }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteAnnouncement(announcement.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Tier Dialog */}
@@ -722,6 +927,15 @@ const Configuracoes = () => {
         onOpenChange={setPromotionDialogOpen}
         promotion={editingPromotion}
         onSave={savePromotion}
+      />
+
+      {/* Announcement Dialog */}
+      <AnnouncementDialog
+        open={announcementDialogOpen}
+        onOpenChange={setAnnouncementDialogOpen}
+        announcement={editingAnnouncement}
+        companies={companies}
+        onSave={saveAnnouncement}
       />
     </div>
   );
@@ -1086,6 +1300,203 @@ function PromotionDialog({
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button onClick={handleSave}>Salvar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Announcement Dialog Component
+function AnnouncementDialog({
+  open,
+  onOpenChange,
+  announcement,
+  companies,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  announcement: Announcement | null;
+  companies: Company[];
+  onSave: (announcement: Partial<Announcement>) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [targetType, setTargetType] = useState<"all" | "company" | "role">("all");
+  const [targetCompanyId, setTargetCompanyId] = useState<string>("");
+  const [targetRoles, setTargetRoles] = useState<string[]>([]);
+  const [priority, setPriority] = useState<"low" | "normal" | "high" | "urgent">("normal");
+  const [isActive, setIsActive] = useState(true);
+  const [expiresAt, setExpiresAt] = useState("");
+
+  useEffect(() => {
+    if (announcement) {
+      setTitle(announcement.title);
+      setMessage(announcement.message);
+      setTargetType(announcement.target_type);
+      setTargetCompanyId(announcement.target_company_id || "");
+      setTargetRoles(announcement.target_roles || []);
+      setPriority(announcement.priority);
+      setIsActive(announcement.is_active);
+      setExpiresAt(announcement.expires_at ? announcement.expires_at.split("T")[0] : "");
+    } else {
+      setTitle("");
+      setMessage("");
+      setTargetType("all");
+      setTargetCompanyId("");
+      setTargetRoles([]);
+      setPriority("normal");
+      setIsActive(true);
+      setExpiresAt("");
+    }
+  }, [announcement, open]);
+
+  const handleRoleToggle = (role: string) => {
+    setTargetRoles(prev => 
+      prev.includes(role) 
+        ? prev.filter(r => r !== role) 
+        : [...prev, role]
+    );
+  };
+
+  const handleSave = () => {
+    if (!title.trim() || !message.trim()) {
+      return;
+    }
+
+    onSave({
+      title: title.trim(),
+      message: message.trim(),
+      target_type: targetType,
+      target_company_id: targetType === "company" ? targetCompanyId || null : null,
+      target_roles: targetType === "role" ? targetRoles : [],
+      priority,
+      is_active: isActive,
+      expires_at: expiresAt || null,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>{announcement ? "Editar Mensagem" : "Nova Mensagem"}</DialogTitle>
+          <DialogDescription>
+            {announcement ? "Atualize a mensagem do sistema" : "Envie uma mensagem para os usuários do sistema"}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-2">
+            <Label>Título *</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Título da mensagem"
+              maxLength={100}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Mensagem *</Label>
+            <Textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Conteúdo da mensagem..."
+              rows={4}
+              maxLength={2000}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Destinatários</Label>
+            <Select value={targetType} onValueChange={(v) => setTargetType(v as typeof targetType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os usuários</SelectItem>
+                <SelectItem value="company">Empresa específica</SelectItem>
+                <SelectItem value="role">Cargos específicos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {targetType === "company" && (
+            <div className="space-y-2">
+              <Label>Selecione a Empresa</Label>
+              <Select value={targetCompanyId} onValueChange={setTargetCompanyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {targetType === "role" && (
+            <div className="space-y-2">
+              <Label>Selecione os Cargos</Label>
+              <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg">
+                {ROLE_OPTIONS.map((role) => (
+                  <div key={role.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`role-${role.value}`}
+                      checked={targetRoles.includes(role.value)}
+                      onCheckedChange={() => handleRoleToggle(role.value)}
+                    />
+                    <label
+                      htmlFor={`role-${role.value}`}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {role.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Prioridade</Label>
+              <Select value={priority} onValueChange={(v) => setPriority(v as typeof priority)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Baixa</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="urgent">Urgente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Data de Expiração (opcional)</Label>
+              <Input
+                type="date"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Switch checked={isActive} onCheckedChange={setIsActive} />
+            <Label>Mensagem ativa</Label>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={!title.trim() || !message.trim()}>
+            <Send className="h-4 w-4 mr-2" />
+            {announcement ? "Salvar" : "Enviar"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
