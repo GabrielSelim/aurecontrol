@@ -356,17 +356,13 @@ const Contratos = () => {
       : "";
 
     // Determine contractor data based on selection
-    // If usePersonalData = true, show personal name + CPF instead of company data
-    const contratadoNome = usePersonalData 
-      ? collaboratorProfile.full_name 
-      : (collaboratorProfile.pj_razao_social || collaboratorProfile.full_name);
+    // If includePersonalData = true, include personal data (Name + CPF) in ADDITION to PJ data
+    const includePersonalData = usePersonalData;
     
-    const contratadoDocumento = usePersonalData
-      ? (collaboratorProfile.cpf ? formatCPF(collaboratorProfile.cpf) : "")
-      : (collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : (collaboratorProfile.cpf || ""));
-    
-    const contratadoTipoDocumento = usePersonalData ? "CPF" : "CNPJ";
-    const contratadoTipoPessoa = usePersonalData ? "pessoa física" : "pessoa jurídica de direito privado";
+    // Dados pessoais para incluir quando a opção está marcada
+    const dadosPessoais = includePersonalData 
+      ? `, neste ato representada por <strong>${collaboratorProfile.full_name}</strong>, inscrito(a) no CPF sob o nº <strong>${collaboratorProfile.cpf ? formatCPF(collaboratorProfile.cpf) : ""}</strong>`
+      : "";
 
     // Replace template variables with actual data
     // Support both new Portuguese variable names and legacy English variable names
@@ -396,14 +392,14 @@ const Contratos = () => {
       // Company representative data (Legacy English)
       "{{company_representative_name}}": representativeProfile?.full_name || "",
       
-      // Contracted party data (Portuguese) - adapts based on PF/PJ selection
-      "{{contratado_nome}}": contratadoNome,
+      // Contracted party data (Portuguese) - always uses PJ data, with optional personal data
+      "{{contratado_nome}}": collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
       "{{contratado_nome_fantasia}}": collaboratorProfile.pj_nome_fantasia || collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
-      "{{contratado_cpf_cnpj}}": contratadoDocumento,
-      "{{contratado_tipo_documento}}": contratadoTipoDocumento,
-      "{{contratado_tipo_pessoa}}": contratadoTipoPessoa,
+      "{{contratado_cpf_cnpj}}": collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : "",
       "{{contratado_endereco}}": collaboratorAddress,
-      // Personal data (always available for reference)
+      // Dados pessoais (incluídos apenas quando a opção está marcada)
+      "{{contratado_dados_pessoais}}": dadosPessoais,
+      // Personal data (always available for reference in custom templates)
       "{{contratado_nome_pessoal}}": collaboratorProfile.full_name,
       "{{contratado_cpf}}": collaboratorProfile.cpf ? formatCPF(collaboratorProfile.cpf) : "",
       // PJ data (always available for reference)
@@ -1026,14 +1022,14 @@ const Contratos = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pj">Pessoa Jurídica (CNPJ e Razão Social)</SelectItem>
-                          <SelectItem value="pf">Pessoa Física (CPF e Nome)</SelectItem>
+                          <SelectItem value="pj">Somente PJ (CNPJ e Razão Social)</SelectItem>
+                          <SelectItem value="pf">PJ + Pessoa Física (CNPJ, Razão Social, Nome e CPF)</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
                         {contractorDataType === "pj" 
-                          ? "O contrato usará os dados da empresa do colaborador (CNPJ e Razão Social)."
-                          : "O contrato usará os dados pessoais do colaborador (CPF e Nome)."}
+                          ? "O contrato usará apenas os dados da empresa (CNPJ e Razão Social)."
+                          : "O contrato incluirá também os dados pessoais do responsável (Nome e CPF)."}
                       </p>
                     </div>
 
