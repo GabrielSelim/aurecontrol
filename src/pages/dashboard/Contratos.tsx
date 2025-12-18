@@ -194,7 +194,7 @@ const Contratos = () => {
       const { error } = await supabase.from("contracts").insert({
         company_id: profile.company_id,
         user_id: selectedUserId,
-        contract_type: contractType as "CLT" | "PJ",
+        contract_type: contractType as "CLT" | "PJ" | "estagio" | "temporario",
         job_title: jobTitle,
         department: department || null,
         salary: salary ? parseFloat(salary) : null,
@@ -236,8 +236,8 @@ const Contratos = () => {
 
   const getContractTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      clt: "CLT",
-      pj: "PJ",
+      CLT: "CLT",
+      PJ: "PJ",
       estagio: "Estágio",
       temporario: "Temporário",
     };
@@ -397,6 +397,8 @@ const Contratos = () => {
                       <SelectContent>
                         <SelectItem value="CLT">CLT</SelectItem>
                         <SelectItem value="PJ">PJ</SelectItem>
+                        <SelectItem value="estagio">Estágio</SelectItem>
+                        <SelectItem value="temporario">Temporário</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -428,7 +430,7 @@ const Contratos = () => {
                       <>
                         <p className="font-medium">Contrato para Gestão Interna</p>
                         <p className="text-xs mt-1">
-                          Contratos {contractType === "clt" ? "CLT" : contractType === "estagio" ? "de Estágio" : "Temporários"} são 
+                          Contratos {contractType === "CLT" ? "CLT" : contractType === "estagio" ? "de Estágio" : "Temporários"} são 
                           para organização interna da empresa e não geram cobrança adicional.
                         </p>
                       </>
