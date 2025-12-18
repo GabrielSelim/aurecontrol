@@ -177,6 +177,192 @@ export type Database = {
           },
         ]
       }
+      contract_documents: {
+        Row: {
+          completed_at: string | null
+          contract_id: string
+          created_at: string | null
+          document_html: string
+          id: string
+          signature_status:
+            | Database["public"]["Enums"]["signature_status"]
+            | null
+          template_id: string | null
+          updated_at: string | null
+          witness_count: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          contract_id: string
+          created_at?: string | null
+          document_html: string
+          id?: string
+          signature_status?:
+            | Database["public"]["Enums"]["signature_status"]
+            | null
+          template_id?: string | null
+          updated_at?: string | null
+          witness_count?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          contract_id?: string
+          created_at?: string | null
+          document_html?: string
+          id?: string
+          signature_status?:
+            | Database["public"]["Enums"]["signature_status"]
+            | null
+          template_id?: string | null
+          updated_at?: string | null
+          witness_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_documents_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: true
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_documents_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: true
+            referencedRelation: "contracts_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_documents_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "contract_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_signatures: {
+        Row: {
+          created_at: string | null
+          document_id: string
+          external_signature_id: string | null
+          external_signature_provider: string | null
+          id: string
+          ip_address: string | null
+          signature_image_url: string | null
+          signed_at: string | null
+          signer_document: string | null
+          signer_email: string
+          signer_name: string
+          signer_order: number | null
+          signer_type: Database["public"]["Enums"]["signer_type"]
+          signer_user_id: string | null
+          updated_at: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_id: string
+          external_signature_id?: string | null
+          external_signature_provider?: string | null
+          id?: string
+          ip_address?: string | null
+          signature_image_url?: string | null
+          signed_at?: string | null
+          signer_document?: string | null
+          signer_email: string
+          signer_name: string
+          signer_order?: number | null
+          signer_type: Database["public"]["Enums"]["signer_type"]
+          signer_user_id?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string
+          external_signature_id?: string | null
+          external_signature_provider?: string | null
+          id?: string
+          ip_address?: string | null
+          signature_image_url?: string | null
+          signed_at?: string | null
+          signer_document?: string | null
+          signer_email?: string
+          signer_name?: string
+          signer_order?: number | null
+          signer_type?: Database["public"]["Enums"]["signer_type"]
+          signer_user_id?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_signatures_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "contract_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_templates: {
+        Row: {
+          company_id: string | null
+          content: string
+          created_at: string | null
+          created_by: string | null
+          default_witness_count: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_system_default: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          default_witness_count?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system_default?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          default_witness_count?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system_default?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
           company_id: string
@@ -1008,6 +1194,8 @@ export type Database = {
       contract_type: "CLT" | "PJ" | "estagio" | "temporario"
       invite_status: "pending" | "accepted" | "expired" | "cancelled"
       payment_status: "pending" | "approved" | "paid" | "rejected"
+      signature_status: "pending" | "partial" | "completed" | "cancelled"
+      signer_type: "contractor" | "company_representative" | "witness"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1147,6 +1335,8 @@ export const Constants = {
       contract_type: ["CLT", "PJ", "estagio", "temporario"],
       invite_status: ["pending", "accepted", "expired", "cancelled"],
       payment_status: ["pending", "approved", "paid", "rejected"],
+      signature_status: ["pending", "partial", "completed", "cancelled"],
+      signer_type: ["contractor", "company_representative", "witness"],
     },
   },
 } as const
