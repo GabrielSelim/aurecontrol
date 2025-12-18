@@ -16,7 +16,7 @@ interface Profile {
 }
 
 interface UserRole {
-  role: "master_admin" | "admin" | "financeiro" | "gestor" | "colaborador";
+  role: "master_admin" | "admin" | "financeiro" | "juridico" | "gestor" | "colaborador";
 }
 
 interface AuthContextType {

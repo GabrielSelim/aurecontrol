@@ -270,6 +270,7 @@ const Convites = () => {
     const labels: Record<string, string> = {
       admin: "Administrador",
       financeiro: "Financeiro",
+      juridico: "Jurídico",
       gestor: "Gestor",
       colaborador: "Colaborador",
     };
@@ -365,6 +366,7 @@ const Convites = () => {
                   <SelectContent>
                     <SelectItem value="admin">Administrador</SelectItem>
                     <SelectItem value="financeiro">Financeiro</SelectItem>
+                    <SelectItem value="juridico">Jurídico</SelectItem>
                     <SelectItem value="gestor">Gestor</SelectItem>
                     <SelectItem value="colaborador">Colaborador</SelectItem>
                   </SelectContent>

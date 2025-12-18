@@ -32,21 +32,26 @@ interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
-const adminNavigation = [
-  { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
-  { name: "Contratos", href: "/dashboard/contratos", icon: FileText },
-  { name: "Pagamentos", href: "/dashboard/pagamentos", icon: CreditCard },
-  { name: "Convites", href: "/dashboard/convites", icon: UserPlus },
-  { name: "Empresa", href: "/dashboard/empresa", icon: Building2 },
-];
+// Navigation items by role
+const navigationItems = {
+  visaoGeral: { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
+  colaboradores: { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
+  contratos: { name: "Contratos", href: "/dashboard/contratos", icon: FileText },
+  pagamentos: { name: "Pagamentos", href: "/dashboard/pagamentos", icon: CreditCard },
+  convites: { name: "Convites", href: "/dashboard/convites", icon: UserPlus },
+  empresa: { name: "Empresa", href: "/dashboard/empresa", icon: Building2 },
+  empresas: { name: "Empresas", href: "/dashboard/empresas", icon: Building2 },
+  faturamento: { name: "Faturamento", href: "/dashboard/faturamento", icon: CreditCard },
+  notificacoes: { name: "Notificações", href: "/dashboard/notificacoes", icon: Bell },
+  configuracoes: { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
+};
 
 const masterAdminNavigation = [
-  { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Empresas", href: "/dashboard/empresas", icon: Building2 },
-  { name: "Faturamento", href: "/dashboard/faturamento", icon: CreditCard },
-  { name: "Notificações", href: "/dashboard/notificacoes", icon: Bell },
-  { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
+  navigationItems.visaoGeral,
+  navigationItems.empresas,
+  navigationItems.faturamento,
+  navigationItems.notificacoes,
+  navigationItems.configuracoes,
 ];
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -62,6 +67,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       master_admin: "Master Admin",
       admin: "Administrador",
       financeiro: "Financeiro",
+      juridico: "Jurídico",
       gestor: "Gestor",
       colaborador: "Colaborador",
     };
@@ -82,15 +88,47 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     navigate("/");
   };
 
-  const filteredNavigation = isMasterAdmin
-    ? masterAdminNavigation
-    : adminNavigation.filter((item) => {
-        // Only admins can see company and invites
-        if (["/dashboard/empresa", "/dashboard/convites"].includes(item.href)) {
-          return isAdmin();
-        }
-        return true;
-      });
+  // Build navigation based on user role
+  const getNavigationForRole = () => {
+    if (isMasterAdmin) {
+      return masterAdminNavigation;
+    }
+    
+    const nav = [navigationItems.visaoGeral];
+    
+    // Admin sees everything
+    if (hasRole("admin")) {
+      nav.push(
+        navigationItems.colaboradores,
+        navigationItems.contratos,
+        navigationItems.pagamentos,
+        navigationItems.convites,
+        navigationItems.empresa
+      );
+      return nav;
+    }
+    
+    // Gestor: only collaborators
+    if (hasRole("gestor")) {
+      nav.push(navigationItems.colaboradores);
+    }
+    
+    // Juridico: only contracts
+    if (hasRole("juridico")) {
+      nav.push(navigationItems.contratos);
+    }
+    
+    // Financeiro: only payments
+    if (hasRole("financeiro")) {
+      nav.push(navigationItems.pagamentos);
+    }
+    
+    // Colaborador: only visão geral (already added)
+    
+    return nav;
+  };
+
+  const filteredNavigation = getNavigationForRole();
 
   const Sidebar = () => (
     <div className="flex h-full flex-col bg-card border-r border-border">
