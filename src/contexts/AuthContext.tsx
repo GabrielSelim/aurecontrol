@@ -79,14 +79,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
+        // Clear profile and roles immediately when user changes
+        // This prevents showing old data while new data loads
+        setProfile(null);
+        setRoles([]);
+
         // Defer profile fetch to avoid deadlock
         if (session?.user) {
+          setIsLoading(true);
           setTimeout(() => {
             fetchUserData(session.user.id);
           }, 0);
         } else {
-          setProfile(null);
-          setRoles([]);
+          setIsLoading(false);
         }
       }
     );
