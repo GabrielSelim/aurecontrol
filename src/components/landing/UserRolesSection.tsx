@@ -1,9 +1,9 @@
-import { Crown, Calculator, Scale, User, Building2 } from "lucide-react";
+import { Crown, Calculator, Scale, Users, User } from "lucide-react";
 
 const roles = [
   {
     icon: Crown,
-    title: "Dono da Empresa",
+    title: "Administrador",
     description: "Controle total: pagamentos, convites, contratos e configurações.",
     permissions: ["Efetuar pagamentos", "Convidar usuários", "Gerenciar contratos", "Todos os relatórios"],
     color: "bg-warning/10 text-warning",
@@ -11,30 +11,30 @@ const roles = [
   {
     icon: Calculator,
     title: "Financeiro",
-    description: "Visão completa das finanças sem poder de autorização.",
-    permissions: ["Visualizar finanças", "Gerenciar funcionários", "Gerar relatórios"],
+    description: "Gestão completa dos pagamentos da empresa.",
+    permissions: ["Gerenciar pagamentos", "Aprovar/rejeitar", "Visualizar relatórios"],
     color: "bg-success/10 text-success",
   },
   {
     icon: Scale,
     title: "Jurídico",
     description: "Gestão de contratos e documentação legal.",
-    permissions: ["Criar contratos", "Gerenciar templates", "Alterar cargos"],
+    permissions: ["Criar contratos", "Gerenciar documentos", "Alterar cargos"],
     color: "bg-primary/10 text-primary",
   },
   {
-    icon: User,
-    title: "Funcionário CLT",
-    description: "Acesso aos próprios dados e contrato de trabalho.",
-    permissions: ["Ver próprio perfil", "Ver contrato CLT", "Atualizar dados"],
+    icon: Users,
+    title: "Gestor",
+    description: "Gestão da equipe e colaboradores.",
+    permissions: ["Ver colaboradores", "Gerenciar equipe", "Acompanhar desempenho"],
     color: "bg-accent/10 text-accent",
   },
   {
-    icon: Building2,
-    title: "Funcionário PJ",
-    description: "Gestão da própria empresa e contratos de prestação.",
-    permissions: ["Assinar contratos", "Ver pagamentos", "Gerenciar empresa PJ"],
-    color: "bg-destructive/10 text-destructive",
+    icon: User,
+    title: "Colaborador",
+    description: "Acesso aos próprios dados e contratos.",
+    permissions: ["Ver próprio perfil", "Ver contratos", "Atualizar dados"],
+    color: "bg-muted-foreground/10 text-muted-foreground",
   },
 ];
 
