@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.contract-expiration-alerts]
 verify_jwt = false
+
+[functions.send-urgent-announcement]
+verify_jwt = true
