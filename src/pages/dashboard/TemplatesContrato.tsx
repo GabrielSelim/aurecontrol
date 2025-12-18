@@ -71,22 +71,36 @@ interface Template {
 }
 
 const TEMPLATE_VARIABLES = [
-  { key: "{{company_name}}", description: "Nome da empresa contratante" },
-  { key: "{{company_cnpj}}", description: "CNPJ da empresa contratante" },
-  { key: "{{company_address}}", description: "Endereço da empresa" },
-  { key: "{{company_city}}", description: "Cidade da empresa" },
-  { key: "{{company_representative_name}}", description: "Nome do representante da empresa" },
-  { key: "{{contractor_name}}", description: "Nome do contratado (PJ)" },
-  { key: "{{contractor_cpf}}", description: "CPF do representante do contratado" },
-  { key: "{{contractor_company_name}}", description: "Razão social do contratado" },
-  { key: "{{contractor_cnpj}}", description: "CNPJ do contratado" },
-  { key: "{{contractor_address}}", description: "Endereço do contratado" },
-  { key: "{{job_title}}", description: "Cargo/função" },
-  { key: "{{salary}}", description: "Valor do contrato" },
-  { key: "{{start_date}}", description: "Data de início" },
-  { key: "{{end_date}}", description: "Data de término (se houver)" },
-  { key: "{{current_date}}", description: "Data atual" },
-  { key: "{{city}}", description: "Cidade de assinatura" },
+  // Empresa Contratante
+  { key: "{{contratante_razao_social}}", description: "Razão social da empresa contratante" },
+  { key: "{{contratante_cnpj}}", description: "CNPJ da empresa contratante" },
+  { key: "{{contratante_endereco}}", description: "Endereço da empresa contratante" },
+  
+  // Representante da Empresa
+  { key: "{{representante_nome}}", description: "Nome do representante/administrador" },
+  { key: "{{representante_cpf}}", description: "CPF do representante" },
+  { key: "{{representante_nacionalidade}}", description: "Nacionalidade do representante" },
+  { key: "{{representante_estado_civil}}", description: "Estado civil do representante" },
+  { key: "{{representante_data_nascimento}}", description: "Data de nascimento do representante" },
+  { key: "{{representante_profissao}}", description: "Profissão do representante" },
+  { key: "{{representante_rg}}", description: "RG do representante" },
+  { key: "{{representante_orgao_expedidor}}", description: "Órgão expedidor do RG" },
+  { key: "{{representante_endereco}}", description: "Endereço do representante" },
+  
+  // Contratado (PJ)
+  { key: "{{contratado_nome}}", description: "Razão social do contratado (PJ)" },
+  { key: "{{contratado_nome_fantasia}}", description: "Nome fantasia do contratado" },
+  { key: "{{contratado_cpf_cnpj}}", description: "CNPJ do contratado" },
+  { key: "{{contratado_endereco}}", description: "Endereço do contratado" },
+  
+  // Dados do Contrato
+  { key: "{{cargo}}", description: "Cargo/função" },
+  { key: "{{departamento}}", description: "Departamento" },
+  { key: "{{valor}}", description: "Valor do contrato" },
+  { key: "{{data_inicio}}", description: "Data de início" },
+  { key: "{{data_fim}}", description: "Data de término (se houver)" },
+  { key: "{{data_atual}}", description: "Data atual por extenso" },
+  { key: "{{cidade}}", description: "Cidade de assinatura" },
 ];
 
 const TemplatesContrato = () => {

@@ -22,6 +22,13 @@ interface ProfileData {
   pj_cnpj: string | null;
   pj_razao_social: string | null;
   pj_nome_fantasia: string | null;
+  // Representative data
+  nationality: string | null;
+  marital_status: string | null;
+  birth_date: string | null;
+  profession: string | null;
+  identity_number: string | null;
+  identity_issuer: string | null;
 }
 
 interface CompanyData {
@@ -50,6 +57,12 @@ export default function Perfil() {
     pj_cnpj: null,
     pj_razao_social: null,
     pj_nome_fantasia: null,
+    nationality: null,
+    marital_status: null,
+    birth_date: null,
+    profession: null,
+    identity_number: null,
+    identity_issuer: null,
   });
 
   const [addressData, setAddressData] = useState<AddressData>({
@@ -87,6 +100,12 @@ export default function Perfil() {
         pj_cnpj: profile.pj_cnpj ? formatCNPJ(profile.pj_cnpj) : null,
         pj_razao_social: profile.pj_razao_social,
         pj_nome_fantasia: profile.pj_nome_fantasia,
+        nationality: (profile as any).nationality || null,
+        marital_status: (profile as any).marital_status || null,
+        birth_date: (profile as any).birth_date || null,
+        profession: (profile as any).profession || null,
+        identity_number: (profile as any).identity_number || null,
+        identity_issuer: (profile as any).identity_issuer || null,
       });
       setAddressData({
         cep: profile.address_cep || "",
@@ -258,6 +277,12 @@ export default function Perfil() {
           full_name: profileData.full_name,
           phone: profileData.phone,
           cpf: profileData.cpf,
+          nationality: profileData.nationality,
+          marital_status: profileData.marital_status,
+          birth_date: profileData.birth_date,
+          profession: profileData.profession,
+          identity_number: profileData.identity_number,
+          identity_issuer: profileData.identity_issuer,
         })
         .eq("user_id", user.id);
 
@@ -509,6 +534,67 @@ export default function Perfil() {
                       {errors.phone && (
                         <p className="text-sm text-destructive">{errors.phone}</p>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Representative Data Section - for admins */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="text-sm font-medium mb-4">Dados do Representante (para assinatura de contratos)</h4>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="nationality">Nacionalidade</Label>
+                        <Input
+                          id="nationality"
+                          value={profileData.nationality || ""}
+                          onChange={(e) => setProfileData((prev) => ({ ...prev, nationality: e.target.value }))}
+                          placeholder="Ex: Brasileira"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="marital_status">Estado Civil</Label>
+                        <Input
+                          id="marital_status"
+                          value={profileData.marital_status || ""}
+                          onChange={(e) => setProfileData((prev) => ({ ...prev, marital_status: e.target.value }))}
+                          placeholder="Ex: Casado, Solteiro"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="birth_date">Data de Nascimento</Label>
+                        <Input
+                          id="birth_date"
+                          type="date"
+                          value={profileData.birth_date || ""}
+                          onChange={(e) => setProfileData((prev) => ({ ...prev, birth_date: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="profession">Profissão</Label>
+                        <Input
+                          id="profession"
+                          value={profileData.profession || ""}
+                          onChange={(e) => setProfileData((prev) => ({ ...prev, profession: e.target.value }))}
+                          placeholder="Ex: Empresário, Advogado"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="identity_number">RG</Label>
+                        <Input
+                          id="identity_number"
+                          value={profileData.identity_number || ""}
+                          onChange={(e) => setProfileData((prev) => ({ ...prev, identity_number: e.target.value }))}
+                          placeholder="Número do RG"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="identity_issuer">Órgão Expedidor</Label>
+                        <Input
+                          id="identity_issuer"
+                          value={profileData.identity_issuer || ""}
+                          onChange={(e) => setProfileData((prev) => ({ ...prev, identity_issuer: e.target.value }))}
+                          placeholder="Ex: SSP-SP, DRT-MS"
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="flex justify-end">
