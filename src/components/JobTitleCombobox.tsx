@@ -4,11 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
-  CommandGroup,
   CommandInput,
-  CommandItem,
-  CommandList,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -128,7 +124,7 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
   }, {} as Record<string, typeof commonJobTitles>);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -140,7 +136,10 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-popover z-[100]" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <PopoverContent 
+        className="w-[--radix-popover-trigger-width] p-0 bg-popover" 
+        align="start"
+      >
         <Command shouldFilter={false}>
           <CommandInput 
             placeholder="Buscar cargo..." 
@@ -150,39 +149,46 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
               onChange(val);
             }}
           />
-          <CommandList>
-            <CommandEmpty>
-              <div className="py-2 px-3 text-sm">
+          <div className="max-h-[200px] overflow-y-auto">
+            {filteredTitles.length === 0 ? (
+              <div className="py-6 text-center text-sm">
                 <p className="text-muted-foreground">Nenhum cargo encontrado.</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Pressione Enter para usar "{inputValue}"
                 </p>
               </div>
-            </CommandEmpty>
-            {Object.entries(groupedTitles).map(([category, titles]) => (
-              <CommandGroup key={category} heading={category}>
-                {titles.map((title) => (
-                  <CommandItem
-                    key={title.value}
-                    value={title.value}
-                    onSelect={(currentValue) => {
-                      onChange(currentValue);
-                      setInputValue(currentValue);
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
+            ) : (
+              Object.entries(groupedTitles).map(([category, titles]) => (
+                <div key={category} className="p-1">
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    {category}
+                  </div>
+                  {titles.map((title) => (
+                    <div
+                      key={title.value}
                       className={cn(
-                        "mr-2 h-4 w-4",
-                        value === title.value ? "opacity-100" : "opacity-0"
+                        "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                        value === title.value && "bg-accent text-accent-foreground"
                       )}
-                    />
-                    {title.value}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
-          </CommandList>
+                      onClick={() => {
+                        onChange(title.value);
+                        setInputValue(title.value);
+                        setOpen(false);
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          value === title.value ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      {title.value}
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
         </Command>
       </PopoverContent>
     </Popover>

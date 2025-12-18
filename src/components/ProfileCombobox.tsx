@@ -4,11 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
-  CommandEmpty,
-  CommandGroup,
   CommandInput,
-  CommandItem,
-  CommandList,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -46,7 +42,7 @@ export function ProfileCombobox({
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -59,9 +55,8 @@ export function ProfileCombobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[--radix-popover-trigger-width] p-0 bg-popover z-[100]" 
+        className="w-[--radix-popover-trigger-width] p-0 bg-popover" 
         align="start"
-        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <Command shouldFilter={false}>
           <CommandInput 
@@ -69,32 +64,40 @@ export function ProfileCombobox({
             value={searchValue}
             onValueChange={setSearchValue}
           />
-          <CommandList>
-            <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
-            <CommandGroup>
-              {filteredProfiles.map((profile) => (
-                <CommandItem
-                  key={profile.user_id}
-                  value={profile.user_id}
-                  onSelect={() => {
-                    onChange(profile.user_id);
-                    setOpen(false);
-                  }}
-                >
-                  <Check
+          <div className="max-h-[200px] overflow-y-auto">
+            {filteredProfiles.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                Nenhum colaborador encontrado.
+              </div>
+            ) : (
+              <div className="p-1">
+                {filteredProfiles.map((profile) => (
+                  <div
+                    key={profile.user_id}
                     className={cn(
-                      "mr-2 h-4 w-4",
-                      value === profile.user_id ? "opacity-100" : "opacity-0"
+                      "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                      value === profile.user_id && "bg-accent text-accent-foreground"
                     )}
-                  />
-                  <div className="flex flex-col">
-                    <span>{profile.full_name}</span>
-                    <span className="text-xs text-muted-foreground">{profile.email}</span>
+                    onClick={() => {
+                      onChange(profile.user_id);
+                      setOpen(false);
+                    }}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        value === profile.user_id ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <div className="flex flex-col">
+                      <span>{profile.full_name}</span>
+                      <span className="text-xs text-muted-foreground">{profile.email}</span>
+                    </div>
                   </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
+                ))}
+              </div>
+            )}
+          </div>
         </Command>
       </PopoverContent>
     </Popover>
