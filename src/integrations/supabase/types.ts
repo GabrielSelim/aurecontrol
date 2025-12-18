@@ -494,6 +494,9 @@ export type Database = {
           id: string
           is_active: boolean | null
           phone: string | null
+          pj_cnpj: string | null
+          pj_nome_fantasia: string | null
+          pj_razao_social: string | null
           updated_at: string | null
           user_id: string
         }
@@ -507,6 +510,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           phone?: string | null
+          pj_cnpj?: string | null
+          pj_nome_fantasia?: string | null
+          pj_razao_social?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -520,6 +526,9 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           phone?: string | null
+          pj_cnpj?: string | null
+          pj_nome_fantasia?: string | null
+          pj_razao_social?: string | null
           updated_at?: string | null
           user_id?: string
         }

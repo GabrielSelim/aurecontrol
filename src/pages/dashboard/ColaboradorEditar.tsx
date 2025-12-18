@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { formatCPF, formatPhone, validateCPF, validatePhone } from "@/lib/masks";
+import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
 
 interface ColaboradorData {
   id: string;
@@ -19,6 +19,9 @@ interface ColaboradorData {
   cpf: string;
   phone: string;
   is_active: boolean;
+  pj_cnpj: string;
+  pj_razao_social: string;
+  pj_nome_fantasia: string;
 }
 
 const ColaboradorEditar = () => {
@@ -36,8 +39,11 @@ const ColaboradorEditar = () => {
     cpf: "",
     phone: "",
     is_active: true,
+    pj_cnpj: "",
+    pj_razao_social: "",
+    pj_nome_fantasia: "",
   });
-  const [errors, setErrors] = useState<{ cpf?: string; phone?: string }>({});
+  const [errors, setErrors] = useState<{ cpf?: string; phone?: string; pj_cnpj?: string }>({});
 
   useEffect(() => {
     const fetchColaborador = async () => {
@@ -62,6 +68,9 @@ const ColaboradorEditar = () => {
             cpf: data.cpf ? formatCPF(data.cpf) : "",
             phone: data.phone ? formatPhone(data.phone) : "",
             is_active: data.is_active ?? true,
+            pj_cnpj: data.pj_cnpj ? formatCNPJ(data.pj_cnpj) : "",
+            pj_razao_social: data.pj_razao_social || "",
+            pj_nome_fantasia: data.pj_nome_fantasia || "",
           });
         }
       } catch (error) {
@@ -106,11 +115,26 @@ const ColaboradorEditar = () => {
     }
   };
 
+  const handlePJCNPJChange = (value: string) => {
+    const formatted = formatCNPJ(value);
+    setFormData({ ...formData, pj_cnpj: formatted });
+    
+    if (formatted.length === 18) {
+      if (!validateCNPJ(formatted)) {
+        setErrors({ ...errors, pj_cnpj: "CNPJ inválido" });
+      } else {
+        setErrors({ ...errors, pj_cnpj: undefined });
+      }
+    } else {
+      setErrors({ ...errors, pj_cnpj: undefined });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate
-    const newErrors: { cpf?: string; phone?: string } = {};
+    const newErrors: { cpf?: string; phone?: string; pj_cnpj?: string } = {};
     
     if (formData.cpf && !validateCPF(formData.cpf)) {
       newErrors.cpf = "CPF inválido";
@@ -118,6 +142,10 @@ const ColaboradorEditar = () => {
     
     if (formData.phone && !validatePhone(formData.phone)) {
       newErrors.phone = "Telefone inválido";
+    }
+
+    if (formData.pj_cnpj && formData.pj_cnpj.length === 18 && !validateCNPJ(formData.pj_cnpj)) {
+      newErrors.pj_cnpj = "CNPJ inválido";
     }
     
     if (Object.keys(newErrors).length > 0) {
@@ -136,6 +164,9 @@ const ColaboradorEditar = () => {
           cpf: formData.cpf.replace(/\D/g, "") || null,
           phone: formData.phone.replace(/\D/g, "") || null,
           is_active: formData.is_active,
+          pj_cnpj: formData.pj_cnpj.replace(/\D/g, "") || null,
+          pj_razao_social: formData.pj_razao_social || null,
+          pj_nome_fantasia: formData.pj_nome_fantasia || null,
         })
         .eq("id", formData.id);
 
@@ -243,6 +274,51 @@ const ColaboradorEditar = () => {
                   <p className="text-xs text-destructive">{errors.phone}</p>
                 )}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Dados PJ */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Dados de Pessoa Jurídica</CardTitle>
+            <CardDescription>Preencha se o colaborador presta serviços como PJ</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="pj_cnpj">CNPJ</Label>
+                <Input
+                  id="pj_cnpj"
+                  value={formData.pj_cnpj}
+                  onChange={(e) => handlePJCNPJChange(e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                />
+                {errors.pj_cnpj && (
+                  <p className="text-xs text-destructive">{errors.pj_cnpj}</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="pj_razao_social">Razão Social</Label>
+                <Input
+                  id="pj_razao_social"
+                  value={formData.pj_razao_social}
+                  onChange={(e) => setFormData({ ...formData, pj_razao_social: e.target.value })}
+                  placeholder="Nome oficial da empresa"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pj_nome_fantasia">Nome Fantasia</Label>
+              <Input
+                id="pj_nome_fantasia"
+                value={formData.pj_nome_fantasia}
+                onChange={(e) => setFormData({ ...formData, pj_nome_fantasia: e.target.value })}
+                placeholder="Nome comercial (opcional)"
+              />
             </div>
           </CardContent>
         </Card>
