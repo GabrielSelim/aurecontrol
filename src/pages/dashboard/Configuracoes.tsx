@@ -366,9 +366,43 @@ const Configuracoes = () => {
         if (error) throw error;
         toast.success("Mensagem atualizada!");
       } else {
-        const { error } = await supabase.from("system_announcements").insert([dataToSave as any]);
+        const { data: insertedData, error } = await supabase
+          .from("system_announcements")
+          .insert([dataToSave as any])
+          .select()
+          .single();
         if (error) throw error;
         toast.success("Mensagem enviada!");
+
+        // Send email notifications for urgent announcements
+        if (announcement.priority === "urgent" && announcement.is_active) {
+          toast.info("Enviando notificações por email...");
+          try {
+            const { data: emailResult, error: emailError } = await supabase.functions.invoke(
+              "send-urgent-announcement",
+              {
+                body: {
+                  announcement_id: insertedData.id,
+                  title: announcement.title,
+                  message: announcement.message,
+                  target_type: announcement.target_type,
+                  target_company_id: announcement.target_company_id,
+                  target_roles: announcement.target_roles,
+                },
+              }
+            );
+
+            if (emailError) {
+              console.error("Error sending emails:", emailError);
+              toast.error("Erro ao enviar emails de notificação");
+            } else {
+              toast.success(`Emails enviados: ${emailResult?.sent_count || 0}`);
+            }
+          } catch (emailErr) {
+            console.error("Error calling email function:", emailErr);
+            toast.error("Erro ao enviar emails de notificação");
+          }
+        }
       }
       fetchData();
       setAnnouncementDialogOpen(false);
@@ -1480,7 +1514,7 @@ function AnnouncementDialog({
                   <SelectItem value="low">Baixa</SelectItem>
                   <SelectItem value="normal">Normal</SelectItem>
                   <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="urgent">Urgente</SelectItem>
+                  <SelectItem value="urgent">Urgente (envia email)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1494,6 +1528,13 @@ function AnnouncementDialog({
               />
             </div>
           </div>
+
+          {priority === "urgent" && !announcement && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-200 text-sm">
+              <Bell className="h-4 w-4 flex-shrink-0" />
+              <span>Mensagens urgentes enviarão notificação por email para todos os destinatários selecionados.</span>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <Switch checked={isActive} onCheckedChange={setIsActive} />
