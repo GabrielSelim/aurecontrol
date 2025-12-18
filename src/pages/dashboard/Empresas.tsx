@@ -4,11 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Search, Eye, Settings, Users, MoreHorizontal, FileText, Briefcase, Download } from "lucide-react";
+import { Building2, Plus, Search, Eye, Settings, Users, MoreHorizontal, FileText, Briefcase, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import {
   Select,
   SelectContent,
@@ -53,6 +54,8 @@ interface PricingTier {
   price_per_contract: number;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 const Empresas = () => {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -60,6 +63,7 @@ const Empresas = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchPricingTiers = async () => {
@@ -166,20 +170,25 @@ const Empresas = () => {
     return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   };
 
+  const getExportData = () => {
+    return filteredCompanies.map((company) => ({
+      Nome: company.name,
+      CNPJ: formatCNPJ(company.cnpj),
+      "E-mail": company.email || "",
+      Telefone: formatPhone(company.phone),
+      Usuários: company._count?.users || 0,
+      "Contratos PJ": company._count?.pjContracts || 0,
+      "Outros Contratos": company._count?.otherContracts || 0,
+      "Receita Estimada": formatCurrency(calculateEstimatedRevenue(company._count?.pjContracts || 0)),
+      Status: company.is_active ? "Ativa" : "Inativa",
+      "Data de Cadastro": formatDate(company.created_at),
+    }));
+  };
+
   const exportToCSV = () => {
-    const headers = ["Nome", "CNPJ", "E-mail", "Telefone", "Usuários", "Contratos PJ", "Outros Contratos", "Receita Estimada", "Status", "Data de Cadastro"];
-    const rows = filteredCompanies.map((company) => [
-      company.name,
-      formatCNPJ(company.cnpj),
-      company.email || "",
-      formatPhone(company.phone),
-      company._count?.users || 0,
-      company._count?.pjContracts || 0,
-      company._count?.otherContracts || 0,
-      formatCurrency(calculateEstimatedRevenue(company._count?.pjContracts || 0)),
-      company.is_active ? "Ativa" : "Inativa",
-      formatDate(company.created_at),
-    ]);
+    const data = getExportData();
+    const headers = Object.keys(data[0] || {});
+    const rows = data.map((row) => headers.map((h) => row[h as keyof typeof row]));
 
     const csvContent = [
       headers.join(";"),
@@ -196,6 +205,22 @@ const Empresas = () => {
     toast.success("Arquivo CSV exportado com sucesso!");
   };
 
+  const exportToExcel = () => {
+    const data = getExportData();
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Empresas");
+    
+    // Auto-size columns
+    const colWidths = Object.keys(data[0] || {}).map((key) => ({
+      wch: Math.max(key.length, ...data.map((row) => String(row[key as keyof typeof row]).length)) + 2
+    }));
+    worksheet["!cols"] = colWidths;
+
+    XLSX.writeFile(workbook, `empresas_${new Date().toISOString().split("T")[0]}.xlsx`);
+    toast.success("Arquivo Excel exportado com sucesso!");
+  };
+
   const filteredCompanies = companies.filter((company) => {
     const matchesSearch =
       company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -209,6 +234,16 @@ const Empresas = () => {
 
     return matchesSearch && matchesStatus;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredCompanies.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedCompanies = filteredCompanies.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   return (
     <div className="space-y-6">
@@ -237,10 +272,24 @@ const Empresas = () => {
                   {filteredCompanies.length} de {companies.length} empresa(s)
                 </CardDescription>
               </div>
-              <Button variant="outline" onClick={exportToCSV} disabled={filteredCompanies.length === 0}>
-                <Download className="h-4 w-4 mr-2" />
-                Exportar CSV
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={filteredCompanies.length === 0}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportToCSV}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Exportar CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToExcel}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Exportar Excel (XLSX)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
@@ -295,7 +344,7 @@ const Empresas = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-              {filteredCompanies.map((company) => (
+              {paginatedCompanies.map((company) => (
                   <TableRow 
                     key={company.id} 
                     className="cursor-pointer transition-colors duration-200 hover:bg-primary/5 hover:shadow-sm"
@@ -436,6 +485,60 @@ const Empresas = () => {
                 </TableRow>
               </TableFooter>
             </Table>
+          )}
+          
+          {/* Pagination */}
+          {filteredCompanies.length > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {startIndex + 1} a {Math.min(startIndex + ITEMS_PER_PAGE, filteredCompanies.length)} de {filteredCompanies.length} empresas
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) => {
+                      if (totalPages <= 5) return true;
+                      if (page === 1 || page === totalPages) return true;
+                      if (Math.abs(page - currentPage) <= 1) return true;
+                      return false;
+                    })
+                    .map((page, idx, arr) => (
+                      <>
+                        {idx > 0 && arr[idx - 1] !== page - 1 && (
+                          <span key={`ellipsis-${page}`} className="px-2 text-muted-foreground">...</span>
+                        )}
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          className="w-8 h-8 p-0"
+                          onClick={() => setCurrentPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      </>
+                    ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Próximo
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
