@@ -150,7 +150,7 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
               onChange(val);
             }}
           />
-          <CommandList>
+          <CommandList className="max-h-[300px] overflow-y-auto">
             <CommandEmpty>
               <div className="py-2 px-3 text-sm">
                 <p className="text-muted-foreground">Nenhum cargo encontrado.</p>
