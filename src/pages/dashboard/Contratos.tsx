@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
   FileText,
   Calendar,
   Briefcase,
+  Clock,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -82,6 +84,7 @@ interface Profile {
 
 const Contratos = () => {
   const { profile, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [contratos, setContratos] = useState<Contract[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -265,6 +268,40 @@ const Contratos = () => {
       style: "currency",
       currency: "BRL",
     }).format(value);
+  };
+
+  const getDurationDisplay = (contract: Contract) => {
+    if (contract.contract_type !== "pj") return null;
+    
+    if (!contract.duration_type || contract.duration_type === "indefinite") {
+      return { label: "Indeterminado", detail: null };
+    }
+    
+    if (contract.duration_type === "time_based") {
+      const unitLabels: Record<string, string> = {
+        days: "dias",
+        weeks: "sem.",
+        months: "meses",
+        years: "anos",
+      };
+      return {
+        label: "Por Tempo",
+        detail: contract.duration_value 
+          ? `${contract.duration_value} ${unitLabels[contract.duration_unit || "months"]}` 
+          : null,
+      };
+    }
+    
+    if (contract.duration_type === "delivery_based") {
+      return {
+        label: "Por Entrega",
+        detail: contract.deliverable_description 
+          ? contract.deliverable_description.substring(0, 30) + (contract.deliverable_description.length > 30 ? "..." : "")
+          : null,
+      };
+    }
+    
+    return null;
   };
 
   const filteredContratos = contratos.filter(
@@ -457,7 +494,8 @@ const Contratos = () => {
                   <TableHead>Colaborador</TableHead>
                   <TableHead>Cargo</TableHead>
                   <TableHead className="hidden md:table-cell">Tipo</TableHead>
-                  <TableHead className="hidden lg:table-cell">Salário</TableHead>
+                  <TableHead className="hidden xl:table-cell">Duração</TableHead>
+                  <TableHead className="hidden lg:table-cell">Término</TableHead>
                   <TableHead className="hidden md:table-cell">Início</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -470,7 +508,8 @@ const Contratos = () => {
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-16" /></TableCell>
-                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="hidden xl:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell className="hidden lg:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-8" /></TableCell>
@@ -478,69 +517,96 @@ const Contratos = () => {
                   ))
                 ) : filteredContratos.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center">
+                    <TableCell colSpan={8} className="h-32 text-center">
                       <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                       <p className="text-muted-foreground">Nenhum contrato encontrado</p>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredContratos.map((contrato) => (
-                    <TableRow key={contrato.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{contrato.profile?.full_name || "-"}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {contrato.profile?.email}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          {contrato.job_title}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <Badge variant="outline">
-                          {getContractTypeLabel(contrato.contract_type)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell">
-                        {formatCurrency(contrato.salary)}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex items-center gap-1 text-sm">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {format(new Date(contrato.start_date), "dd/MM/yyyy", { locale: ptBR })}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(contrato.status)}>
-                          {getStatusLabel(contrato.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver detalhes</DropdownMenuItem>
-                            {isAdmin() && (
-                              <>
-                                <DropdownMenuItem>Editar</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive">
-                                  Encerrar
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredContratos.map((contrato) => {
+                    const durationInfo = getDurationDisplay(contrato);
+                    return (
+                      <TableRow key={contrato.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/dashboard/contratos/${contrato.id}`)}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{contrato.profile?.full_name || "-"}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {contrato.profile?.email}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Briefcase className="h-4 w-4 text-muted-foreground" />
+                            {contrato.job_title}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <Badge variant="outline">
+                            {getContractTypeLabel(contrato.contract_type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell">
+                          {durationInfo ? (
+                            <div className="text-sm">
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                <span>{durationInfo.label}</span>
+                              </div>
+                              {durationInfo.detail && (
+                                <p className="text-xs text-muted-foreground mt-0.5">{durationInfo.detail}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          {contrato.end_date ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {format(new Date(contrato.end_date), "dd/MM/yyyy", { locale: ptBR })}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Sem término</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex items-center gap-1 text-sm">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            {format(new Date(contrato.start_date), "dd/MM/yyyy", { locale: ptBR })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(contrato.status)}>
+                            {getStatusLabel(contrato.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/contratos/${contrato.id}`); }}>
+                                Ver detalhes
+                              </DropdownMenuItem>
+                              {isAdmin() && (
+                                <>
+                                  <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Editar</DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                                    Encerrar
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

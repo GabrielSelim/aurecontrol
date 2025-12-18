@@ -17,6 +17,7 @@ import Colaboradores from "./pages/dashboard/Colaboradores";
 import ColaboradorEditar from "./pages/dashboard/ColaboradorEditar";
 import ColaboradorDetalhes from "./pages/dashboard/ColaboradorDetalhes";
 import Contratos from "./pages/dashboard/Contratos";
+import ContratoDetalhes from "./pages/dashboard/ContratoDetalhes";
 import Pagamentos from "./pages/dashboard/Pagamentos";
 import Convites from "./pages/dashboard/Convites";
 import Empresa from "./pages/dashboard/Empresa";
@@ -47,6 +48,7 @@ function DashboardRoutes() {
           <Route path="colaboradores/:id" element={<ColaboradorDetalhes />} />
           <Route path="colaboradores/:id/editar" element={<ColaboradorEditar />} />
           <Route path="contratos" element={<Contratos />} />
+          <Route path="contratos/:id" element={<ContratoDetalhes />} />
           <Route path="pagamentos" element={<Pagamentos />} />
           <Route path="convites" element={<Convites />} />
           <Route path="empresa" element={<Empresa />} />
