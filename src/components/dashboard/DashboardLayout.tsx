@@ -43,6 +43,7 @@ const navigationItems = {
   colaboradores: { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
   contratos: { name: "Contratos", href: "/dashboard/contratos", icon: FileText },
   templatesContrato: { name: "Templates", href: "/dashboard/templates-contrato", icon: FileSignature },
+  contratosFaturaveis: { name: "PJ Faturáveis", href: "/dashboard/contratos-faturaveis", icon: CreditCard },
   pagamentos: { name: "Pagamentos", href: "/dashboard/pagamentos", icon: CreditCard },
   convites: { name: "Convites", href: "/dashboard/convites", icon: UserPlus },
   empresa: { name: "Empresa", href: "/dashboard/empresa", icon: Building2 },
@@ -55,6 +56,7 @@ const navigationItems = {
 const masterAdminNavigation = [
   navigationItems.visaoGeral,
   navigationItems.empresas,
+  navigationItems.contratosFaturaveis,
   navigationItems.faturamento,
   navigationItems.notificacoes,
   navigationItems.configuracoes,
