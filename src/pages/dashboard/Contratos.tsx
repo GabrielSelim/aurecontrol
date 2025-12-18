@@ -22,7 +22,9 @@ import {
   Calendar,
   Briefcase,
   Clock,
+  AlertTriangle,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -304,6 +306,31 @@ const Contratos = () => {
     return null;
   };
 
+  const getExpirationAlert = (contract: Contract) => {
+    if (!contract.end_date || contract.status !== "active") return null;
+    
+    const today = new Date();
+    const endDate = new Date(contract.end_date);
+    const daysUntilExpiry = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiry < 0) {
+      return { level: "expired", days: Math.abs(daysUntilExpiry), label: "Expirado", color: "bg-destructive text-destructive-foreground" };
+    } else if (daysUntilExpiry <= 7) {
+      return { level: "critical", days: daysUntilExpiry, label: "Crítico", color: "bg-destructive text-destructive-foreground" };
+    } else if (daysUntilExpiry <= 14) {
+      return { level: "warning", days: daysUntilExpiry, label: "Atenção", color: "bg-orange-500 text-white" };
+    } else if (daysUntilExpiry <= 30) {
+      return { level: "notice", days: daysUntilExpiry, label: "Aviso", color: "bg-amber-500 text-white" };
+    }
+    return null;
+  };
+
+  // Count expiring contracts
+  const expiringContractsCount = contratos.filter(c => {
+    const alert = getExpirationAlert(c);
+    return alert && alert.level !== "expired";
+  }).length;
+
   const filteredContratos = contratos.filter(
     (c) =>
       c.profile?.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -312,6 +339,21 @@ const Contratos = () => {
 
   return (
     <div className="space-y-6">
+      {/* Alert Banner */}
+      {expiringContractsCount > 0 && (
+        <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-foreground">
+              {expiringContractsCount} contrato(s) próximo(s) do vencimento
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Revise os contratos marcados com alertas e tome as medidas necessárias.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -525,14 +567,40 @@ const Contratos = () => {
                 ) : (
                   filteredContratos.map((contrato) => {
                     const durationInfo = getDurationDisplay(contrato);
+                    const expirationAlert = getExpirationAlert(contrato);
                     return (
-                      <TableRow key={contrato.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/dashboard/contratos/${contrato.id}`)}>
+                      <TableRow 
+                        key={contrato.id} 
+                        className={`cursor-pointer hover:bg-muted/50 ${expirationAlert ? 'bg-amber-500/5' : ''}`} 
+                        onClick={() => navigate(`/dashboard/contratos/${contrato.id}`)}
+                      >
                         <TableCell>
-                          <div>
-                            <p className="font-medium">{contrato.profile?.full_name || "-"}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {contrato.profile?.email}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <p className="font-medium">{contrato.profile?.full_name || "-"}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {contrato.profile?.email}
+                              </p>
+                            </div>
+                            {expirationAlert && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${expirationAlert.color}`}>
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {expirationAlert.level === "expired" 
+                                      ? `Expirado há ${expirationAlert.days}d`
+                                      : `${expirationAlert.days}d`
+                                    }
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {expirationAlert.level === "expired" 
+                                    ? `Contrato expirado há ${expirationAlert.days} dia(s)`
+                                    : `Contrato expira em ${expirationAlert.days} dia(s)`
+                                  }
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -563,9 +631,11 @@ const Contratos = () => {
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           {contrato.end_date ? (
-                            <div className="flex items-center gap-1 text-sm">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              {format(new Date(contrato.end_date), "dd/MM/yyyy", { locale: ptBR })}
+                            <div className={`flex items-center gap-1 text-sm ${expirationAlert ? 'font-medium' : ''}`}>
+                              <Calendar className={`h-3 w-3 ${expirationAlert ? (expirationAlert.level === 'critical' || expirationAlert.level === 'expired' ? 'text-destructive' : 'text-amber-500') : 'text-muted-foreground'}`} />
+                              <span className={expirationAlert ? (expirationAlert.level === 'critical' || expirationAlert.level === 'expired' ? 'text-destructive' : 'text-amber-600') : ''}>
+                                {format(new Date(contrato.end_date), "dd/MM/yyyy", { locale: ptBR })}
+                              </span>
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">Sem término</span>
