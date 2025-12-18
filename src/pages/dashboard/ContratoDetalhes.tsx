@@ -6,6 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
   User,
@@ -19,6 +23,8 @@ import {
   FileSignature,
   Check,
   AlertCircle,
+  Users,
+  Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -55,15 +61,31 @@ interface ContractDocument {
   id: string;
   signature_status: string;
   completed_at: string | null;
+  witness_count: number;
+}
+
+interface ContractSignature {
+  id: string;
+  document_id: string;
+  signer_type: string;
+  signer_name: string;
+  signer_email: string;
+  signed_at: string | null;
 }
 
 const ContratoDetalhes = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [contract, setContract] = useState<Contract | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [document, setDocument] = useState<ContractDocument | null>(null);
+  const [signatures, setSignatures] = useState<ContractSignature[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [editingWitness, setEditingWitness] = useState<ContractSignature | null>(null);
+  const [witnessName, setWitnessName] = useState("");
+  const [witnessEmail, setWitnessEmail] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -100,17 +122,86 @@ const ContratoDetalhes = () => {
       if (contractData.contract_type === "PJ") {
         const { data: docData } = await supabase
           .from("contract_documents")
-          .select("id, signature_status, completed_at")
+          .select("id, signature_status, completed_at, witness_count")
           .eq("contract_id", contractData.id)
           .maybeSingle();
         
         setDocument(docData);
+
+        // Fetch signatures
+        if (docData) {
+          const { data: signaturesData } = await supabase
+            .from("contract_signatures")
+            .select("id, document_id, signer_type, signer_name, signer_email, signed_at")
+            .eq("document_id", docData.id)
+            .order("signer_order");
+          
+          setSignatures(signaturesData || []);
+        }
       }
     } catch (error) {
       console.error("Error fetching contract:", error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleEditWitness = (witness: ContractSignature) => {
+    setEditingWitness(witness);
+    setWitnessName(witness.signer_name);
+    setWitnessEmail(witness.signer_email);
+  };
+
+  const handleSaveWitness = async () => {
+    if (!editingWitness) return;
+    
+    if (!witnessName.trim() || !witnessEmail.trim()) {
+      toast({
+        title: "Erro",
+        description: "Nome e email são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("contract_signatures")
+        .update({
+          signer_name: witnessName.trim(),
+          signer_email: witnessEmail.trim(),
+        })
+        .eq("id", editingWitness.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: "Testemunha atualizada com sucesso",
+      });
+
+      setEditingWitness(null);
+      fetchContract();
+    } catch (error) {
+      console.error("Error updating witness:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a testemunha",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getSignerTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      contractor: "Contratado",
+      company_representative: "Representante da Empresa",
+      witness: "Testemunha",
+    };
+    return labels[type] || type;
   };
 
   const getContractTypeLabel = (type: string) => {
@@ -424,6 +515,56 @@ const ContratoDetalhes = () => {
           </Card>
         )}
 
+        {/* Testemunhas - Only for PJ contracts with witnesses */}
+        {contract.contract_type === "PJ" && document && signatures.filter(s => s.signer_type === "witness").length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Testemunhas
+              </CardTitle>
+              <CardDescription>
+                Gerencie as testemunhas do contrato
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {signatures
+                .filter(s => s.signer_type === "witness")
+                .map((witness, index) => (
+                  <div key={witness.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground">Testemunha {index + 1}</p>
+                      <p className="font-medium">{witness.signer_name}</p>
+                      <p className="text-sm text-muted-foreground">{witness.signer_email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {witness.signed_at ? (
+                        <Badge className="bg-green-500">
+                          <Check className="mr-1 h-3 w-3" />
+                          Assinado
+                        </Badge>
+                      ) : (
+                        <>
+                          <Badge variant="outline">
+                            <Clock className="mr-1 h-3 w-3" />
+                            Pendente
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditWitness(witness)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Observações */}
         <Card>
           <CardHeader>
@@ -457,6 +598,47 @@ const ContratoDetalhes = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog para editar testemunha */}
+      <Dialog open={!!editingWitness} onOpenChange={(open) => !open && setEditingWitness(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Testemunha</DialogTitle>
+            <DialogDescription>
+              Atualize os dados da testemunha pendente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="witnessName">Nome Completo</Label>
+              <Input
+                id="witnessName"
+                value={witnessName}
+                onChange={(e) => setWitnessName(e.target.value)}
+                placeholder="Nome da testemunha"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="witnessEmail">Email</Label>
+              <Input
+                id="witnessEmail"
+                type="email"
+                value={witnessEmail}
+                onChange={(e) => setWitnessEmail(e.target.value)}
+                placeholder="email@exemplo.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingWitness(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveWitness} disabled={isSaving}>
+              {isSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
