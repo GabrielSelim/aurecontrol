@@ -411,6 +411,32 @@ const Contratos = () => {
                     />
                   </div>
                 </div>
+                {/* Contract Type Info */}
+                {contractType && (
+                  <div className={`p-3 rounded-lg text-sm ${
+                    contractType === "pj" 
+                      ? "bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300" 
+                      : "bg-muted border border-border text-muted-foreground"
+                  }`}>
+                    {contractType === "pj" ? (
+                      <>
+                        <p className="font-medium">Contrato PJ (Faturável)</p>
+                        <p className="text-xs mt-1">
+                          Contratos PJ incluem gestão completa com assinaturas digitais, alertas e conformidade legal. 
+                          Este tipo de contrato é cobrado mensalmente.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium">Contrato para Gestão Interna</p>
+                        <p className="text-xs mt-1">
+                          Contratos {contractType === "clt" ? "CLT" : contractType === "estagio" ? "de Estágio" : "Temporários"} são 
+                          para organização interna da empresa e não geram cobrança adicional.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
                 {/* PJ Duration Options */}
                 {contractType === "pj" && (
                   <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">

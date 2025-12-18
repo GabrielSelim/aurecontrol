@@ -8,18 +8,19 @@ const features = [
   },
   {
     icon: FileText,
-    title: "Contratos Digitais",
-    description: "Crie, envie e assine contratos digitalmente com validade jurídica e rastreamento completo.",
+    title: "Contratos PJ Completos",
+    description: "Contratos PJ com gestão completa: assinaturas digitais, alertas de vencimento e conformidade legal. Cobrança apenas por contratos PJ ativos.",
+    highlight: true,
+  },
+  {
+    icon: Shield,
+    title: "Contratos CLT Internos",
+    description: "Registre e organize contratos CLT para gestão interna da empresa, sem custo adicional.",
   },
   {
     icon: CreditCard,
     title: "Controle de Pagamentos",
     description: "Processe pagamentos para PJs, controle vencimentos e mantenha histórico completo.",
-  },
-  {
-    icon: Shield,
-    title: "Segurança LGPD",
-    description: "Dados criptografados, auditoria completa e conformidade com a legislação brasileira.",
   },
   {
     icon: Bell,
@@ -62,22 +63,39 @@ function FeatureCard({
   title,
   description,
   index,
+  highlight,
 }: {
   icon: typeof Users;
   title: string;
   description: string;
   index: number;
+  highlight?: boolean;
 }) {
   return (
     <div
-      className="group bg-card border border-border rounded-2xl p-8 hover:border-primary/30 hover:shadow-xl transition-all duration-300"
+      className={`group bg-card border rounded-2xl p-8 hover:shadow-xl transition-all duration-300 ${
+        highlight 
+          ? "border-primary/50 ring-1 ring-primary/20 hover:border-primary" 
+          : "border-border hover:border-primary/30"
+      }`}
       style={{ animationDelay: `${index * 0.1}s` }}
     >
-      <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-6 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 group-hover:text-primary-foreground transition-all duration-300 ${
+        highlight 
+          ? "bg-primary text-primary-foreground group-hover:bg-primary/90" 
+          : "bg-primary/10 text-primary group-hover:bg-primary"
+      }`}>
         <Icon className="w-7 h-7" />
       </div>
       <h3 className="font-bold text-xl text-foreground mb-3">{title}</h3>
       <p className="text-muted-foreground leading-relaxed">{description}</p>
+      {highlight && (
+        <div className="mt-4 pt-4 border-t border-primary/20">
+          <span className="text-xs font-medium text-primary">
+            ★ Principal recurso faturável
+          </span>
+        </div>
+      )}
     </div>
   );
 }
