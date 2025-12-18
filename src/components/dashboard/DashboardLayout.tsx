@@ -19,6 +19,7 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  FileSignature,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -41,6 +42,7 @@ const navigationItems = {
   visaoGeral: { name: "Visão Geral", href: "/dashboard", icon: LayoutDashboard },
   colaboradores: { name: "Colaboradores", href: "/dashboard/colaboradores", icon: Users },
   contratos: { name: "Contratos", href: "/dashboard/contratos", icon: FileText },
+  templatesContrato: { name: "Templates", href: "/dashboard/templates-contrato", icon: FileSignature },
   pagamentos: { name: "Pagamentos", href: "/dashboard/pagamentos", icon: CreditCard },
   convites: { name: "Convites", href: "/dashboard/convites", icon: UserPlus },
   empresa: { name: "Empresa", href: "/dashboard/empresa", icon: Building2 },
@@ -106,6 +108,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       nav.push(
         navigationItems.colaboradores,
         navigationItems.contratos,
+        navigationItems.templatesContrato,
         navigationItems.pagamentos,
         navigationItems.convites,
         navigationItems.empresa
@@ -118,9 +121,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       nav.push(navigationItems.colaboradores);
     }
     
-    // Juridico: only contracts
+    // Juridico: contracts and templates
     if (hasRole("juridico")) {
       nav.push(navigationItems.contratos);
+      nav.push(navigationItems.templatesContrato);
     }
     
     // Financeiro: only payments
