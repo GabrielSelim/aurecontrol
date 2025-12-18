@@ -581,11 +581,6 @@ export default function Perfil() {
                           disabled={!canEditRestrictedFields}
                           className={!canEditRestrictedFields ? "bg-muted" : ""}
                         />
-                        {!canEditRestrictedFields && (
-                          <p className="text-xs text-muted-foreground">
-                            Somente Administradores ou Gestores podem alterar este campo
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="identity_number">RG</Label>
