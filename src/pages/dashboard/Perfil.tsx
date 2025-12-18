@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { User, Building2, Lock, Camera, Loader2, Save, Briefcase } from "lucide-react";
+import { User, Building2, Lock, Camera, Loader2, Save, Briefcase, MapPin } from "lucide-react";
 import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
+import { AddressForm } from "@/components/AddressForm";
+import { AddressData } from "@/hooks/useCepLookup";
 
 interface ProfileData {
   full_name: string;
@@ -17,7 +19,6 @@ interface ProfileData {
   cpf: string | null;
   phone: string | null;
   avatar_url: string | null;
-  address: string | null;
   pj_cnpj: string | null;
   pj_razao_social: string | null;
   pj_nome_fantasia: string | null;
@@ -37,6 +38,7 @@ export default function Perfil() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingPJ, setIsSavingPJ] = useState(false);
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [profileData, setProfileData] = useState<ProfileData>({
@@ -45,10 +47,19 @@ export default function Perfil() {
     cpf: null,
     phone: null,
     avatar_url: null,
-    address: null,
     pj_cnpj: null,
     pj_razao_social: null,
     pj_nome_fantasia: null,
+  });
+
+  const [addressData, setAddressData] = useState<AddressData>({
+    cep: "",
+    street: "",
+    number: "",
+    complement: "",
+    neighborhood: "",
+    city: "",
+    state: "",
   });
 
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
@@ -73,10 +84,18 @@ export default function Perfil() {
         cpf: profile.cpf ? formatCPF(profile.cpf) : null,
         phone: profile.phone ? formatPhone(profile.phone) : null,
         avatar_url: profile.avatar_url,
-        address: profile.address,
         pj_cnpj: profile.pj_cnpj ? formatCNPJ(profile.pj_cnpj) : null,
         pj_razao_social: profile.pj_razao_social,
         pj_nome_fantasia: profile.pj_nome_fantasia,
+      });
+      setAddressData({
+        cep: profile.address_cep || "",
+        street: profile.address_street || "",
+        number: profile.address_number || "",
+        complement: profile.address_complement || "",
+        neighborhood: profile.address_neighborhood || "",
+        city: profile.address_city || "",
+        state: profile.address_state || "",
       });
       fetchCompany();
     }
@@ -239,7 +258,6 @@ export default function Perfil() {
           full_name: profileData.full_name,
           phone: profileData.phone,
           cpf: profileData.cpf,
-          address: profileData.address,
         })
         .eq("user_id", user.id);
 
@@ -250,6 +268,34 @@ export default function Perfil() {
       toast.error("Erro ao atualizar perfil");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveAddress = async () => {
+    if (!user) return;
+    
+    setIsSavingAddress(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          address_cep: addressData.cep.replace(/\D/g, "") || null,
+          address_street: addressData.street || null,
+          address_number: addressData.number || null,
+          address_complement: addressData.complement || null,
+          address_neighborhood: addressData.neighborhood || null,
+          address_city: addressData.city || null,
+          address_state: addressData.state || null,
+        })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      toast.success("Endereço atualizado com sucesso!");
+    } catch (error) {
+      console.error("Error updating address:", error);
+      toast.error("Erro ao atualizar endereço");
+    } finally {
+      setIsSavingAddress(false);
     }
   };
 
@@ -386,6 +432,10 @@ export default function Perfil() {
                 <User className="h-4 w-4" />
                 Dados Pessoais
               </TabsTrigger>
+              <TabsTrigger value="address" className="gap-2">
+                <MapPin className="h-4 w-4" />
+                Endereço
+              </TabsTrigger>
               <TabsTrigger value="pj" className="gap-2">
                 <Briefcase className="h-4 w-4" />
                 Dados PJ
@@ -460,20 +510,6 @@ export default function Perfil() {
                         <p className="text-sm text-destructive">{errors.phone}</p>
                       )}
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="address">Endereço</Label>
-                      <Input
-                        id="address"
-                        value={profileData.address || ""}
-                        onChange={(e) =>
-                          setProfileData((prev) => ({
-                            ...prev,
-                            address: e.target.value,
-                          }))
-                        }
-                        placeholder="Rua, número, bairro, cidade - UF, CEP"
-                      />
-                    </div>
                   </div>
                   <div className="flex justify-end">
                     <Button onClick={handleSaveProfile} disabled={isSaving}>
@@ -483,6 +519,33 @@ export default function Perfil() {
                         <Save className="mr-2 h-4 w-4" />
                       )}
                       Salvar Alterações
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="address">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Endereço</CardTitle>
+                  <CardDescription>
+                    Informe seu endereço completo. Digite o CEP para preencher automaticamente.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <AddressForm
+                    address={addressData}
+                    onChange={setAddressData}
+                  />
+                  <div className="flex justify-end">
+                    <Button onClick={handleSaveAddress} disabled={isSavingAddress}>
+                      {isSavingAddress ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      Salvar Endereço
                     </Button>
                   </div>
                 </CardContent>
