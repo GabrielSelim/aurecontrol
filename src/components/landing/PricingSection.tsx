@@ -95,9 +95,14 @@ export function PricingSection() {
           </div>
         </div>
 
-        <p className="text-center text-sm text-muted-foreground mt-8">
-          * O valor por contrato PJ pode variar de acordo com pacotes promocionais e quantidade de contratos.
-        </p>
+        <div className="text-center mt-8 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            * O valor por contrato PJ pode variar de acordo com pacotes promocionais e quantidade de contratos.
+          </p>
+          <Button variant="link" onClick={() => navigate("/precos")} className="text-primary">
+            Ver todos os pacotes e descontos →
+          </Button>
+        </div>
       </div>
     </section>
   );
