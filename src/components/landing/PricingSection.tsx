@@ -1,9 +1,47 @@
 import { Check, FileText, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function PricingSection() {
   const navigate = useNavigate();
+  const [basePrice, setBasePrice] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPrice = async () => {
+      try {
+        const { data } = await supabase
+          .from("system_settings")
+          .select("value")
+          .eq("key", "pj_contract_price")
+          .maybeSingle();
+
+        if (data?.value) {
+          const priceValue = (data.value as { amount: number })?.amount;
+          setBasePrice(priceValue || 49.90);
+        } else {
+          setBasePrice(49.90);
+        }
+      } catch (error) {
+        console.error("Error fetching price:", error);
+        setBasePrice(49.90);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPrice();
+  }, []);
+
+  const formatPrice = (price: number) => {
+    const [integer, decimal] = price.toFixed(2).split(".");
+    return { integer, decimal };
+  };
+
+  const priceDisplay = basePrice ? formatPrice(basePrice) : { integer: "49", decimal: "90" };
 
   return (
     <section id="precos" className="py-20 md:py-32 bg-muted/30">
@@ -14,7 +52,7 @@ export function PricingSection() {
             Pague apenas pelo que usar
           </h2>
           <p className="text-muted-foreground text-lg">
-            Cobramos apenas pelos contratos PJ ativos. Gestão de CLT e outros recursos são gratuitos.
+            Cobramos apenas pelos contratos PJ <strong>assinados</strong>. Gestão de CLT e outros recursos são gratuitos.
           </p>
         </div>
 
@@ -36,12 +74,19 @@ export function PricingSection() {
               </div>
             </div>
             <div className="mb-6">
-              <span className="text-4xl font-bold text-foreground">R$ 29</span>
-              <span className="text-muted-foreground">/contrato PJ ativo/mês</span>
+              {isLoading ? (
+                <Skeleton className="h-12 w-32" />
+              ) : (
+                <>
+                  <span className="text-4xl font-bold text-foreground">R$ {priceDisplay.integer}</span>
+                  <span className="text-xl text-foreground">,{priceDisplay.decimal}</span>
+                  <span className="text-muted-foreground">/contrato PJ assinado/mês</span>
+                </>
+              )}
             </div>
             <ul className="space-y-3 mb-8">
               {[
-                "Assinaturas digitais (em breve)",
+                "Assinaturas digitais",
                 "Alertas de vencimento",
                 "Controle de pagamentos",
                 "Conformidade legal",

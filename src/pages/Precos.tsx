@@ -57,8 +57,8 @@ const tierFeatures: Record<string, string[]> = {
 
 const faqs = [
   {
-    question: "O que é considerado um contrato PJ ativo?",
-    answer: "Um contrato PJ ativo é qualquer contrato de prestação de serviços com um profissional pessoa jurídica que esteja com status 'ativo' no sistema. Contratos encerrados, cancelados ou expirados não são cobrados.",
+    question: "O que é considerado um contrato PJ ativo para cobrança?",
+    answer: "Apenas contratos PJ que foram assinados digitalmente por todas as partes (contratado e representante da empresa) são considerados para cobrança. Contratos sem assinatura completa, encerrados, cancelados ou expirados não são cobrados.",
   },
   {
     question: "Contratos CLT são cobrados?",
@@ -66,7 +66,7 @@ const faqs = [
   },
   {
     question: "Como funciona a cobrança mensal?",
-    answer: "No início de cada mês, contamos quantos contratos PJ ativos sua empresa possui e geramos uma fatura com base no seu pacote de preços. O vencimento padrão é dia 10 de cada mês.",
+    answer: "No início de cada mês, contamos quantos contratos PJ ativos e assinados sua empresa possui e geramos uma fatura com base no seu pacote de preços. O vencimento padrão é dia 10 de cada mês.",
   },
   {
     question: "Posso mudar de pacote a qualquer momento?",
@@ -74,7 +74,7 @@ const faqs = [
   },
   {
     question: "Existe período de teste gratuito?",
-    answer: "Sim! Novos usuários têm 14 dias para testar a plataforma gratuitamente, sem compromisso. Após esse período, a cobrança é feita apenas pelos contratos PJ ativos.",
+    answer: "Sim! Novos usuários têm 14 dias para testar a plataforma gratuitamente, sem compromisso. Após esse período, a cobrança é feita apenas pelos contratos PJ assinados.",
   },
   {
     question: "Como funcionam os cupons de desconto?",
@@ -130,11 +130,11 @@ export default function Precos() {
               Preços transparentes
             </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6">
-              Pague apenas por contratos PJ
+              Pague apenas por contratos PJ assinados
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
               Gestão de CLT e outros tipos de contrato são <strong>100% gratuitos</strong>. 
-              Você só paga pelos contratos PJ ativos na sua empresa.
+              Você só paga pelos contratos PJ totalmente assinados na sua empresa.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" onClick={() => navigate("/registro")}>

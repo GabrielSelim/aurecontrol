@@ -251,13 +251,19 @@ serve(async (req: Request) => {
           continue;
         }
 
-        // Get PJ contracts count
-        const { count: pjCount } = await supabase
+        // Get PJ contracts count - ONLY count contracts with completed signatures
+        const { data: signedContracts } = await supabase
           .from("contracts")
-          .select("*", { count: "exact", head: true })
+          .select(`
+            id,
+            contract_documents!inner(signature_status)
+          `)
           .eq("company_id", company.id)
           .eq("contract_type", "PJ")
-          .eq("status", "active");
+          .eq("status", "active")
+          .eq("contract_documents.signature_status", "completed");
+
+        const pjCount = signedContracts?.length || 0;
 
         const contractsCount = pjCount || 0;
 

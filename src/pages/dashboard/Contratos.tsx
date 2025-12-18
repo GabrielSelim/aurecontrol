@@ -96,6 +96,23 @@ interface Profile {
   cpf?: string;
   pj_cnpj?: string;
   pj_razao_social?: string;
+  pj_nome_fantasia?: string;
+  address_street?: string;
+  address_number?: string;
+  address_complement?: string;
+  address_neighborhood?: string;
+  address_city?: string;
+  address_state?: string;
+  address_cep?: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  cnpj: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
 }
 
 interface ContractTemplate {
@@ -108,11 +125,12 @@ interface ContractTemplate {
 }
 
 const Contratos = () => {
-  const { profile, isAdmin } = useAuth();
+  const { profile, isAdmin, user } = useAuth();
   const navigate = useNavigate();
   const [contratos, setContratos] = useState<Contract[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
+  const [companyData, setCompanyData] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -140,6 +158,7 @@ const Contratos = () => {
     fetchContratos();
     fetchProfiles();
     fetchTemplates();
+    fetchCompany();
   }, [profile?.company_id]);
 
   const fetchContratos = async () => {
@@ -184,7 +203,7 @@ const Contratos = () => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("user_id, full_name, email, cpf, pj_cnpj, pj_razao_social")
+        .select("user_id, full_name, email, cpf, pj_cnpj, pj_razao_social, pj_nome_fantasia, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_cep")
         .eq("company_id", profile.company_id)
         .eq("is_active", true);
 
@@ -192,6 +211,23 @@ const Contratos = () => {
       setProfiles(data || []);
     } catch (error) {
       console.error("Error fetching profiles:", error);
+    }
+  };
+
+  const fetchCompany = async () => {
+    if (!profile?.company_id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id, name, cnpj, email, phone, address")
+        .eq("id", profile.company_id)
+        .single();
+
+      if (error) throw error;
+      setCompanyData(data);
+    } catch (error) {
+      console.error("Error fetching company:", error);
     }
   };
 
@@ -221,23 +257,35 @@ const Contratos = () => {
   };
 
   const generateDocumentHtml = (template: ContractTemplate, contractData: any, collaboratorProfile: Profile) => {
-    const company = profile;
     let html = template.content;
 
-    // Replace template variables
+    // Build collaborator address
+    const collaboratorAddress = [
+      collaboratorProfile.address_street,
+      collaboratorProfile.address_number,
+      collaboratorProfile.address_complement,
+      collaboratorProfile.address_neighborhood,
+      collaboratorProfile.address_city,
+      collaboratorProfile.address_state,
+      collaboratorProfile.address_cep,
+    ].filter(Boolean).join(", ") || "Endereço não informado";
+
+    // Replace template variables with actual data
     const variables: Record<string, string> = {
-      "{{contratante_razao_social}}": company?.company_id || "Empresa",
-      "{{contratante_cnpj}}": "",
-      "{{contratante_endereco}}": "",
+      "{{contratante_razao_social}}": companyData?.name || "Empresa",
+      "{{contratante_cnpj}}": companyData?.cnpj ? formatCNPJ(companyData.cnpj) : "",
+      "{{contratante_endereco}}": companyData?.address || "Endereço não informado",
       "{{contratado_nome}}": collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
-      "{{contratado_cpf_cnpj}}": collaboratorProfile.pj_cnpj || collaboratorProfile.cpf || "",
-      "{{contratado_endereco}}": "",
+      "{{contratado_nome_fantasia}}": collaboratorProfile.pj_nome_fantasia || collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
+      "{{contratado_cpf_cnpj}}": collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : (collaboratorProfile.cpf || ""),
+      "{{contratado_endereco}}": collaboratorAddress,
       "{{cargo}}": contractData.job_title,
+      "{{departamento}}": contractData.department || "Não especificado",
       "{{valor}}": contractData.salary ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(contractData.salary) : "A definir",
       "{{data_inicio}}": format(new Date(contractData.start_date), "dd/MM/yyyy", { locale: ptBR }),
       "{{data_fim}}": contractData.end_date ? format(new Date(contractData.end_date), "dd/MM/yyyy", { locale: ptBR }) : "Indeterminado",
       "{{data_atual}}": format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
-      "{{cidade}}": "Cidade",
+      "{{cidade}}": companyData?.address?.split(",").pop()?.trim() || "Cidade",
     };
 
     Object.entries(variables).forEach(([key, value]) => {
@@ -245,6 +293,12 @@ const Contratos = () => {
     });
 
     return html;
+  };
+
+  const formatCNPJ = (cnpj: string) => {
+    const cleaned = cnpj.replace(/\D/g, "");
+    if (cleaned.length !== 14) return cnpj;
+    return cleaned.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
   };
 
   const handleCreateContract = async () => {
@@ -257,6 +311,15 @@ const Contratos = () => {
     if (contractType === "PJ" && !selectedTemplateId) {
       toast.error("Selecione um template de contrato para contratos PJ");
       return;
+    }
+
+    // PJ contracts require employee to have company data (CNPJ and Razão Social)
+    if (contractType === "PJ") {
+      const selectedProfile = profiles.find(p => p.user_id === selectedUserId);
+      if (!selectedProfile?.pj_cnpj || !selectedProfile?.pj_razao_social) {
+        toast.error("O colaborador selecionado não possui dados de empresa PJ cadastrados (CNPJ e Razão Social). Atualize o cadastro do colaborador antes de criar um contrato PJ.");
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -309,7 +372,7 @@ const Contratos = () => {
         throw error;
       }
 
-      // For PJ contracts, generate the document
+      // For PJ contracts, generate the document and create signatures
       if (contractType === "PJ" && selectedTemplateId && contractData) {
         const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
         const collaboratorProfile = profiles.find(p => p.user_id === selectedUserId);
@@ -317,7 +380,7 @@ const Contratos = () => {
         if (selectedTemplate && collaboratorProfile) {
           const documentHtml = generateDocumentHtml(selectedTemplate, { ...insertData, end_date: endDate }, collaboratorProfile);
           
-          const { error: docError } = await supabase
+          const { data: docData, error: docError } = await supabase
             .from("contract_documents")
             .insert({
               contract_id: contractData.id,
@@ -325,11 +388,61 @@ const Contratos = () => {
               document_html: documentHtml,
               witness_count: parseInt(witnessCount),
               signature_status: "pending",
-            });
+            })
+            .select()
+            .single();
 
           if (docError) {
             console.error("Error creating document:", docError);
             toast.error("Contrato criado, mas houve erro ao gerar o documento");
+          } else if (docData) {
+            // Create signature entries
+            const signatureEntries = [];
+
+            // 1. Contractor signature (the PJ employee)
+            signatureEntries.push({
+              document_id: docData.id,
+              signer_type: "contractor" as const,
+              signer_order: 1,
+              signer_user_id: selectedUserId,
+              signer_name: collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
+              signer_email: collaboratorProfile.email,
+              signer_document: collaboratorProfile.pj_cnpj || collaboratorProfile.cpf || null,
+            });
+
+            // 2. Company representative signature (current user creating the contract - must be admin)
+            signatureEntries.push({
+              document_id: docData.id,
+              signer_type: "company_representative" as const,
+              signer_order: 2,
+              signer_user_id: user?.id || null,
+              signer_name: profile.full_name,
+              signer_email: profile.email,
+              signer_document: profile.cpf || null,
+            });
+
+            // 3. Witness signatures (if any)
+            const witnessCountNum = parseInt(witnessCount);
+            for (let i = 0; i < witnessCountNum; i++) {
+              signatureEntries.push({
+                document_id: docData.id,
+                signer_type: "witness" as const,
+                signer_order: 3 + i,
+                signer_user_id: null,
+                signer_name: `Testemunha ${i + 1}`,
+                signer_email: "",
+                signer_document: null,
+              });
+            }
+
+            const { error: sigError } = await supabase
+              .from("contract_signatures")
+              .insert(signatureEntries);
+
+            if (sigError) {
+              console.error("Error creating signatures:", sigError);
+              toast.error("Documento criado, mas houve erro ao configurar assinaturas");
+            }
           }
         }
       }
