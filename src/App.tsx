@@ -48,24 +48,101 @@ function DashboardRoutes() {
     <ProtectedRoute>
       <DashboardLayout>
         <Routes>
+          {/* Rotas acessíveis a todos os usuários autenticados */}
           <Route index element={<DashboardHome />} />
-          <Route path="colaboradores" element={<Colaboradores />} />
-          <Route path="colaboradores/:id" element={<ColaboradorDetalhes />} />
-          <Route path="colaboradores/:id/editar" element={<ColaboradorEditar />} />
-          <Route path="contratos" element={<Contratos />} />
-          <Route path="contratos/:id" element={<ContratoDetalhes />} />
-          <Route path="contratos/:id/documento" element={<ContratoDocumento />} />
-          <Route path="templates-contrato" element={<TemplatesContrato />} />
-          <Route path="contratos-faturaveis" element={<ContratosFaturaveis />} />
-          <Route path="pagamentos" element={<Pagamentos />} />
-          <Route path="convites" element={<Convites />} />
-          <Route path="empresa" element={<Empresa />} />
-          <Route path="empresas" element={<Empresas />} />
-          <Route path="empresas/:id" element={<EmpresaDetalhes />} />
-          <Route path="faturamento" element={<Faturamento />} />
-          <Route path="configuracoes" element={<Configuracoes />} />
           <Route path="notificacoes" element={<Notificacoes />} />
           <Route path="perfil" element={<Perfil />} />
+          
+          {/* Rotas de colaboradores - admin, gestor, financeiro */}
+          <Route path="colaboradores" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "gestor", "financeiro"]}>
+              <Colaboradores />
+            </ProtectedRoute>
+          } />
+          <Route path="colaboradores/:id" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "gestor", "financeiro"]}>
+              <ColaboradorDetalhes />
+            </ProtectedRoute>
+          } />
+          <Route path="colaboradores/:id/editar" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "gestor"]}>
+              <ColaboradorEditar />
+            </ProtectedRoute>
+          } />
+          
+          {/* Rotas de contratos - admin, gestor, juridico, financeiro */}
+          <Route path="contratos" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "gestor", "juridico", "financeiro"]}>
+              <Contratos />
+            </ProtectedRoute>
+          } />
+          <Route path="contratos/:id" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "gestor", "juridico", "financeiro", "colaborador"]}>
+              <ContratoDetalhes />
+            </ProtectedRoute>
+          } />
+          <Route path="contratos/:id/documento" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "gestor", "juridico", "colaborador"]}>
+              <ContratoDocumento />
+            </ProtectedRoute>
+          } />
+          
+          {/* Templates de contrato - admin, juridico */}
+          <Route path="templates-contrato" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "juridico"]}>
+              <TemplatesContrato />
+            </ProtectedRoute>
+          } />
+          
+          {/* Contratos faturáveis - master_admin */}
+          <Route path="contratos-faturaveis" element={
+            <ProtectedRoute requiredRoles={["master_admin"]}>
+              <ContratosFaturaveis />
+            </ProtectedRoute>
+          } />
+          
+          {/* Pagamentos - admin, financeiro */}
+          <Route path="pagamentos" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "financeiro"]}>
+              <Pagamentos />
+            </ProtectedRoute>
+          } />
+          
+          {/* Convites - admin */}
+          <Route path="convites" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin"]}>
+              <Convites />
+            </ProtectedRoute>
+          } />
+          
+          {/* Empresa - admin */}
+          <Route path="empresa" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin"]}>
+              <Empresa />
+            </ProtectedRoute>
+          } />
+          
+          {/* Rotas exclusivas do master_admin */}
+          <Route path="empresas" element={
+            <ProtectedRoute requiredRoles={["master_admin"]}>
+              <Empresas />
+            </ProtectedRoute>
+          } />
+          <Route path="empresas/:id" element={
+            <ProtectedRoute requiredRoles={["master_admin"]}>
+              <EmpresaDetalhes />
+            </ProtectedRoute>
+          } />
+          <Route path="faturamento" element={
+            <ProtectedRoute requiredRoles={["master_admin"]}>
+              <Faturamento />
+            </ProtectedRoute>
+          } />
+          <Route path="configuracoes" element={
+            <ProtectedRoute requiredRoles={["master_admin"]}>
+              <Configuracoes />
+            </ProtectedRoute>
+          } />
         </Routes>
       </DashboardLayout>
     </ProtectedRoute>
