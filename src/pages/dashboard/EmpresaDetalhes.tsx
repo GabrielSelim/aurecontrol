@@ -40,6 +40,8 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatCNPJ as formatCNPJMask, validateCNPJ } from "@/lib/masks";
@@ -117,6 +119,8 @@ interface Payment {
   contract_title?: string;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 const EmpresaDetalhes = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -148,6 +152,12 @@ const EmpresaDetalhes = () => {
     pendingBillings: 0,
     totalRevenue: 0,
   });
+
+  // Pagination states
+  const [usersPage, setUsersPage] = useState(1);
+  const [contractsPage, setContractsPage] = useState(1);
+  const [billingsPage, setBillingsPage] = useState(1);
+  const [paymentsPage, setPaymentsPage] = useState(1);
 
   useEffect(() => {
     if (id) {
@@ -337,6 +347,77 @@ const EmpresaDetalhes = () => {
       <Badge variant="outline" className={styles[status] || ""}>
         {labels[status] || status}
       </Badge>
+    );
+  };
+
+  // Pagination helpers
+  const getPaginatedData = <T,>(data: T[], page: number) => {
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    return data.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  };
+
+  const getTotalPages = (total: number) => Math.ceil(total / ITEMS_PER_PAGE);
+
+  const renderPagination = (
+    currentPage: number,
+    totalItems: number,
+    setPage: (page: number) => void
+  ) => {
+    const totalPages = getTotalPages(totalItems);
+    if (totalItems <= ITEMS_PER_PAGE) return null;
+
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    
+    return (
+      <div className="flex items-center justify-between mt-4 pt-4 border-t">
+        <p className="text-sm text-muted-foreground">
+          Mostrando {startIndex + 1} a {Math.min(startIndex + ITEMS_PER_PAGE, totalItems)} de {totalItems}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Anterior
+          </Button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((page) => {
+                if (totalPages <= 5) return true;
+                if (page === 1 || page === totalPages) return true;
+                if (Math.abs(page - currentPage) <= 1) return true;
+                return false;
+              })
+              .map((page, idx, arr) => (
+                <span key={page}>
+                  {idx > 0 && arr[idx - 1] !== page - 1 && (
+                    <span className="px-2 text-muted-foreground">...</span>
+                  )}
+                  <Button
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    className="w-8 h-8 p-0"
+                    onClick={() => setPage(page)}
+                  >
+                    {page}
+                  </Button>
+                </span>
+              ))}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Próximo
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     );
   };
 
@@ -680,36 +761,39 @@ const EmpresaDetalhes = () => {
                   <p>Nenhum usuário encontrado</p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>E-mail</TableHead>
-                      <TableHead>Telefone</TableHead>
-                      <TableHead>Perfil</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-center">Cadastrado em</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.full_name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>{formatPhone(user.phone)}</TableCell>
-                        <TableCell>{getRoleBadge(user.role)}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={user.is_active ? "default" : "secondary"}>
-                            {user.is_active ? "Ativo" : "Inativo"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center text-sm text-muted-foreground">
-                          {formatDate(user.created_at)}
-                        </TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>E-mail</TableHead>
+                        <TableHead>Telefone</TableHead>
+                        <TableHead>Perfil</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead className="text-center">Cadastrado em</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {getPaginatedData(users, usersPage).map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.full_name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>{formatPhone(user.phone)}</TableCell>
+                          <TableCell>{getRoleBadge(user.role)}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={user.is_active ? "default" : "secondary"}>
+                              {user.is_active ? "Ativo" : "Inativo"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center text-sm text-muted-foreground">
+                            {formatDate(user.created_at)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {renderPagination(usersPage, users.length, setUsersPage)}
+                </>
               )}
             </CardContent>
           </Card>
@@ -729,42 +813,45 @@ const EmpresaDetalhes = () => {
                   <p>Nenhum contrato encontrado</p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Colaborador</TableHead>
-                      <TableHead>Cargo</TableHead>
-                      <TableHead className="text-center">Tipo</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead>Início</TableHead>
-                      <TableHead>Término</TableHead>
-                      <TableHead className="text-right">Salário</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {contracts.map((contract) => (
-                      <TableRow key={contract.id}>
-                        <TableCell className="font-medium">
-                          {contract.user_name || "-"}
-                        </TableCell>
-                        <TableCell>{contract.job_title}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={contract.contract_type === "PJ" ? "default" : "secondary"}>
-                            {contract.contract_type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {getStatusBadge(contract.status)}
-                        </TableCell>
-                        <TableCell>{formatDate(contract.start_date)}</TableCell>
-                        <TableCell>{contract.end_date ? formatDate(contract.end_date) : "-"}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          {contract.salary ? formatCurrency(contract.salary) : "-"}
-                        </TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Colaborador</TableHead>
+                        <TableHead>Cargo</TableHead>
+                        <TableHead className="text-center">Tipo</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead>Início</TableHead>
+                        <TableHead>Término</TableHead>
+                        <TableHead className="text-right">Salário</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {getPaginatedData(contracts, contractsPage).map((contract) => (
+                        <TableRow key={contract.id}>
+                          <TableCell className="font-medium">
+                            {contract.user_name || "-"}
+                          </TableCell>
+                          <TableCell>{contract.job_title}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={contract.contract_type === "PJ" ? "default" : "secondary"}>
+                              {contract.contract_type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {getStatusBadge(contract.status)}
+                          </TableCell>
+                          <TableCell>{formatDate(contract.start_date)}</TableCell>
+                          <TableCell>{contract.end_date ? formatDate(contract.end_date) : "-"}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {contract.salary ? formatCurrency(contract.salary) : "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {renderPagination(contractsPage, contracts.length, setContractsPage)}
+                </>
               )}
             </CardContent>
           </Card>
@@ -784,40 +871,43 @@ const EmpresaDetalhes = () => {
                   <p>Nenhuma fatura encontrada</p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Referência</TableHead>
-                      <TableHead className="text-center">Contratos PJ</TableHead>
-                      <TableHead className="text-right">Preço Unit.</TableHead>
-                      <TableHead className="text-right">Subtotal</TableHead>
-                      <TableHead className="text-right">Desconto</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead>Vencimento</TableHead>
-                      <TableHead>Pago em</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {billings.map((billing) => (
-                      <TableRow key={billing.id}>
-                        <TableCell className="font-medium capitalize">
-                          {formatMonth(billing.reference_month)}
-                        </TableCell>
-                        <TableCell className="text-center">{billing.pj_contracts_count}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(billing.unit_price)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(billing.subtotal)}</TableCell>
-                        <TableCell className="text-right text-green-600">
-                          {billing.discount_amount ? `-${formatCurrency(billing.discount_amount)}` : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-bold">{formatCurrency(billing.total)}</TableCell>
-                        <TableCell className="text-center">{getStatusBadge(billing.status)}</TableCell>
-                        <TableCell>{formatDate(billing.due_date)}</TableCell>
-                        <TableCell>{billing.paid_at ? formatDate(billing.paid_at) : "-"}</TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Referência</TableHead>
+                        <TableHead className="text-center">Contratos PJ</TableHead>
+                        <TableHead className="text-right">Preço Unit.</TableHead>
+                        <TableHead className="text-right">Subtotal</TableHead>
+                        <TableHead className="text-right">Desconto</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead>Vencimento</TableHead>
+                        <TableHead>Pago em</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {getPaginatedData(billings, billingsPage).map((billing) => (
+                        <TableRow key={billing.id}>
+                          <TableCell className="font-medium capitalize">
+                            {formatMonth(billing.reference_month)}
+                          </TableCell>
+                          <TableCell className="text-center">{billing.pj_contracts_count}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(billing.unit_price)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(billing.subtotal)}</TableCell>
+                          <TableCell className="text-right text-green-600">
+                            {billing.discount_amount ? `-${formatCurrency(billing.discount_amount)}` : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-bold">{formatCurrency(billing.total)}</TableCell>
+                          <TableCell className="text-center">{getStatusBadge(billing.status)}</TableCell>
+                          <TableCell>{formatDate(billing.due_date)}</TableCell>
+                          <TableCell>{billing.paid_at ? formatDate(billing.paid_at) : "-"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {renderPagination(billingsPage, billings.length, setBillingsPage)}
+                </>
               )}
             </CardContent>
           </Card>
@@ -837,36 +927,39 @@ const EmpresaDetalhes = () => {
                   <p>Nenhum pagamento encontrado</p>
                 </div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Colaborador</TableHead>
-                      <TableHead>Contrato</TableHead>
-                      <TableHead>Referência</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead>Data Pagamento</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {payments.map((payment) => (
-                      <TableRow key={payment.id}>
-                        <TableCell className="font-medium">
-                          {payment.user_name || "-"}
-                        </TableCell>
-                        <TableCell>{payment.contract_title || "-"}</TableCell>
-                        <TableCell className="capitalize">{formatMonth(payment.reference_month)}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(payment.amount)}
-                        </TableCell>
-                        <TableCell className="text-center">{getStatusBadge(payment.status)}</TableCell>
-                        <TableCell>
-                          {payment.payment_date ? formatDate(payment.payment_date) : "-"}
-                        </TableCell>
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Colaborador</TableHead>
+                        <TableHead>Contrato</TableHead>
+                        <TableHead>Referência</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                        <TableHead>Data Pagamento</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {getPaginatedData(payments, paymentsPage).map((payment) => (
+                        <TableRow key={payment.id}>
+                          <TableCell className="font-medium">
+                            {payment.user_name || "-"}
+                          </TableCell>
+                          <TableCell>{payment.contract_title || "-"}</TableCell>
+                          <TableCell className="capitalize">{formatMonth(payment.reference_month)}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatCurrency(payment.amount)}
+                          </TableCell>
+                          <TableCell className="text-center">{getStatusBadge(payment.status)}</TableCell>
+                          <TableCell>
+                            {payment.payment_date ? formatDate(payment.payment_date) : "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {renderPagination(paymentsPage, payments.length, setPaymentsPage)}
+                </>
               )}
             </CardContent>
           </Card>
