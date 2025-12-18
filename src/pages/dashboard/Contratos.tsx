@@ -64,6 +64,10 @@ interface Contract {
   end_date: string | null;
   status: string;
   created_at: string;
+  duration_type: string | null;
+  duration_value: number | null;
+  duration_unit: string | null;
+  deliverable_description: string | null;
   profile?: {
     full_name: string;
     email: string;
@@ -92,6 +96,11 @@ const Contratos = () => {
   const [department, setDepartment] = useState("");
   const [salary, setSalary] = useState("");
   const [startDate, setStartDate] = useState("");
+  // PJ duration fields
+  const [durationType, setDurationType] = useState("indefinite");
+  const [durationValue, setDurationValue] = useState("");
+  const [durationUnit, setDurationUnit] = useState("months");
+  const [deliverableDescription, setDeliverableDescription] = useState("");
 
   useEffect(() => {
     fetchContratos();
@@ -160,6 +169,23 @@ const Contratos = () => {
     setIsSubmitting(true);
 
     try {
+      // Calculate end_date for time-based contracts
+      let endDate = null;
+      if (contractType === "pj" && durationType === "time_based" && durationValue) {
+        const start = new Date(startDate);
+        const value = parseInt(durationValue);
+        if (durationUnit === "days") {
+          start.setDate(start.getDate() + value);
+        } else if (durationUnit === "weeks") {
+          start.setDate(start.getDate() + (value * 7));
+        } else if (durationUnit === "months") {
+          start.setMonth(start.getMonth() + value);
+        } else if (durationUnit === "years") {
+          start.setFullYear(start.getFullYear() + value);
+        }
+        endDate = start.toISOString().split('T')[0];
+      }
+
       const { error } = await supabase.from("contracts").insert({
         company_id: profile.company_id,
         user_id: selectedUserId,
@@ -168,8 +194,13 @@ const Contratos = () => {
         department: department || null,
         salary: salary ? parseFloat(salary) : null,
         start_date: startDate,
+        end_date: endDate,
         status: "active",
         created_by: profile.user_id,
+        duration_type: contractType === "pj" ? durationType : null,
+        duration_value: contractType === "pj" && durationType === "time_based" ? parseInt(durationValue) : null,
+        duration_unit: contractType === "pj" && durationType === "time_based" ? durationUnit : null,
+        deliverable_description: contractType === "pj" && durationType === "delivery_based" ? deliverableDescription : null,
       });
       if (error) throw error;
 
@@ -192,6 +223,10 @@ const Contratos = () => {
     setDepartment("");
     setSalary("");
     setStartDate("");
+    setDurationType("indefinite");
+    setDurationValue("");
+    setDurationUnit("months");
+    setDeliverableDescription("");
   };
 
   const getContractTypeLabel = (type: string) => {
@@ -297,6 +332,62 @@ const Contratos = () => {
                     />
                   </div>
                 </div>
+                {/* PJ Duration Options */}
+                {contractType === "pj" && (
+                  <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
+                    <Label className="text-sm font-medium">Duração do Contrato PJ</Label>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Tipo de Duração</Label>
+                      <Select value={durationType} onValueChange={setDurationType}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="indefinite">Indeterminado</SelectItem>
+                          <SelectItem value="time_based">Por Tempo</SelectItem>
+                          <SelectItem value="delivery_based">Por Entrega</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {durationType === "time_based" && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Quantidade</Label>
+                          <Input
+                            type="number"
+                            placeholder="Ex: 12"
+                            value={durationValue}
+                            onChange={(e) => setDurationValue(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground">Unidade</Label>
+                          <Select value={durationUnit} onValueChange={setDurationUnit}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="days">Dias</SelectItem>
+                              <SelectItem value="weeks">Semanas</SelectItem>
+                              <SelectItem value="months">Meses</SelectItem>
+                              <SelectItem value="years">Anos</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                    {durationType === "delivery_based" && (
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Descrição da Entrega</Label>
+                        <Input
+                          placeholder="Ex: Desenvolvimento do app mobile"
+                          value={deliverableDescription}
+                          onChange={(e) => setDeliverableDescription(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Cargo *</Label>
                   <JobTitleCombobox
