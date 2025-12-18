@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.validate-cnpj]
 verify_jwt = false
+
+[functions.contract-expiration-alerts]
+verify_jwt = false
