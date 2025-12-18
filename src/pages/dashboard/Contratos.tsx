@@ -82,6 +82,18 @@ interface Profile {
   user_id: string;
   full_name: string;
   email: string;
+  cpf?: string;
+  pj_cnpj?: string;
+  pj_razao_social?: string;
+}
+
+interface ContractTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  content: string;
+  default_witness_count: number;
+  is_system_default: boolean;
 }
 
 const Contratos = () => {
@@ -89,6 +101,7 @@ const Contratos = () => {
   const navigate = useNavigate();
   const [contratos, setContratos] = useState<Contract[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -106,10 +119,14 @@ const Contratos = () => {
   const [durationValue, setDurationValue] = useState("");
   const [durationUnit, setDurationUnit] = useState("months");
   const [deliverableDescription, setDeliverableDescription] = useState("");
+  // PJ document fields
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [witnessCount, setWitnessCount] = useState("0");
 
   useEffect(() => {
     fetchContratos();
     fetchProfiles();
+    fetchTemplates();
   }, [profile?.company_id]);
 
   const fetchContratos = async () => {
@@ -154,7 +171,7 @@ const Contratos = () => {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("user_id, full_name, email")
+        .select("user_id, full_name, email, cpf, pj_cnpj, pj_razao_social")
         .eq("company_id", profile.company_id)
         .eq("is_active", true);
 
@@ -165,9 +182,67 @@ const Contratos = () => {
     }
   };
 
+  const fetchTemplates = async () => {
+    if (!profile?.company_id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("contract_templates")
+        .select("id, name, description, content, default_witness_count, is_system_default")
+        .or(`company_id.eq.${profile.company_id},is_system_default.eq.true`)
+        .eq("is_active", true)
+        .order("is_system_default", { ascending: false });
+
+      if (error) throw error;
+      setTemplates(data || []);
+      
+      // Auto-select default template
+      const defaultTemplate = (data || []).find(t => t.is_system_default);
+      if (defaultTemplate && !selectedTemplateId) {
+        setSelectedTemplateId(defaultTemplate.id);
+        setWitnessCount(String(defaultTemplate.default_witness_count || 0));
+      }
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+    }
+  };
+
+  const generateDocumentHtml = (template: ContractTemplate, contractData: any, collaboratorProfile: Profile) => {
+    const company = profile;
+    let html = template.content;
+
+    // Replace template variables
+    const variables: Record<string, string> = {
+      "{{contratante_razao_social}}": company?.company_id || "Empresa",
+      "{{contratante_cnpj}}": "",
+      "{{contratante_endereco}}": "",
+      "{{contratado_nome}}": collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
+      "{{contratado_cpf_cnpj}}": collaboratorProfile.pj_cnpj || collaboratorProfile.cpf || "",
+      "{{contratado_endereco}}": "",
+      "{{cargo}}": contractData.job_title,
+      "{{valor}}": contractData.salary ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(contractData.salary) : "A definir",
+      "{{data_inicio}}": format(new Date(contractData.start_date), "dd/MM/yyyy", { locale: ptBR }),
+      "{{data_fim}}": contractData.end_date ? format(new Date(contractData.end_date), "dd/MM/yyyy", { locale: ptBR }) : "Indeterminado",
+      "{{data_atual}}": format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
+      "{{cidade}}": "Cidade",
+    };
+
+    Object.entries(variables).forEach(([key, value]) => {
+      html = html.replace(new RegExp(key, "g"), value);
+    });
+
+    return html;
+  };
+
   const handleCreateContract = async () => {
     if (!profile?.company_id || !selectedUserId || !contractType || !jobTitle || !startDate) {
       toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    // PJ contracts require template selection
+    if (contractType === "PJ" && !selectedTemplateId) {
+      toast.error("Selecione um template de contrato para contratos PJ");
       return;
     }
 
@@ -210,11 +285,40 @@ const Contratos = () => {
 
       console.log("Inserting contract:", insertData);
 
-      const { error } = await supabase.from("contracts").insert(insertData);
+      const { data: contractData, error } = await supabase
+        .from("contracts")
+        .insert(insertData)
+        .select()
+        .single();
       
       if (error) {
         console.error("Supabase error:", error);
         throw error;
+      }
+
+      // For PJ contracts, generate the document
+      if (contractType === "PJ" && selectedTemplateId && contractData) {
+        const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+        const collaboratorProfile = profiles.find(p => p.user_id === selectedUserId);
+        
+        if (selectedTemplate && collaboratorProfile) {
+          const documentHtml = generateDocumentHtml(selectedTemplate, { ...insertData, end_date: endDate }, collaboratorProfile);
+          
+          const { error: docError } = await supabase
+            .from("contract_documents")
+            .insert({
+              contract_id: contractData.id,
+              template_id: selectedTemplateId,
+              document_html: documentHtml,
+              witness_count: parseInt(witnessCount),
+              signature_status: "pending",
+            });
+
+          if (docError) {
+            console.error("Error creating document:", docError);
+            toast.error("Contrato criado, mas houve erro ao gerar o documento");
+          }
+        }
       }
 
       toast.success("Contrato criado com sucesso!");
@@ -240,6 +344,8 @@ const Contratos = () => {
     setDurationValue("");
     setDurationUnit("months");
     setDeliverableDescription("");
+    setSelectedTemplateId("");
+    setWitnessCount("0");
   };
 
   const getContractTypeLabel = (type: string) => {
@@ -448,7 +554,47 @@ const Contratos = () => {
                 {/* PJ Duration Options */}
                 {contractType === "PJ" && (
                   <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
-                    <Label className="text-sm font-medium">Duração do Contrato PJ</Label>
+                    <Label className="text-sm font-medium">Configurações do Contrato PJ</Label>
+                    
+                    {/* Template Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Template do Contrato *</Label>
+                      <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {templates.map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name} {template.is_system_default && "(Padrão)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {templates.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Nenhum template disponível. Crie um template primeiro.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Witness Count */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Quantidade de Testemunhas</Label>
+                      <Select value={witnessCount} onValueChange={setWitnessCount}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Sem testemunhas</SelectItem>
+                          <SelectItem value="1">1 testemunha</SelectItem>
+                          <SelectItem value="2">2 testemunhas</SelectItem>
+                          <SelectItem value="3">3 testemunhas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Duration Type */}
                     <div className="space-y-2">
                       <Label className="text-xs text-muted-foreground">Tipo de Duração</Label>
                       <Select value={durationType} onValueChange={setDurationType}>
