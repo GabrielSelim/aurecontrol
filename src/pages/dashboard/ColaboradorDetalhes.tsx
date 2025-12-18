@@ -36,7 +36,7 @@ interface ColaboradorData {
 interface Contract {
   id: string;
   job_title: string;
-  contract_type: "CLT" | "PJ";
+  contract_type: "CLT" | "PJ" | "estagio" | "temporario";
   status: "active" | "inactive" | "terminated";
   start_date: string;
   end_date: string | null;
