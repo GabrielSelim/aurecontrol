@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Users, Download, ChevronLeft, ChevronRight, ArrowUpDown, X, Info, LayoutGrid, List, Mail, Building2 } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Users, Download, ChevronLeft, ChevronRight, ArrowUpDown, X, Info, LayoutGrid, List, Mail, Building2, FileText, Briefcase } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -57,6 +57,9 @@ interface Colaborador {
   created_at: string;
   roles: { role: string }[];
   department: string | null;
+  has_contract: boolean;
+  contract_type: string | null;
+  job_title: string | null;
 }
 
 const Colaboradores = () => {
@@ -98,16 +101,21 @@ const Colaboradores = () => {
                 .eq("user_id", p.user_id),
               supabase
                 .from("contracts")
-                .select("department")
+                .select("department, contract_type, job_title, status")
                 .eq("user_id", p.user_id)
                 .eq("status", "active")
                 .limit(1)
             ]);
 
+            const activeContract = contractsRes.data?.[0];
+
             return {
               ...p,
               roles: rolesRes.data || [],
-              department: contractsRes.data?.[0]?.department || null,
+              department: activeContract?.department || null,
+              has_contract: !!activeContract,
+              contract_type: activeContract?.contract_type || null,
+              job_title: activeContract?.job_title || null,
             };
           })
         );
@@ -202,12 +210,12 @@ const Colaboradores = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ["Nome", "E-mail", "CPF", "Telefone", "Cargo(s)", "Status"];
+    const headers = ["Nome", "E-mail", "Profissão", "Tipo Contrato", "Cargo(s)", "Status"];
     const rows = filteredColaboradores.map(c => [
       c.full_name,
       c.email,
-      c.cpf ? formatCPF(c.cpf) : "",
-      c.phone ? formatPhone(c.phone) : "",
+      c.job_title || "",
+      c.has_contract ? (c.contract_type === "pj" ? "PJ" : "CLT") : "Sem contrato",
       c.roles.map(r => getRoleLabel(r.role)).join("; "),
       c.is_active ? "Ativo" : "Inativo"
     ]);
@@ -527,8 +535,8 @@ const Colaboradores = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Colaborador</TableHead>
-                    <TableHead className="hidden md:table-cell">Contato</TableHead>
-                    <TableHead className="hidden lg:table-cell">CPF</TableHead>
+                    <TableHead className="hidden md:table-cell">Profissão</TableHead>
+                    <TableHead className="hidden lg:table-cell">Tipo Contrato</TableHead>
                     <TableHead>Cargo</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
@@ -551,7 +559,7 @@ const Colaboradores = () => {
                           <Skeleton className="h-4 w-24" />
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          <Skeleton className="h-4 w-28" />
+                          <Skeleton className="h-6 w-16" />
                         </TableCell>
                         <TableCell>
                           <Skeleton className="h-6 w-20" />
@@ -591,13 +599,26 @@ const Colaboradores = () => {
                           </div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Phone className="h-3 w-3" />
-                            {displayPhone(colaborador.phone)}
-                          </div>
+                          {colaborador.job_title ? (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Briefcase className="h-3 w-3 text-muted-foreground" />
+                              {colaborador.job_title}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          <span className="text-sm">{displayCPF(colaborador.cpf)}</span>
+                          {colaborador.has_contract ? (
+                            <Badge variant={colaborador.contract_type === "pj" ? "default" : "secondary"}>
+                              <FileText className="h-3 w-3 mr-1" />
+                              {colaborador.contract_type === "pj" ? "PJ" : "CLT"}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Sem contrato
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
@@ -705,10 +726,10 @@ const Colaboradores = () => {
                               <Mail className="h-3 w-3" />
                               {colaborador.email}
                             </p>
-                            {colaborador.phone && (
+                            {colaborador.job_title && (
                               <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
-                                <Phone className="h-3 w-3" />
-                                {displayPhone(colaborador.phone)}
+                                <Briefcase className="h-3 w-3" />
+                                {colaborador.job_title}
                               </p>
                             )}
                             {colaborador.department && (
@@ -716,6 +737,18 @@ const Colaboradores = () => {
                                 <Building2 className="h-3 w-3" />
                                 {colaborador.department}
                               </p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap justify-center gap-1">
+                            {colaborador.has_contract ? (
+                              <Badge variant={colaborador.contract_type === "pj" ? "default" : "secondary"}>
+                                <FileText className="h-3 w-3 mr-1" />
+                                {colaborador.contract_type === "pj" ? "PJ" : "CLT"}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-muted-foreground">
+                                Sem contrato
+                              </Badge>
                             )}
                           </div>
                           <div className="flex flex-wrap justify-center gap-1">
