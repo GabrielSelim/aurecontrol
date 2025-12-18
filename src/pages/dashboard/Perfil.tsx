@@ -17,6 +17,7 @@ interface ProfileData {
   cpf: string | null;
   phone: string | null;
   avatar_url: string | null;
+  address: string | null;
   pj_cnpj: string | null;
   pj_razao_social: string | null;
   pj_nome_fantasia: string | null;
@@ -44,6 +45,7 @@ export default function Perfil() {
     cpf: null,
     phone: null,
     avatar_url: null,
+    address: null,
     pj_cnpj: null,
     pj_razao_social: null,
     pj_nome_fantasia: null,
@@ -71,6 +73,7 @@ export default function Perfil() {
         cpf: profile.cpf ? formatCPF(profile.cpf) : null,
         phone: profile.phone ? formatPhone(profile.phone) : null,
         avatar_url: profile.avatar_url,
+        address: profile.address,
         pj_cnpj: profile.pj_cnpj ? formatCNPJ(profile.pj_cnpj) : null,
         pj_razao_social: profile.pj_razao_social,
         pj_nome_fantasia: profile.pj_nome_fantasia,
@@ -236,6 +239,7 @@ export default function Perfil() {
           full_name: profileData.full_name,
           phone: profileData.phone,
           cpf: profileData.cpf,
+          address: profileData.address,
         })
         .eq("user_id", user.id);
 
@@ -455,6 +459,20 @@ export default function Perfil() {
                       {errors.phone && (
                         <p className="text-sm text-destructive">{errors.phone}</p>
                       )}
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="address">Endereço</Label>
+                      <Input
+                        id="address"
+                        value={profileData.address || ""}
+                        onChange={(e) =>
+                          setProfileData((prev) => ({
+                            ...prev,
+                            address: e.target.value,
+                          }))
+                        }
+                        placeholder="Rua, número, bairro, cidade - UF, CEP"
+                      />
                     </div>
                   </div>
                   <div className="flex justify-end">

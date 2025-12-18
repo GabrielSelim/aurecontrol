@@ -16,6 +16,7 @@ interface Profile {
   pj_cnpj: string | null;
   pj_razao_social: string | null;
   pj_nome_fantasia: string | null;
+  address: string | null;
 }
 
 interface UserRole {
