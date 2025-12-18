@@ -431,6 +431,20 @@ const Contratos = () => {
       return;
     }
 
+    // PJ contracts require representative to have complete data
+    if (contractType === "PJ") {
+      const selectedAdmin = adminProfiles.find(a => a.user_id === selectedRepresentativeId);
+      const missingFields = [];
+      if (!selectedAdmin?.cpf) missingFields.push("CPF");
+      if (!selectedAdmin?.identity_number) missingFields.push("RG");
+      if (!selectedAdmin?.nationality) missingFields.push("Nacionalidade");
+      
+      if (missingFields.length > 0) {
+        toast.error(`O representante selecionado não possui dados obrigatórios: ${missingFields.join(", ")}. Atualize o perfil do administrador antes de criar o contrato.`);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
