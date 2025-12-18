@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NotificationBell } from "./NotificationBell";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -224,6 +225,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </nav>
       </ScrollArea>
 
+      {/* Notification Bell - Desktop */}
+      {!collapsed && (
+        <div className="px-4 py-2 border-t border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Notificações</span>
+            <NotificationBell />
+          </div>
+        </div>
+      )}
+      {collapsed && (
+        <div className="px-2 py-2 border-t border-border flex justify-center">
+          <NotificationBell />
+        </div>
+      )}
+
       {/* User Info */}
       <div className={cn(
         "border-t border-border transition-all duration-300",
@@ -307,20 +323,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         isCollapsed ? "lg:pl-16" : "lg:pl-72"
       )}>
         {/* Mobile Header */}
-        <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-background px-4 lg:hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Menu className="h-6 w-6" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">A</span>
+        <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-border bg-background px-4 lg:hidden">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-sm">A</span>
+              </div>
+              <span className="font-bold text-xl text-foreground">Aure</span>
             </div>
-            <span className="font-bold text-xl text-foreground">Aure</span>
           </div>
+          <NotificationBell />
         </header>
 
         {/* Page Content */}
