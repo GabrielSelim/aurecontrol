@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Settings, CreditCard, Tag, Percent, Package, Plus, Pencil, Trash2, Save, Bell } from "lucide-react";
+import { Settings, CreditCard, Tag, Percent, Package, Plus, Pencil, Trash2, Save, Bell, FileText } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -63,12 +63,14 @@ interface Promotion {
 const Configuracoes = () => {
   const [basePrice, setBasePrice] = useState<number>(49.90);
   const [reminderDays, setReminderDays] = useState<number>(3);
+  const [contractAlertDays, setContractAlertDays] = useState<number>(30);
   const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingReminder, setIsSavingReminder] = useState(false);
+  const [isSavingContractAlert, setIsSavingContractAlert] = useState(false);
 
   // Dialog states
   const [tierDialogOpen, setTierDialogOpen] = useState(false);
@@ -84,9 +86,10 @@ const Configuracoes = () => {
 
   const fetchData = async () => {
     try {
-      const [settingsResult, reminderResult, tiersResult, couponsResult, promotionsResult] = await Promise.all([
+      const [settingsResult, reminderResult, contractAlertResult, tiersResult, couponsResult, promotionsResult] = await Promise.all([
         supabase.from("system_settings").select("*").eq("key", "pj_contract_price").maybeSingle(),
         supabase.from("system_settings").select("*").eq("key", "billing_reminder_days").maybeSingle(),
+        supabase.from("system_settings").select("*").eq("key", "contract_expiration_alert_days").maybeSingle(),
         supabase.from("pricing_tiers").select("*").order("min_contracts"),
         supabase.from("discount_coupons").select("*").order("created_at", { ascending: false }),
         supabase.from("promotions").select("*").order("created_at", { ascending: false }),
@@ -100,6 +103,11 @@ const Configuracoes = () => {
       if (reminderResult.data) {
         const value = reminderResult.data.value as { days: number };
         setReminderDays(value.days);
+      }
+
+      if (contractAlertResult.data) {
+        const value = contractAlertResult.data.value as { days: number };
+        setContractAlertDays(value.days);
       }
 
       if (tiersResult.data) setPricingTiers(tiersResult.data);
@@ -158,6 +166,24 @@ const Configuracoes = () => {
       toast.error("Erro ao salvar configuração");
     } finally {
       setIsSavingReminder(false);
+    }
+  };
+
+  const saveContractAlertDays = async () => {
+    setIsSavingContractAlert(true);
+    try {
+      const { error } = await supabase
+        .from("system_settings")
+        .update({ value: { days: contractAlertDays } })
+        .eq("key", "contract_expiration_alert_days");
+      
+      if (error) throw error;
+      toast.success("Configuração de alerta de contratos atualizada!");
+    } catch (error) {
+      console.error("Error saving contract alert days:", error);
+      toast.error("Erro ao salvar configuração");
+    } finally {
+      setIsSavingContractAlert(false);
     }
   };
 
@@ -623,6 +649,35 @@ const Configuracoes = () => {
                 </div>
 
                 <div className="pt-4 border-t">
+                  <Label htmlFor="contractAlertDays" className="text-base font-medium">
+                    Alerta de Vencimento de Contratos
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1 mb-3">
+                    Quantos dias antes do vencimento o sistema deve alertar sobre contratos PJ expirando
+                  </p>
+                  <div className="flex items-end gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="contractAlertDays"
+                          type="number"
+                          min="7"
+                          max="90"
+                          value={contractAlertDays}
+                          onChange={(e) => setContractAlertDays(parseInt(e.target.value) || 30)}
+                          className="w-24"
+                        />
+                        <span className="text-muted-foreground">dias antes</span>
+                      </div>
+                    </div>
+                    <Button onClick={saveContractAlertDays} disabled={isSavingContractAlert}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isSavingContractAlert ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
                   <h4 className="font-medium mb-2">Tipos de Notificações Automáticas</h4>
                   <ul className="text-sm text-muted-foreground space-y-2">
                     <li className="flex items-center gap-2">
@@ -631,7 +686,11 @@ const Configuracoes = () => {
                     </li>
                     <li className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-amber-500" />
-                      <strong>Lembrete de Vencimento:</strong> Enviada {reminderDays} dia(s) antes do vencimento (diariamente às 8h)
+                      <strong>Lembrete de Vencimento de Faturas:</strong> Enviada {reminderDays} dia(s) antes do vencimento (diariamente às 8h)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-orange-500" />
+                      <strong>Alerta de Contratos:</strong> Enviada {contractAlertDays} dia(s) antes do vencimento de contratos PJ (diariamente às 7h)
                     </li>
                   </ul>
                 </div>
