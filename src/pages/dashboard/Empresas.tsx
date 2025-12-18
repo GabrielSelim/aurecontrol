@@ -4,10 +4,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Search, Eye, Settings, Users, MoreHorizontal, FileText, Briefcase, DollarSign } from "lucide-react";
+import { Building2, Plus, Search, Eye, Settings, Users, MoreHorizontal, FileText, Briefcase, Download } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +59,7 @@ const Empresas = () => {
   const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   useEffect(() => {
     const fetchPricingTiers = async () => {
@@ -157,12 +166,49 @@ const Empresas = () => {
     return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   };
 
-  const filteredCompanies = companies.filter(
-    (company) =>
+  const exportToCSV = () => {
+    const headers = ["Nome", "CNPJ", "E-mail", "Telefone", "Usuários", "Contratos PJ", "Outros Contratos", "Receita Estimada", "Status", "Data de Cadastro"];
+    const rows = filteredCompanies.map((company) => [
+      company.name,
+      formatCNPJ(company.cnpj),
+      company.email || "",
+      formatPhone(company.phone),
+      company._count?.users || 0,
+      company._count?.pjContracts || 0,
+      company._count?.otherContracts || 0,
+      formatCurrency(calculateEstimatedRevenue(company._count?.pjContracts || 0)),
+      company.is_active ? "Ativa" : "Inativa",
+      formatDate(company.created_at),
+    ]);
+
+    const csvContent = [
+      headers.join(";"),
+      ...rows.map((row) => row.join(";")),
+    ].join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `empresas_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("Arquivo CSV exportado com sucesso!");
+  };
+
+  const filteredCompanies = companies.filter((company) => {
+    const matchesSearch =
       company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       company.cnpj.includes(searchTerm) ||
-      company.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      company.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && company.is_active) ||
+      (statusFilter === "inactive" && !company.is_active);
+
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="space-y-6">
@@ -183,21 +229,39 @@ const Empresas = () => {
       {/* Companies Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Lista de Empresas</CardTitle>
-              <CardDescription>
-                {companies.length} empresa(s) cadastrada(s)
-              </CardDescription>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Lista de Empresas</CardTitle>
+                <CardDescription>
+                  {filteredCompanies.length} de {companies.length} empresa(s)
+                </CardDescription>
+              </div>
+              <Button variant="outline" onClick={exportToCSV} disabled={filteredCompanies.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar CSV
+              </Button>
             </div>
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nome, CNPJ ou e-mail..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome, CNPJ ou e-mail..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(value: "all" | "active" | "inactive") => setStatusFilter(value)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="active">Ativas</SelectItem>
+                  <SelectItem value="inactive">Inativas</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -212,8 +276,8 @@ const Empresas = () => {
             <div className="text-center py-12 text-muted-foreground">
               <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Nenhuma empresa encontrada</p>
-              {searchTerm && (
-                <p className="text-sm mt-2">Tente buscar com outros termos</p>
+              {(searchTerm || statusFilter !== "all") && (
+                <p className="text-sm mt-2">Tente ajustar os filtros ou buscar com outros termos</p>
               )}
             </div>
           ) : (
