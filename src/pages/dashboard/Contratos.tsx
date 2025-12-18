@@ -354,13 +354,20 @@ const Contratos = () => {
       : "";
 
     // Replace template variables with actual data
+    // Support both new Portuguese variable names and legacy English variable names
     const variables: Record<string, string> = {
-      // Company/Contractor data
+      // Company/Contractor data (Portuguese)
       "{{contratante_razao_social}}": companyData?.name || "Empresa",
       "{{contratante_cnpj}}": companyData?.cnpj ? formatCNPJ(companyData.cnpj) : "",
       "{{contratante_endereco}}": companyData?.address || "Endereço não informado",
       
-      // Company representative data
+      // Company/Contractor data (Legacy English)
+      "{{company_name}}": companyData?.name || "Empresa",
+      "{{company_cnpj}}": companyData?.cnpj ? formatCNPJ(companyData.cnpj) : "",
+      "{{company_address}}": companyData?.address || "Endereço não informado",
+      "{{company_city}}": companyData?.address?.split(",").pop()?.trim() || "Cidade",
+      
+      // Company representative data (Portuguese)
       "{{representante_nome}}": representativeProfile?.full_name || "",
       "{{representante_cpf}}": representativeProfile?.cpf ? formatCPF(representativeProfile.cpf) : "",
       "{{representante_nacionalidade}}": representativeProfile?.nationality || "",
@@ -371,13 +378,23 @@ const Contratos = () => {
       "{{representante_orgao_expedidor}}": representativeProfile?.identity_issuer || "",
       "{{representante_endereco}}": representativeAddress,
       
-      // Contracted PJ data
+      // Company representative data (Legacy English)
+      "{{company_representative_name}}": representativeProfile?.full_name || "",
+      
+      // Contracted PJ data (Portuguese)
       "{{contratado_nome}}": collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
       "{{contratado_nome_fantasia}}": collaboratorProfile.pj_nome_fantasia || collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
       "{{contratado_cpf_cnpj}}": collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : (collaboratorProfile.cpf || ""),
       "{{contratado_endereco}}": collaboratorAddress,
       
-      // Contract data
+      // Contracted PJ data (Legacy English)
+      "{{contractor_name}}": collaboratorProfile.full_name,
+      "{{contractor_cpf}}": collaboratorProfile.cpf ? formatCPF(collaboratorProfile.cpf) : "",
+      "{{contractor_company_name}}": collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
+      "{{contractor_cnpj}}": collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : "",
+      "{{contractor_address}}": collaboratorAddress,
+      
+      // Contract data (Portuguese)
       "{{cargo}}": contractData.job_title,
       "{{departamento}}": contractData.department || "Não especificado",
       "{{valor}}": contractData.salary ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(contractData.salary) : "A definir",
@@ -385,6 +402,14 @@ const Contratos = () => {
       "{{data_fim}}": contractData.end_date ? format(new Date(contractData.end_date), "dd/MM/yyyy", { locale: ptBR }) : "Indeterminado",
       "{{data_atual}}": format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
       "{{cidade}}": companyData?.address?.split(",").pop()?.trim() || "Cidade",
+      
+      // Contract data (Legacy English)
+      "{{job_title}}": contractData.job_title,
+      "{{salary}}": contractData.salary ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(contractData.salary) : "A definir",
+      "{{start_date}}": format(new Date(contractData.start_date), "dd/MM/yyyy", { locale: ptBR }),
+      "{{end_date}}": contractData.end_date ? format(new Date(contractData.end_date), "dd/MM/yyyy", { locale: ptBR }) : "Indeterminado",
+      "{{current_date}}": format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR }),
+      "{{city}}": companyData?.address?.split(",").pop()?.trim() || "Cidade",
     };
 
     Object.entries(variables).forEach(([key, value]) => {
