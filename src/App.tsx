@@ -13,6 +13,7 @@ import RegistroMaster from "./pages/RegistroMaster";
 import RecuperarSenha from "./pages/RecuperarSenha";
 import AtualizarSenha from "./pages/AtualizarSenha";
 import Precos from "./pages/Precos";
+import AssinarContrato from "./pages/AssinarContrato";
 import DashboardHome from "./pages/dashboard/DashboardHome";
 import Colaboradores from "./pages/dashboard/Colaboradores";
 import ColaboradorEditar from "./pages/dashboard/ColaboradorEditar";
@@ -20,6 +21,7 @@ import ColaboradorDetalhes from "./pages/dashboard/ColaboradorDetalhes";
 import Contratos from "./pages/dashboard/Contratos";
 import ContratoDetalhes from "./pages/dashboard/ContratoDetalhes";
 import ContratoDocumento from "./pages/dashboard/ContratoDocumento";
+import ContratosFaturaveis from "./pages/dashboard/ContratosFaturaveis";
 import TemplatesContrato from "./pages/dashboard/TemplatesContrato";
 import Pagamentos from "./pages/dashboard/Pagamentos";
 import Convites from "./pages/dashboard/Convites";
@@ -54,6 +56,7 @@ function DashboardRoutes() {
           <Route path="contratos/:id" element={<ContratoDetalhes />} />
           <Route path="contratos/:id/documento" element={<ContratoDocumento />} />
           <Route path="templates-contrato" element={<TemplatesContrato />} />
+          <Route path="contratos-faturaveis" element={<ContratosFaturaveis />} />
           <Route path="pagamentos" element={<Pagamentos />} />
           <Route path="convites" element={<Convites />} />
           <Route path="empresa" element={<Empresa />} />
@@ -79,6 +82,7 @@ function AppRoutes() {
       <Route path="/registro-master" element={<PublicRoute><RegistroMaster /></PublicRoute>} />
       <Route path="/recuperar-senha" element={<PublicRoute><RecuperarSenha /></PublicRoute>} />
       <Route path="/atualizar-senha" element={<AtualizarSenha />} />
+      <Route path="/assinar-contrato" element={<AssinarContrato />} />
       <Route path="/dashboard/*" element={<DashboardRoutes />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

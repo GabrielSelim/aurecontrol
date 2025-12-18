@@ -257,6 +257,7 @@ export type Database = {
           signer_order: number | null
           signer_type: Database["public"]["Enums"]["signer_type"]
           signer_user_id: string | null
+          signing_token: string | null
           updated_at: string | null
           user_agent: string | null
         }
@@ -275,6 +276,7 @@ export type Database = {
           signer_order?: number | null
           signer_type: Database["public"]["Enums"]["signer_type"]
           signer_user_id?: string | null
+          signing_token?: string | null
           updated_at?: string | null
           user_agent?: string | null
         }
@@ -293,6 +295,7 @@ export type Database = {
           signer_order?: number | null
           signer_type?: Database["public"]["Enums"]["signer_type"]
           signer_user_id?: string | null
+          signing_token?: string | null
           updated_at?: string | null
           user_agent?: string | null
         }

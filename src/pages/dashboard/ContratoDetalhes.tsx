@@ -25,6 +25,7 @@ import {
   AlertCircle,
   Users,
   Pencil,
+  Mail,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -71,6 +72,7 @@ interface ContractSignature {
   signer_name: string;
   signer_email: string;
   signed_at: string | null;
+  signing_token: string | null;
 }
 
 const ContratoDetalhes = () => {
@@ -86,6 +88,7 @@ const ContratoDetalhes = () => {
   const [witnessName, setWitnessName] = useState("");
   const [witnessEmail, setWitnessEmail] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -132,7 +135,7 @@ const ContratoDetalhes = () => {
         if (docData) {
           const { data: signaturesData } = await supabase
             .from("contract_signatures")
-            .select("id, document_id, signer_type, signer_name, signer_email, signed_at")
+            .select("id, document_id, signer_type, signer_name, signer_email, signed_at, signing_token")
             .eq("document_id", docData.id)
             .order("signer_order");
           
@@ -157,9 +160,11 @@ const ContratoDetalhes = () => {
     return emailRegex.test(email);
   };
 
-  const sendWitnessNotificationEmail = async (name: string, email: string) => {
+  const sendWitnessNotificationEmail = async (name: string, email: string, signingToken: string | null) => {
     try {
       const contractorName = profile?.full_name || "Contratado";
+      const baseUrl = window.location.origin;
+      const signingLink = signingToken ? `${baseUrl}/assinar-contrato?token=${signingToken}` : null;
       
       await supabase.functions.invoke("send-email", {
         body: {
@@ -170,7 +175,19 @@ const ContratoDetalhes = () => {
               <h2 style="color: #333;">Olá ${name},</h2>
               <p>Você foi adicionado como <strong>testemunha</strong> em um contrato PJ no sistema Aure.</p>
               <p><strong>Contrato de:</strong> ${contractorName}</p>
-              <p>Em breve você receberá instruções para assinar o documento.</p>
+              ${signingLink ? `
+                <p>Clique no botão abaixo para assinar o contrato:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${signingLink}" 
+                     style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                    Assinar Contrato
+                  </a>
+                </div>
+                <p style="color: #666; font-size: 12px;">Ou copie e cole este link no seu navegador:</p>
+                <p style="color: #666; font-size: 12px; word-break: break-all;">${signingLink}</p>
+              ` : `
+                <p>Em breve você receberá instruções para assinar o documento.</p>
+              `}
               <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
               <p style="color: #666; font-size: 12px;">Este é um email automático do sistema Aure.</p>
             </div>
@@ -218,8 +235,15 @@ const ContratoDetalhes = () => {
 
       if (error) throw error;
 
-      // Send email notification to the witness
-      await sendWitnessNotificationEmail(witnessName.trim(), witnessEmail.trim());
+      // Fetch the updated signature with the signing token
+      const { data: updatedSig } = await supabase
+        .from("contract_signatures")
+        .select("signing_token")
+        .eq("id", editingWitness.id)
+        .maybeSingle();
+
+      // Send email notification to the witness with signing link
+      await sendWitnessNotificationEmail(witnessName.trim(), witnessEmail.trim(), updatedSig?.signing_token || null);
 
       toast({
         title: "Sucesso",
@@ -237,6 +261,35 @@ const ContratoDetalhes = () => {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleResendSigningLink = async (witness: ContractSignature) => {
+    if (!witness.signing_token) {
+      toast({
+        title: "Erro",
+        description: "Token de assinatura não encontrado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingEmail(witness.id);
+    try {
+      await sendWitnessNotificationEmail(witness.signer_name, witness.signer_email, witness.signing_token);
+      toast({
+        title: "Sucesso",
+        description: "Link de assinatura reenviado por email",
+      });
+    } catch (error) {
+      console.error("Error resending signing link:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível reenviar o email",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingEmail(null);
     }
   };
 
@@ -597,7 +650,17 @@ const ContratoDetalhes = () => {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleResendSigningLink(witness)}
+                            disabled={isSendingEmail === witness.id}
+                            title="Reenviar link de assinatura"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleEditWitness(witness)}
+                            title="Editar testemunha"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
