@@ -634,14 +634,14 @@ const Contratos = () => {
                 Novo Contrato
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+              <DialogHeader className="flex-shrink-0">
                 <DialogTitle>Criar Novo Contrato</DialogTitle>
                 <DialogDescription>
                   Preencha as informações do contrato
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
+              <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
                 <div className="space-y-2">
                   <Label>Colaborador *</Label>
                   <ProfileCombobox
@@ -825,7 +825,7 @@ const Contratos = () => {
                   </div>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-shrink-0 pt-4 border-t">
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
