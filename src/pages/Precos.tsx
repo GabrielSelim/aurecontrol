@@ -3,8 +3,11 @@ import { Footer } from "@/components/landing/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Check, FileText, Users, Percent, Gift, Clock, HelpCircle, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Accordion,
   AccordionContent,
@@ -12,48 +15,45 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-const pricingTiers = [
-  {
-    name: "Básico",
-    contracts: "1-10",
-    pricePerContract: 29,
-    description: "Ideal para pequenas empresas",
-    features: [
-      "Gestão completa de contratos PJ",
-      "Alertas de vencimento",
-      "Controle de pagamentos",
-      "Relatórios básicos",
-      "Suporte por e-mail",
-    ],
-  },
-  {
-    name: "Profissional",
-    contracts: "11-50",
-    pricePerContract: 25,
-    description: "Para empresas em crescimento",
-    popular: true,
-    features: [
-      "Tudo do plano Básico",
-      "Assinaturas digitais (em breve)",
-      "Relatórios avançados",
-      "API de integração",
-      "Suporte prioritário",
-    ],
-  },
-  {
-    name: "Empresarial",
-    contracts: "51+",
-    pricePerContract: 19,
-    description: "Para grandes operações",
-    features: [
-      "Tudo do plano Profissional",
-      "Gerente de conta dedicado",
-      "Treinamento personalizado",
-      "SLA garantido",
-      "Integrações customizadas",
-    ],
-  },
-];
+interface PricingTier {
+  id: string;
+  name: string;
+  min_contracts: number;
+  max_contracts: number | null;
+  price_per_contract: number;
+  is_active: boolean;
+}
+
+const tierFeatures: Record<string, string[]> = {
+  "Básico": [
+    "Gestão completa de contratos PJ",
+    "Alertas de vencimento",
+    "Controle de pagamentos",
+    "Relatórios básicos",
+    "Suporte por e-mail",
+  ],
+  "Profissional": [
+    "Tudo do plano Básico",
+    "Assinaturas digitais (em breve)",
+    "Relatórios avançados",
+    "API de integração",
+    "Suporte prioritário",
+  ],
+  "Empresarial": [
+    "Tudo do plano Profissional",
+    "Gerente de conta dedicado",
+    "Treinamento personalizado",
+    "SLA garantido",
+    "Integrações customizadas",
+  ],
+  "Enterprise": [
+    "Tudo do plano Empresarial",
+    "Infraestrutura dedicada",
+    "Suporte 24/7",
+    "Customizações ilimitadas",
+    "Contrato personalizado",
+  ],
+};
 
 const faqs = [
   {
@@ -84,6 +84,39 @@ const faqs = [
 
 export default function Precos() {
   const navigate = useNavigate();
+  const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPricingTiers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("pricing_tiers")
+          .select("*")
+          .eq("is_active", true)
+          .order("min_contracts", { ascending: true });
+
+        if (error) throw error;
+        setPricingTiers(data || []);
+      } catch (error) {
+        console.error("Error fetching pricing tiers:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPricingTiers();
+  }, []);
+
+  const formatContractRange = (min: number, max: number | null) => {
+    if (max === null) return `${min}+`;
+    return `${min}-${max}`;
+  };
+
+  const getPopularTier = () => {
+    // The second tier is usually the most popular
+    return pricingTiers.length > 1 ? pricingTiers[1]?.name : null;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -127,52 +160,77 @@ export default function Precos() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              {pricingTiers.map((tier) => (
-                <Card 
-                  key={tier.name} 
-                  className={`relative ${tier.popular ? "border-primary shadow-lg scale-105" : ""}`}
-                >
-                  {tier.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                      <Badge className="bg-primary text-primary-foreground">
-                        Mais popular
-                      </Badge>
-                    </div>
-                  )}
-                  <CardHeader className="text-center pb-4">
-                    <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                    <CardDescription>{tier.description}</CardDescription>
-                    <div className="pt-4">
-                      <span className="text-4xl font-bold text-foreground">
-                        R$ {tier.pricePerContract}
-                      </span>
-                      <span className="text-muted-foreground">/contrato PJ/mês</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {tier.contracts} contratos PJ ativos
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-3">
-                      {tier.features.map((feature) => (
-                        <li key={feature} className="flex items-start gap-2 text-sm">
-                          <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button 
-                      className="w-full mt-6" 
-                      variant={tier.popular ? "default" : "outline"}
-                      onClick={() => navigate("/registro")}
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardHeader className="text-center pb-4">
+                      <Skeleton className="h-6 w-24 mx-auto mb-2" />
+                      <Skeleton className="h-4 w-32 mx-auto mb-4" />
+                      <Skeleton className="h-10 w-28 mx-auto" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {[1, 2, 3, 4, 5].map((j) => (
+                          <Skeleton key={j} className="h-4 w-full" />
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className={`grid grid-cols-1 md:grid-cols-2 ${pricingTiers.length > 2 ? 'lg:grid-cols-' + Math.min(pricingTiers.length, 4) : ''} gap-6 max-w-6xl mx-auto`}>
+                {pricingTiers.map((tier) => {
+                  const isPopular = tier.name === getPopularTier();
+                  const features = tierFeatures[tier.name] || tierFeatures["Básico"];
+                  
+                  return (
+                    <Card 
+                      key={tier.id} 
+                      className={`relative ${isPopular ? "border-primary shadow-lg scale-105" : ""}`}
                     >
-                      Começar agora
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      {isPopular && (
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          <Badge className="bg-primary text-primary-foreground">
+                            Mais popular
+                          </Badge>
+                        </div>
+                      )}
+                      <CardHeader className="text-center pb-4">
+                        <CardTitle className="text-2xl">{tier.name}</CardTitle>
+                        <CardDescription>
+                          {formatContractRange(tier.min_contracts, tier.max_contracts)} contratos PJ
+                        </CardDescription>
+                        <div className="pt-4">
+                          <span className="text-4xl font-bold text-foreground">
+                            R$ {tier.price_per_contract.toFixed(2).replace(".", ",")}
+                          </span>
+                          <span className="text-muted-foreground">/contrato/mês</span>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <ul className="space-y-3">
+                          {features.map((feature) => (
+                            <li key={feature} className="flex items-start gap-2 text-sm">
+                              <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <Button 
+                          className="w-full mt-6" 
+                          variant={isPopular ? "default" : "outline"}
+                          onClick={() => navigate("/registro")}
+                        >
+                          Começar agora
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
 
@@ -229,8 +287,8 @@ export default function Precos() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
               <Card className="border-dashed">
                 <CardHeader>
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
-                    <Gift className="h-6 w-6 text-green-600" />
+                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center mb-4">
+                    <Gift className="h-6 w-6 text-green-600 dark:text-green-400" />
                   </div>
                   <CardTitle>Cupons de desconto</CardTitle>
                   <CardDescription>
@@ -241,8 +299,8 @@ export default function Precos() {
 
               <Card className="border-dashed">
                 <CardHeader>
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-                    <Clock className="h-6 w-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center mb-4">
+                    <Clock className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                   </div>
                   <CardTitle>Promoções por tempo</CardTitle>
                   <CardDescription>
@@ -253,8 +311,8 @@ export default function Precos() {
 
               <Card className="border-dashed">
                 <CardHeader>
-                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
-                    <Users className="h-6 w-6 text-purple-600" />
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center mb-4">
+                    <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                   </div>
                   <CardTitle>Volume de contratos</CardTitle>
                   <CardDescription>
