@@ -16,6 +16,9 @@ import {
   DollarSign,
   Building2,
   Target,
+  FileSignature,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -48,11 +51,18 @@ interface Profile {
   avatar_url: string | null;
 }
 
+interface ContractDocument {
+  id: string;
+  signature_status: string;
+  completed_at: string | null;
+}
+
 const ContratoDetalhes = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [contract, setContract] = useState<Contract | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [document, setDocument] = useState<ContractDocument | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -85,6 +95,17 @@ const ContratoDetalhes = () => {
         .maybeSingle();
 
       setProfile(profileData);
+
+      // Fetch document if PJ contract
+      if (contractData.contract_type === "PJ") {
+        const { data: docData } = await supabase
+          .from("contract_documents")
+          .select("id, signature_status, completed_at")
+          .eq("contract_id", contractData.id)
+          .maybeSingle();
+        
+        setDocument(docData);
+      }
     } catch (error) {
       console.error("Error fetching contract:", error);
     } finally {
@@ -94,8 +115,8 @@ const ContratoDetalhes = () => {
 
   const getContractTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      clt: "CLT",
-      pj: "PJ",
+      CLT: "CLT",
+      PJ: "PJ",
       estagio: "Estágio",
       temporario: "Temporário",
     };
@@ -154,6 +175,41 @@ const ContratoDetalhes = () => {
   const formatDate = (date: string | null) => {
     if (!date) return "-";
     return format(new Date(date), "dd/MM/yyyy", { locale: ptBR });
+  };
+
+  const getDocumentStatusBadge = () => {
+    if (!document) {
+      return (
+        <Badge variant="outline" className="text-muted-foreground">
+          <AlertCircle className="mr-1 h-3 w-3" />
+          Documento não gerado
+        </Badge>
+      );
+    }
+    
+    switch (document.signature_status) {
+      case "completed":
+        return (
+          <Badge className="bg-green-500">
+            <Check className="mr-1 h-3 w-3" />
+            Totalmente Assinado
+          </Badge>
+        );
+      case "partial":
+        return (
+          <Badge variant="secondary">
+            <Clock className="mr-1 h-3 w-3" />
+            Parcialmente Assinado
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline">
+            <Clock className="mr-1 h-3 w-3" />
+            Pendente de Assinatura
+          </Badge>
+        );
+    }
   };
 
   if (isLoading) {
@@ -296,7 +352,7 @@ const ContratoDetalhes = () => {
               </div>
             </div>
 
-            {contract.contract_type === "pj" && (
+            {contract.contract_type === "PJ" && (
               <>
                 <Separator />
                 <div>
@@ -331,6 +387,42 @@ const ContratoDetalhes = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Documento Digital - Only for PJ */}
+        {contract.contract_type === "PJ" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSignature className="h-5 w-5" />
+                Documento Digital
+              </CardTitle>
+              <CardDescription>
+                Contrato PJ com assinaturas digitais
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status:</span>
+                {getDocumentStatusBadge()}
+              </div>
+              
+              {document?.completed_at && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Concluído em</p>
+                  <p className="font-medium">{formatDate(document.completed_at)}</p>
+                </div>
+              )}
+
+              <Button 
+                className="w-full" 
+                onClick={() => navigate(`/dashboard/contratos/${id}/documento`)}
+              >
+                <FileSignature className="mr-2 h-4 w-4" />
+                {document ? "Ver Documento e Assinaturas" : "Gerar Documento"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Observações */}
         <Card>
