@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Search, Eye, Settings, Users, MoreHorizontal } from "lucide-react";
+import { Building2, Plus, Search, Eye, Settings, Users, MoreHorizontal, FileText, Briefcase } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import {
@@ -32,7 +32,8 @@ interface Company {
   created_at: string;
   _count?: {
     users: number;
-    contracts: number;
+    pjContracts: number;
+    otherContracts: number;
   };
 }
 
@@ -56,7 +57,7 @@ const Empresas = () => {
           // Get counts for each company
           const companiesWithCounts = await Promise.all(
             companiesData.map(async (company) => {
-              const [usersResult, contractsResult] = await Promise.all([
+              const [usersResult, pjContractsResult, otherContractsResult] = await Promise.all([
                 supabase
                   .from("profiles")
                   .select("*", { count: "exact", head: true })
@@ -64,14 +65,21 @@ const Empresas = () => {
                 supabase
                   .from("contracts")
                   .select("*", { count: "exact", head: true })
-                  .eq("company_id", company.id),
+                  .eq("company_id", company.id)
+                  .eq("contract_type", "PJ"),
+                supabase
+                  .from("contracts")
+                  .select("*", { count: "exact", head: true })
+                  .eq("company_id", company.id)
+                  .neq("contract_type", "PJ"),
               ]);
 
               return {
                 ...company,
                 _count: {
                   users: usersResult.count || 0,
-                  contracts: contractsResult.count || 0,
+                  pjContracts: pjContractsResult.count || 0,
+                  otherContracts: otherContractsResult.count || 0,
                 },
               };
             })
@@ -173,7 +181,8 @@ const Empresas = () => {
                   <TableHead>CNPJ</TableHead>
                   <TableHead>Contato</TableHead>
                   <TableHead className="text-center">Usuários</TableHead>
-                  <TableHead className="text-center">Contratos</TableHead>
+                  <TableHead className="text-center">PJ</TableHead>
+                  <TableHead className="text-center">Outros</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-center">Criada em</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -203,7 +212,16 @@ const Empresas = () => {
                       <Badge variant="secondary">{company._count?.users || 0}</Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="secondary">{company._count?.contracts || 0}</Badge>
+                      <Badge variant="default" className="bg-blue-600 hover:bg-blue-700">
+                        <FileText className="h-3 w-3 mr-1" />
+                        {company._count?.pjContracts || 0}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary">
+                        <Briefcase className="h-3 w-3 mr-1" />
+                        {company._count?.otherContracts || 0}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant={company.is_active ? "default" : "secondary"}>
