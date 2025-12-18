@@ -106,6 +106,26 @@ interface Profile {
   address_cep?: string;
 }
 
+interface AdminProfile {
+  user_id: string;
+  full_name: string;
+  email: string;
+  cpf?: string;
+  nationality?: string;
+  marital_status?: string;
+  birth_date?: string;
+  profession?: string;
+  identity_number?: string;
+  identity_issuer?: string;
+  address_street?: string;
+  address_number?: string;
+  address_complement?: string;
+  address_neighborhood?: string;
+  address_city?: string;
+  address_state?: string;
+  address_cep?: string;
+}
+
 interface Company {
   id: string;
   name: string;
@@ -129,6 +149,7 @@ const Contratos = () => {
   const navigate = useNavigate();
   const [contratos, setContratos] = useState<Contract[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [adminProfiles, setAdminProfiles] = useState<AdminProfile[]>([]);
   const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const [companyData, setCompanyData] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -153,10 +174,12 @@ const Contratos = () => {
   // PJ document fields
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [witnessCount, setWitnessCount] = useState("0");
+  const [selectedRepresentativeId, setSelectedRepresentativeId] = useState("");
 
   useEffect(() => {
     fetchContratos();
     fetchProfiles();
+    fetchAdminProfiles();
     fetchTemplates();
     fetchCompany();
   }, [profile?.company_id]);
@@ -214,6 +237,48 @@ const Contratos = () => {
     }
   };
 
+  const fetchAdminProfiles = async () => {
+    if (!profile?.company_id) return;
+
+    try {
+      // First get admin user_ids from user_roles
+      const { data: adminRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+
+      if (rolesError) throw rolesError;
+
+      if (!adminRoles || adminRoles.length === 0) {
+        setAdminProfiles([]);
+        return;
+      }
+
+      const adminUserIds = adminRoles.map(r => r.user_id);
+
+      // Fetch admin profiles from the company with additional fields
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id, full_name, email, cpf, nationality, marital_status, birth_date, profession, identity_number, identity_issuer, address_street, address_number, address_complement, address_neighborhood, address_city, address_state, address_cep")
+        .eq("company_id", profile.company_id)
+        .eq("is_active", true)
+        .in("user_id", adminUserIds);
+
+      if (error) throw error;
+      setAdminProfiles(data || []);
+
+      // Auto-select current user if they are an admin
+      if (data && data.length > 0 && !selectedRepresentativeId) {
+        const currentUserAdmin = data.find(a => a.user_id === user?.id);
+        if (currentUserAdmin) {
+          setSelectedRepresentativeId(currentUserAdmin.user_id);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching admin profiles:", error);
+    }
+  };
+
   const fetchCompany = async () => {
     if (!profile?.company_id) return;
 
@@ -256,7 +321,7 @@ const Contratos = () => {
     }
   };
 
-  const generateDocumentHtml = (template: ContractTemplate, contractData: any, collaboratorProfile: Profile) => {
+  const generateDocumentHtml = (template: ContractTemplate, contractData: any, collaboratorProfile: Profile, representativeProfile: AdminProfile | null) => {
     let html = template.content;
 
     // Build collaborator address
@@ -270,15 +335,47 @@ const Contratos = () => {
       collaboratorProfile.address_cep,
     ].filter(Boolean).join(", ") || "Endereço não informado";
 
+    // Build representative address
+    const representativeAddress = representativeProfile ? [
+      representativeProfile.address_street,
+      representativeProfile.address_number,
+      representativeProfile.address_complement,
+      representativeProfile.address_neighborhood,
+      representativeProfile.address_city,
+      representativeProfile.address_state,
+      representativeProfile.address_cep,
+    ].filter(Boolean).join(", ") || "Endereço não informado" : "";
+
+    // Format representative birth date
+    const representativeBirthDate = representativeProfile?.birth_date 
+      ? format(new Date(representativeProfile.birth_date), "dd/MM/yyyy", { locale: ptBR })
+      : "";
+
     // Replace template variables with actual data
     const variables: Record<string, string> = {
+      // Company/Contractor data
       "{{contratante_razao_social}}": companyData?.name || "Empresa",
       "{{contratante_cnpj}}": companyData?.cnpj ? formatCNPJ(companyData.cnpj) : "",
       "{{contratante_endereco}}": companyData?.address || "Endereço não informado",
+      
+      // Company representative data
+      "{{representante_nome}}": representativeProfile?.full_name || "",
+      "{{representante_cpf}}": representativeProfile?.cpf ? formatCPF(representativeProfile.cpf) : "",
+      "{{representante_nacionalidade}}": representativeProfile?.nationality || "",
+      "{{representante_estado_civil}}": representativeProfile?.marital_status || "",
+      "{{representante_data_nascimento}}": representativeBirthDate,
+      "{{representante_profissao}}": representativeProfile?.profession || "",
+      "{{representante_rg}}": representativeProfile?.identity_number || "",
+      "{{representante_orgao_expedidor}}": representativeProfile?.identity_issuer || "",
+      "{{representante_endereco}}": representativeAddress,
+      
+      // Contracted PJ data
       "{{contratado_nome}}": collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
       "{{contratado_nome_fantasia}}": collaboratorProfile.pj_nome_fantasia || collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
       "{{contratado_cpf_cnpj}}": collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : (collaboratorProfile.cpf || ""),
       "{{contratado_endereco}}": collaboratorAddress,
+      
+      // Contract data
       "{{cargo}}": contractData.job_title,
       "{{departamento}}": contractData.department || "Não especificado",
       "{{valor}}": contractData.salary ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(contractData.salary) : "A definir",
@@ -301,6 +398,12 @@ const Contratos = () => {
     return cleaned.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
   };
 
+  const formatCPF = (cpf: string) => {
+    const cleaned = cpf.replace(/\D/g, "");
+    if (cleaned.length !== 11) return cpf;
+    return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  };
+
   const handleCreateContract = async () => {
     if (!profile?.company_id || !selectedUserId || !contractType || !jobTitle || !startDate) {
       toast.error("Preencha todos os campos obrigatórios");
@@ -320,6 +423,12 @@ const Contratos = () => {
         toast.error("O colaborador selecionado não possui dados de empresa PJ cadastrados (CNPJ e Razão Social). Atualize o cadastro do colaborador antes de criar um contrato PJ.");
         return;
       }
+    }
+
+    // PJ contracts require representative selection
+    if (contractType === "PJ" && !selectedRepresentativeId) {
+      toast.error("Selecione um administrador para representar a empresa no contrato");
+      return;
     }
 
     setIsSubmitting(true);
@@ -376,9 +485,10 @@ const Contratos = () => {
       if (contractType === "PJ" && selectedTemplateId && contractData) {
         const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
         const collaboratorProfile = profiles.find(p => p.user_id === selectedUserId);
+        const representativeProfile = adminProfiles.find(a => a.user_id === selectedRepresentativeId) || null;
         
         if (selectedTemplate && collaboratorProfile) {
-          const documentHtml = generateDocumentHtml(selectedTemplate, { ...insertData, end_date: endDate }, collaboratorProfile);
+          const documentHtml = generateDocumentHtml(selectedTemplate, { ...insertData, end_date: endDate }, collaboratorProfile, representativeProfile);
           
           const { data: docData, error: docError } = await supabase
             .from("contract_documents")
@@ -388,6 +498,7 @@ const Contratos = () => {
               document_html: documentHtml,
               witness_count: parseInt(witnessCount),
               signature_status: "pending",
+              company_representative_id: selectedRepresentativeId || null,
             })
             .select()
             .single();
@@ -410,15 +521,15 @@ const Contratos = () => {
               signer_document: collaboratorProfile.pj_cnpj || collaboratorProfile.cpf || null,
             });
 
-            // 2. Company representative signature (current user creating the contract - must be admin)
+            // 2. Company representative signature (selected admin)
             signatureEntries.push({
               document_id: docData.id,
               signer_type: "company_representative" as const,
               signer_order: 2,
-              signer_user_id: user?.id || null,
-              signer_name: profile.full_name,
-              signer_email: profile.email,
-              signer_document: profile.cpf || null,
+              signer_user_id: selectedRepresentativeId || null,
+              signer_name: representativeProfile?.full_name || profile.full_name,
+              signer_email: representativeProfile?.email || profile.email,
+              signer_document: representativeProfile?.cpf || profile.cpf || null,
             });
 
             // 3. Witness signatures (if any)
@@ -472,6 +583,7 @@ const Contratos = () => {
     setDeliverableDescription("");
     setSelectedTemplateId("");
     setWitnessCount("0");
+    setSelectedRepresentativeId("");
   };
 
   const handleTerminateContract = async () => {
@@ -726,6 +838,48 @@ const Contratos = () => {
                           Nenhum template disponível. Crie um template primeiro.
                         </p>
                       )}
+                    </div>
+
+                    {/* Company Representative Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Representante da Empresa (Assinante) *</Label>
+                      <Select value={selectedRepresentativeId} onValueChange={setSelectedRepresentativeId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o administrador assinante" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {adminProfiles.map((admin) => (
+                            <SelectItem key={admin.user_id} value={admin.user_id}>
+                              {admin.full_name} ({admin.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {adminProfiles.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Nenhum administrador encontrado.
+                        </p>
+                      )}
+                      {selectedRepresentativeId && (() => {
+                        const selectedAdmin = adminProfiles.find(a => a.user_id === selectedRepresentativeId);
+                        const missingFields = [];
+                        if (!selectedAdmin?.nationality) missingFields.push("nacionalidade");
+                        if (!selectedAdmin?.marital_status) missingFields.push("estado civil");
+                        if (!selectedAdmin?.birth_date) missingFields.push("data de nascimento");
+                        if (!selectedAdmin?.profession) missingFields.push("profissão");
+                        if (!selectedAdmin?.identity_number) missingFields.push("RG");
+                        if (!selectedAdmin?.cpf) missingFields.push("CPF");
+                        
+                        if (missingFields.length > 0) {
+                          return (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              ⚠️ Dados incompletos do representante: {missingFields.join(", ")}. 
+                              Para um contrato completo, atualize o perfil do administrador.
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
 
                     {/* Witness Count */}

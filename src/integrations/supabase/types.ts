@@ -179,6 +179,7 @@ export type Database = {
       }
       contract_documents: {
         Row: {
+          company_representative_id: string | null
           completed_at: string | null
           contract_id: string
           created_at: string | null
@@ -192,6 +193,7 @@ export type Database = {
           witness_count: number | null
         }
         Insert: {
+          company_representative_id?: string | null
           completed_at?: string | null
           contract_id: string
           created_at?: string | null
@@ -205,6 +207,7 @@ export type Database = {
           witness_count?: number | null
         }
         Update: {
+          company_representative_id?: string | null
           completed_at?: string | null
           contract_id?: string
           created_at?: string | null
@@ -724,17 +727,23 @@ export type Database = {
           address_state: string | null
           address_street: string | null
           avatar_url: string | null
+          birth_date: string | null
           company_id: string | null
           cpf: string | null
           created_at: string | null
           email: string
           full_name: string
           id: string
+          identity_issuer: string | null
+          identity_number: string | null
           is_active: boolean | null
+          marital_status: string | null
+          nationality: string | null
           phone: string | null
           pj_cnpj: string | null
           pj_nome_fantasia: string | null
           pj_razao_social: string | null
+          profession: string | null
           updated_at: string | null
           user_id: string
         }
@@ -748,17 +757,23 @@ export type Database = {
           address_state?: string | null
           address_street?: string | null
           avatar_url?: string | null
+          birth_date?: string | null
           company_id?: string | null
           cpf?: string | null
           created_at?: string | null
           email: string
           full_name: string
           id?: string
+          identity_issuer?: string | null
+          identity_number?: string | null
           is_active?: boolean | null
+          marital_status?: string | null
+          nationality?: string | null
           phone?: string | null
           pj_cnpj?: string | null
           pj_nome_fantasia?: string | null
           pj_razao_social?: string | null
+          profession?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -772,17 +787,23 @@ export type Database = {
           address_state?: string | null
           address_street?: string | null
           avatar_url?: string | null
+          birth_date?: string | null
           company_id?: string | null
           cpf?: string | null
           created_at?: string | null
           email?: string
           full_name?: string
           id?: string
+          identity_issuer?: string | null
+          identity_number?: string | null
           is_active?: boolean | null
+          marital_status?: string | null
+          nationality?: string | null
           phone?: string | null
           pj_cnpj?: string | null
           pj_nome_fantasia?: string | null
           pj_razao_social?: string | null
+          profession?: string | null
           updated_at?: string | null
           user_id?: string
         }
