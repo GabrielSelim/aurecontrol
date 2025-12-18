@@ -49,6 +49,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { JobTitleCombobox } from "@/components/JobTitleCombobox";
+import { ProfileCombobox } from "@/components/ProfileCombobox";
 
 interface Contract {
   id: string;
@@ -265,18 +266,12 @@ const Contratos = () => {
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Colaborador *</Label>
-                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um colaborador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {profiles.map((p) => (
-                        <SelectItem key={p.user_id} value={p.user_id}>
-                          {p.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ProfileCombobox
+                    profiles={profiles}
+                    value={selectedUserId}
+                    onChange={setSelectedUserId}
+                    placeholder="Selecione um colaborador"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

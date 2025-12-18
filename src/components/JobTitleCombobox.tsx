@@ -140,8 +140,8 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-popover" align="start">
-        <Command>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-popover z-[100]" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <Command shouldFilter={false}>
           <CommandInput 
             placeholder="Buscar cargo..." 
             value={inputValue}
@@ -150,7 +150,7 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
               onChange(val);
             }}
           />
-          <CommandList className="max-h-[300px] overflow-y-auto">
+          <CommandList>
             <CommandEmpty>
               <div className="py-2 px-3 text-sm">
                 <p className="text-muted-foreground">Nenhum cargo encontrado.</p>
