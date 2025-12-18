@@ -176,7 +176,7 @@ const Contratos = () => {
     try {
       // Calculate end_date for time-based contracts
       let endDate = null;
-      if (contractType === "pj" && durationType === "time_based" && durationValue) {
+      if (contractType === "PJ" && durationType === "time_based" && durationValue) {
         const start = new Date(startDate);
         const value = parseInt(durationValue);
         if (durationUnit === "days") {
@@ -202,10 +202,10 @@ const Contratos = () => {
         end_date: endDate,
         status: "active",
         created_by: profile.user_id,
-        duration_type: contractType === "pj" ? durationType : null,
-        duration_value: contractType === "pj" && durationType === "time_based" ? parseInt(durationValue) : null,
-        duration_unit: contractType === "pj" && durationType === "time_based" ? durationUnit : null,
-        deliverable_description: contractType === "pj" && durationType === "delivery_based" ? deliverableDescription : null,
+        duration_type: contractType === "PJ" ? durationType : null,
+        duration_value: contractType === "PJ" && durationType === "time_based" ? parseInt(durationValue) : null,
+        duration_unit: contractType === "PJ" && durationType === "time_based" ? durationUnit : null,
+        deliverable_description: contractType === "PJ" && durationType === "delivery_based" ? deliverableDescription : null,
       });
       if (error) throw error;
 
@@ -273,7 +273,7 @@ const Contratos = () => {
   };
 
   const getDurationDisplay = (contract: Contract) => {
-    if (contract.contract_type !== "pj") return null;
+    if (contract.contract_type !== "PJ") return null;
     
     if (!contract.duration_type || contract.duration_type === "indefinite") {
       return { label: "Indeterminado", detail: null };
@@ -395,10 +395,8 @@ const Contratos = () => {
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="clt">CLT</SelectItem>
-                        <SelectItem value="pj">PJ</SelectItem>
-                        <SelectItem value="estagio">Estágio</SelectItem>
-                        <SelectItem value="temporario">Temporário</SelectItem>
+                        <SelectItem value="CLT">CLT</SelectItem>
+                        <SelectItem value="PJ">PJ</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -414,11 +412,11 @@ const Contratos = () => {
                 {/* Contract Type Info */}
                 {contractType && (
                   <div className={`p-3 rounded-lg text-sm ${
-                    contractType === "pj" 
+                    contractType === "PJ" 
                       ? "bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300" 
                       : "bg-muted border border-border text-muted-foreground"
                   }`}>
-                    {contractType === "pj" ? (
+                    {contractType === "PJ" ? (
                       <>
                         <p className="font-medium">Contrato PJ (Faturável)</p>
                         <p className="text-xs mt-1">
@@ -438,7 +436,7 @@ const Contratos = () => {
                   </div>
                 )}
                 {/* PJ Duration Options */}
-                {contractType === "pj" && (
+                {contractType === "PJ" && (
                   <div className="space-y-4 p-4 bg-muted/50 rounded-lg border">
                     <Label className="text-sm font-medium">Duração do Contrato PJ</Label>
                     <div className="space-y-2">
