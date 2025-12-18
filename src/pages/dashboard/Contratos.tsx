@@ -175,6 +175,8 @@ const Contratos = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [witnessCount, setWitnessCount] = useState("0");
   const [selectedRepresentativeId, setSelectedRepresentativeId] = useState("");
+  // Contractor data type: "pj" = use company data only, "pf" = include personal data (name, CPF)
+  const [contractorDataType, setContractorDataType] = useState<"pj" | "pf">("pj");
   // Validation state
   const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
@@ -323,7 +325,7 @@ const Contratos = () => {
     }
   };
 
-  const generateDocumentHtml = (template: ContractTemplate, contractData: any, collaboratorProfile: Profile, representativeProfile: AdminProfile | null, witnessCountNum: number = 0) => {
+  const generateDocumentHtml = (template: ContractTemplate, contractData: any, collaboratorProfile: Profile, representativeProfile: AdminProfile | null, witnessCountNum: number = 0, usePersonalData: boolean = false) => {
     let html = template.content;
 
     // Build collaborator address
@@ -353,6 +355,19 @@ const Contratos = () => {
       ? format(new Date(representativeProfile.birth_date), "dd/MM/yyyy", { locale: ptBR })
       : "";
 
+    // Determine contractor data based on selection
+    // If usePersonalData = true, show personal name + CPF instead of company data
+    const contratadoNome = usePersonalData 
+      ? collaboratorProfile.full_name 
+      : (collaboratorProfile.pj_razao_social || collaboratorProfile.full_name);
+    
+    const contratadoDocumento = usePersonalData
+      ? (collaboratorProfile.cpf ? formatCPF(collaboratorProfile.cpf) : "")
+      : (collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : (collaboratorProfile.cpf || ""));
+    
+    const contratadoTipoDocumento = usePersonalData ? "CPF" : "CNPJ";
+    const contratadoTipoPessoa = usePersonalData ? "pessoa física" : "pessoa jurídica de direito privado";
+
     // Replace template variables with actual data
     // Support both new Portuguese variable names and legacy English variable names
     const variables: Record<string, string> = {
@@ -381,11 +396,19 @@ const Contratos = () => {
       // Company representative data (Legacy English)
       "{{company_representative_name}}": representativeProfile?.full_name || "",
       
-      // Contracted PJ data (Portuguese)
-      "{{contratado_nome}}": collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
+      // Contracted party data (Portuguese) - adapts based on PF/PJ selection
+      "{{contratado_nome}}": contratadoNome,
       "{{contratado_nome_fantasia}}": collaboratorProfile.pj_nome_fantasia || collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
-      "{{contratado_cpf_cnpj}}": collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : (collaboratorProfile.cpf || ""),
+      "{{contratado_cpf_cnpj}}": contratadoDocumento,
+      "{{contratado_tipo_documento}}": contratadoTipoDocumento,
+      "{{contratado_tipo_pessoa}}": contratadoTipoPessoa,
       "{{contratado_endereco}}": collaboratorAddress,
+      // Personal data (always available for reference)
+      "{{contratado_nome_pessoal}}": collaboratorProfile.full_name,
+      "{{contratado_cpf}}": collaboratorProfile.cpf ? formatCPF(collaboratorProfile.cpf) : "",
+      // PJ data (always available for reference)
+      "{{contratado_razao_social}}": collaboratorProfile.pj_razao_social || "",
+      "{{contratado_cnpj}}": collaboratorProfile.pj_cnpj ? formatCNPJ(collaboratorProfile.pj_cnpj) : "",
       
       // Contracted PJ data (Legacy English)
       "{{contractor_name}}": collaboratorProfile.full_name,
@@ -546,7 +569,8 @@ const Contratos = () => {
         const representativeProfile = adminProfiles.find(a => a.user_id === selectedRepresentativeId) || null;
         
         if (selectedTemplate && collaboratorProfile) {
-          const documentHtml = generateDocumentHtml(selectedTemplate, { ...insertData, end_date: endDate }, collaboratorProfile, representativeProfile, parseInt(witnessCount));
+          const usePersonalData = contractorDataType === "pf";
+          const documentHtml = generateDocumentHtml(selectedTemplate, { ...insertData, end_date: endDate }, collaboratorProfile, representativeProfile, parseInt(witnessCount), usePersonalData);
           
           const { data: docData, error: docError } = await supabase
             .from("contract_documents")
@@ -642,6 +666,7 @@ const Contratos = () => {
     setSelectedTemplateId("");
     setWitnessCount("0");
     setSelectedRepresentativeId("");
+    setContractorDataType("pj");
     setValidationErrors({});
   };
 
@@ -991,6 +1016,25 @@ const Contratos = () => {
                         }
                         return null;
                       })()}
+                    </div>
+
+                    {/* Contractor Data Type Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Dados do Contratado no Documento</Label>
+                      <Select value={contractorDataType} onValueChange={(value: "pj" | "pf") => setContractorDataType(value)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pj">Pessoa Jurídica (CNPJ e Razão Social)</SelectItem>
+                          <SelectItem value="pf">Pessoa Física (CPF e Nome)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        {contractorDataType === "pj" 
+                          ? "O contrato usará os dados da empresa do colaborador (CNPJ e Razão Social)."
+                          : "O contrato usará os dados pessoais do colaborador (CPF e Nome)."}
+                      </p>
                     </div>
 
                     {/* Witness Count */}
