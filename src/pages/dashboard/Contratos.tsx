@@ -23,7 +23,18 @@ import {
   Briefcase,
   Clock,
   AlertTriangle,
+  XCircle,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -106,6 +117,8 @@ const Contratos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTerminateDialogOpen, setIsTerminateDialogOpen] = useState(false);
+  const [contractToTerminate, setContractToTerminate] = useState<Contract | null>(null);
 
   // Form state
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -346,6 +359,30 @@ const Contratos = () => {
     setDeliverableDescription("");
     setSelectedTemplateId("");
     setWitnessCount("0");
+  };
+
+  const handleTerminateContract = async () => {
+    if (!contractToTerminate) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from("contracts")
+        .update({ status: "terminated" as const })
+        .eq("id", contractToTerminate.id);
+
+      if (error) throw error;
+
+      toast.success("Contrato encerrado com sucesso!");
+      setIsTerminateDialogOpen(false);
+      setContractToTerminate(null);
+      fetchContratos();
+    } catch (error: any) {
+      console.error("Error terminating contract:", error);
+      toast.error(error?.message || "Erro ao encerrar contrato");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getContractTypeLabel = (type: string) => {
@@ -846,9 +883,19 @@ const Contratos = () => {
                               {isAdmin() && (
                                 <>
                                   <DropdownMenuItem onClick={(e) => e.stopPropagation()}>Editar</DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
-                                    Encerrar
-                                  </DropdownMenuItem>
+                                  {contrato.status === "active" && (
+                                    <DropdownMenuItem 
+                                      className="text-destructive" 
+                                      onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        setContractToTerminate(contrato);
+                                        setIsTerminateDialogOpen(true);
+                                      }}
+                                    >
+                                      <XCircle className="mr-2 h-4 w-4" />
+                                      Encerrar
+                                    </DropdownMenuItem>
+                                  )}
                                 </>
                               )}
                             </DropdownMenuContent>
@@ -863,6 +910,31 @@ const Contratos = () => {
           </div>
         </CardContent>
       </Card>
+      {/* Terminate Contract Dialog */}
+      <AlertDialog open={isTerminateDialogOpen} onOpenChange={setIsTerminateDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Encerrar Contrato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja encerrar o contrato de{" "}
+              <span className="font-medium text-foreground">
+                {contractToTerminate?.profile?.full_name}
+              </span>
+              ? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTerminateContract}
+              disabled={isSubmitting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isSubmitting ? "Encerrando..." : "Encerrar Contrato"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
