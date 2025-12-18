@@ -18,6 +18,7 @@ interface ColaboradorData {
   email: string;
   cpf: string;
   phone: string;
+  address: string;
   is_active: boolean;
   pj_cnpj: string;
   pj_razao_social: string;
@@ -38,6 +39,7 @@ const ColaboradorEditar = () => {
     email: "",
     cpf: "",
     phone: "",
+    address: "",
     is_active: true,
     pj_cnpj: "",
     pj_razao_social: "",
@@ -67,6 +69,7 @@ const ColaboradorEditar = () => {
             email: data.email,
             cpf: data.cpf ? formatCPF(data.cpf) : "",
             phone: data.phone ? formatPhone(data.phone) : "",
+            address: data.address || "",
             is_active: data.is_active ?? true,
             pj_cnpj: data.pj_cnpj ? formatCNPJ(data.pj_cnpj) : "",
             pj_razao_social: data.pj_razao_social || "",
@@ -163,6 +166,7 @@ const ColaboradorEditar = () => {
           full_name: formData.full_name,
           cpf: formData.cpf.replace(/\D/g, "") || null,
           phone: formData.phone.replace(/\D/g, "") || null,
+          address: formData.address || null,
           is_active: formData.is_active,
           pj_cnpj: formData.pj_cnpj.replace(/\D/g, "") || null,
           pj_razao_social: formData.pj_razao_social || null,
@@ -274,6 +278,16 @@ const ColaboradorEditar = () => {
                   <p className="text-xs text-destructive">{errors.phone}</p>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Endereço</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Rua, número, bairro, cidade - UF, CEP"
+              />
             </div>
           </CardContent>
         </Card>
