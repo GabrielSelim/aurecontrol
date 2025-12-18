@@ -252,6 +252,11 @@ export type Database = {
           external_signature_provider: string | null
           id: string
           ip_address: string | null
+          position_height: number | null
+          position_page: number | null
+          position_width: number | null
+          position_x: number | null
+          position_y: number | null
           signature_image_url: string | null
           signed_at: string | null
           signer_document: string | null
@@ -271,6 +276,11 @@ export type Database = {
           external_signature_provider?: string | null
           id?: string
           ip_address?: string | null
+          position_height?: number | null
+          position_page?: number | null
+          position_width?: number | null
+          position_x?: number | null
+          position_y?: number | null
           signature_image_url?: string | null
           signed_at?: string | null
           signer_document?: string | null
@@ -290,6 +300,11 @@ export type Database = {
           external_signature_provider?: string | null
           id?: string
           ip_address?: string | null
+          position_height?: number | null
+          position_page?: number | null
+          position_width?: number | null
+          position_x?: number | null
+          position_y?: number | null
           signature_image_url?: string | null
           signed_at?: string | null
           signer_document?: string | null
@@ -865,6 +880,60 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      signature_provider_configs: {
+        Row: {
+          api_key_secret_name: string | null
+          company_id: string | null
+          config: Json | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          provider_name: string
+          sandbox_mode: boolean | null
+          updated_at: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          api_key_secret_name?: string | null
+          company_id?: string | null
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider_name: string
+          sandbox_mode?: boolean | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          api_key_secret_name?: string | null
+          company_id?: string | null
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          provider_name?: string
+          sandbox_mode?: boolean | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_provider_configs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_provider_configs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       system_announcements: {
         Row: {
