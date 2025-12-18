@@ -191,7 +191,7 @@ const Contratos = () => {
         endDate = start.toISOString().split('T')[0];
       }
 
-      const { error } = await supabase.from("contracts").insert({
+      const insertData = {
         company_id: profile.company_id,
         user_id: selectedUserId,
         contract_type: contractType as "CLT" | "PJ" | "estagio" | "temporario",
@@ -200,22 +200,30 @@ const Contratos = () => {
         salary: salary ? parseFloat(salary) : null,
         start_date: startDate,
         end_date: endDate,
-        status: "active",
+        status: "active" as const,
         created_by: profile.user_id,
         duration_type: contractType === "PJ" ? durationType : null,
-        duration_value: contractType === "PJ" && durationType === "time_based" ? parseInt(durationValue) : null,
+        duration_value: contractType === "PJ" && durationType === "time_based" && durationValue ? parseInt(durationValue) : null,
         duration_unit: contractType === "PJ" && durationType === "time_based" ? durationUnit : null,
         deliverable_description: contractType === "PJ" && durationType === "delivery_based" ? deliverableDescription : null,
-      });
-      if (error) throw error;
+      };
+
+      console.log("Inserting contract:", insertData);
+
+      const { error } = await supabase.from("contracts").insert(insertData);
+      
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
 
       toast.success("Contrato criado com sucesso!");
       setIsDialogOpen(false);
       resetForm();
       fetchContratos();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating contract:", error);
-      toast.error("Erro ao criar contrato");
+      toast.error(error?.message || "Erro ao criar contrato");
     } finally {
       setIsSubmitting(false);
     }
