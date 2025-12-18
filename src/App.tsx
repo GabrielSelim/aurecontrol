@@ -12,6 +12,7 @@ import Registro from "./pages/Registro";
 import RegistroMaster from "./pages/RegistroMaster";
 import RecuperarSenha from "./pages/RecuperarSenha";
 import AtualizarSenha from "./pages/AtualizarSenha";
+import Precos from "./pages/Precos";
 import DashboardHome from "./pages/dashboard/DashboardHome";
 import Colaboradores from "./pages/dashboard/Colaboradores";
 import ColaboradorEditar from "./pages/dashboard/ColaboradorEditar";
@@ -68,6 +69,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
+      <Route path="/precos" element={<Precos />} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/registro" element={<PublicRoute><Registro /></PublicRoute>} />
       <Route path="/registro-master" element={<PublicRoute><RegistroMaster /></PublicRoute>} />

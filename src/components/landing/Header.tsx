@@ -1,10 +1,12 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
+  const isHomePage = location.pathname === "/";
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
@@ -20,15 +22,30 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#recursos" className="text-muted-foreground hover:text-foreground transition-colors">
-              Recursos
-            </a>
-            <a href="#precos" className="text-muted-foreground hover:text-foreground transition-colors">
+            {isHomePage ? (
+              <a href="#recursos" className="text-muted-foreground hover:text-foreground transition-colors">
+                Recursos
+              </a>
+            ) : (
+              <Link to="/#recursos" className="text-muted-foreground hover:text-foreground transition-colors">
+                Recursos
+              </Link>
+            )}
+            <Link 
+              to="/precos" 
+              className={`transition-colors ${location.pathname === "/precos" ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
+            >
               Preços
-            </a>
-            <a href="#sobre" className="text-muted-foreground hover:text-foreground transition-colors">
-              Sobre
-            </a>
+            </Link>
+            {isHomePage ? (
+              <a href="#sobre" className="text-muted-foreground hover:text-foreground transition-colors">
+                Sobre
+              </a>
+            ) : (
+              <Link to="/#sobre" className="text-muted-foreground hover:text-foreground transition-colors">
+                Sobre
+              </Link>
+            )}
           </div>
 
           {/* Desktop CTA */}
@@ -54,27 +71,47 @@ export function Header() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-border animate-fade-in">
             <div className="flex flex-col gap-4">
-              <a
-                href="#recursos"
-                className="text-muted-foreground hover:text-foreground transition-colors py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Recursos
-              </a>
-              <a
-                href="#precos"
-                className="text-muted-foreground hover:text-foreground transition-colors py-2"
+              {isHomePage ? (
+                <a
+                  href="#recursos"
+                  className="text-muted-foreground hover:text-foreground transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Recursos
+                </a>
+              ) : (
+                <Link
+                  to="/#recursos"
+                  className="text-muted-foreground hover:text-foreground transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Recursos
+                </Link>
+              )}
+              <Link
+                to="/precos"
+                className={`transition-colors py-2 ${location.pathname === "/precos" ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Preços
-              </a>
-              <a
-                href="#sobre"
-                className="text-muted-foreground hover:text-foreground transition-colors py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Sobre
-              </a>
+              </Link>
+              {isHomePage ? (
+                <a
+                  href="#sobre"
+                  className="text-muted-foreground hover:text-foreground transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Sobre
+                </a>
+              ) : (
+                <Link
+                  to="/#sobre"
+                  className="text-muted-foreground hover:text-foreground transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Sobre
+                </Link>
+              )}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
                 <Button variant="outline" asChild className="w-full">
                   <Link to="/login">Entrar</Link>
