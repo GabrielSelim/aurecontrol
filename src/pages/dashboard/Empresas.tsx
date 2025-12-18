@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Search, Eye, Settings, Users, MoreHorizontal, FileText, Briefcase } from "lucide-react";
+import { Building2, Plus, Search, Eye, Settings, Users, MoreHorizontal, FileText, Briefcase, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
@@ -37,11 +38,31 @@ interface Company {
   };
 }
 
+interface PricingTier {
+  min_contracts: number;
+  max_contracts: number | null;
+  price_per_contract: number;
+}
+
 const Empresas = () => {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    const fetchPricingTiers = async () => {
+      const { data } = await supabase
+        .from("pricing_tiers")
+        .select("min_contracts, max_contracts, price_per_contract")
+        .eq("is_active", true)
+        .order("min_contracts", { ascending: true });
+      
+      if (data) setPricingTiers(data);
+    };
+    fetchPricingTiers();
+  }, []);
 
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -114,6 +135,27 @@ const Empresas = () => {
     return new Date(dateStr).toLocaleDateString("pt-BR");
   };
 
+  const calculateEstimatedRevenue = (pjContractCount: number): number => {
+    if (pjContractCount === 0 || pricingTiers.length === 0) return 0;
+    
+    const tier = pricingTiers.find(t => 
+      pjContractCount >= t.min_contracts && 
+      (t.max_contracts === null || pjContractCount <= t.max_contracts)
+    );
+    
+    if (tier) {
+      return pjContractCount * tier.price_per_contract;
+    }
+    
+    // Fallback to last tier if no match
+    const lastTier = pricingTiers[pricingTiers.length - 1];
+    return pjContractCount * lastTier.price_per_contract;
+  };
+
+  const formatCurrency = (value: number) => {
+    return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  };
+
   const filteredCompanies = companies.filter(
     (company) =>
       company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -179,12 +221,11 @@ const Empresas = () => {
                 <TableRow>
                   <TableHead>Empresa</TableHead>
                   <TableHead>CNPJ</TableHead>
-                  <TableHead>Contato</TableHead>
                   <TableHead className="text-center">Usuários</TableHead>
                   <TableHead className="text-center">PJ</TableHead>
                   <TableHead className="text-center">Outros</TableHead>
+                  <TableHead className="text-center">Receita Est.</TableHead>
                   <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Criada em</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -196,40 +237,72 @@ const Empresas = () => {
                         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
                           <Building2 className="h-4 w-4 text-primary" />
                         </div>
-                        <span className="font-medium">{company.name}</span>
+                        <div>
+                          <span className="font-medium">{company.name}</span>
+                          <p className="text-xs text-muted-foreground">{company.email || "-"}</p>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
                       {formatCNPJ(company.cnpj)}
                     </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <p>{company.email || "-"}</p>
-                        <p className="text-muted-foreground">{formatPhone(company.phone)}</p>
-                      </div>
-                    </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary">{company._count?.users || 0}</Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="default" className="bg-blue-600 hover:bg-blue-700">
-                        <FileText className="h-3 w-3 mr-1" />
-                        {company._count?.pjContracts || 0}
-                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Badge variant="default" className="bg-blue-600 hover:bg-blue-700 cursor-help">
+                            <FileText className="h-3 w-3 mr-1" />
+                            {company._count?.pjContracts || 0}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-medium">Contratos PJ (Faturáveis)</p>
+                          <p className="text-xs text-muted-foreground">
+                            Prestadores de serviço pessoa jurídica.<br/>
+                            Geram cobrança mensal por contrato ativo.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="secondary">
-                        <Briefcase className="h-3 w-3 mr-1" />
-                        {company._count?.otherContracts || 0}
-                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Badge variant="secondary" className="cursor-help">
+                            <Briefcase className="h-3 w-3 mr-1" />
+                            {company._count?.otherContracts || 0}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-medium">Outros Contratos (Gratuitos)</p>
+                          <p className="text-xs text-muted-foreground">
+                            CLT, estágio, temporários e outros.<br/>
+                            Apenas para gestão interna, sem cobrança.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <span className="font-medium text-green-600 dark:text-green-400 cursor-help">
+                            {formatCurrency(calculateEstimatedRevenue(company._count?.pjContracts || 0))}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-medium">Receita Mensal Estimada</p>
+                          <p className="text-xs text-muted-foreground">
+                            Baseado em {company._count?.pjContracts || 0} contrato(s) PJ ativo(s).<br/>
+                            Valor pode variar com cupons e promoções.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant={company.is_active ? "default" : "secondary"}>
                         {company.is_active ? "Ativa" : "Inativa"}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-center text-sm text-muted-foreground">
-                      {formatDate(company.created_at || "")}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
