@@ -163,7 +163,7 @@ const Contratos = () => {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [contractType, setContractType] = useState("");
   const [jobTitle, setJobTitle] = useState("");
-  const [department, setDepartment] = useState("");
+  
   const [salary, setSalary] = useState("");
   const [startDate, setStartDate] = useState("");
   // PJ duration fields
@@ -470,7 +470,7 @@ const Contratos = () => {
         user_id: selectedUserId,
         contract_type: contractType as "CLT" | "PJ" | "estagio" | "temporario",
         job_title: jobTitle,
-        department: department || null,
+        department: null,
         salary: salary ? parseFloat(salary) : null,
         start_date: startDate,
         end_date: endDate,
@@ -588,7 +588,7 @@ const Contratos = () => {
     setSelectedUserId("");
     setContractType("");
     setJobTitle("");
-    setDepartment("");
+    
     setSalary("");
     setStartDate("");
     setDurationType("indefinite");
@@ -973,24 +973,14 @@ const Contratos = () => {
                     placeholder="Selecione ou digite um cargo"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Departamento</Label>
-                    <Input
-                      placeholder="Ex: Tecnologia"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Salário</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={salary}
-                      onChange={(e) => setSalary(e.target.value)}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Salário</Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={salary}
+                    onChange={(e) => setSalary(e.target.value)}
+                  />
                 </div>
               </div>
               <DialogFooter className="flex-shrink-0 pt-4 border-t">
