@@ -323,7 +323,7 @@ const Contratos = () => {
     }
   };
 
-  const generateDocumentHtml = (template: ContractTemplate, contractData: any, collaboratorProfile: Profile, representativeProfile: AdminProfile | null) => {
+  const generateDocumentHtml = (template: ContractTemplate, contractData: any, collaboratorProfile: Profile, representativeProfile: AdminProfile | null, witnessCountNum: number = 0) => {
     let html = template.content;
 
     // Build collaborator address
@@ -415,6 +415,18 @@ const Contratos = () => {
     Object.entries(variables).forEach(([key, value]) => {
       html = html.replace(new RegExp(key, "g"), value);
     });
+
+    // Remove Handlebars-style witness sections if no witnesses
+    if (witnessCountNum === 0) {
+      // Remove {{#each witnesses}}...{{/each}} blocks
+      html = html.replace(/\{\{#each\s+witnesses\}\}[\s\S]*?\{\{\/each\}\}/gi, "");
+      // Remove sections containing "TESTEMUNHAS:" or "Testemunhas:" with their content
+      html = html.replace(/<p[^>]*>[\s]*TESTEMUNHAS:[\s\S]*?(?=<\/div>|<h|<p[^>]*>[^T])/gi, "");
+      html = html.replace(/<h[1-6][^>]*>[\s]*TESTEMUNHAS[\s]*<\/h[1-6]>[\s\S]*?(?=<\/div>|<h[1-6]|$)/gi, "");
+      // Remove standalone witness template variables
+      html = html.replace(/\{\{this\.name\}\}/g, "");
+      html = html.replace(/\{\{this\.cpf\}\}/g, "");
+    }
 
     return html;
   };
@@ -534,7 +546,7 @@ const Contratos = () => {
         const representativeProfile = adminProfiles.find(a => a.user_id === selectedRepresentativeId) || null;
         
         if (selectedTemplate && collaboratorProfile) {
-          const documentHtml = generateDocumentHtml(selectedTemplate, { ...insertData, end_date: endDate }, collaboratorProfile, representativeProfile);
+          const documentHtml = generateDocumentHtml(selectedTemplate, { ...insertData, end_date: endDate }, collaboratorProfile, representativeProfile, parseInt(witnessCount));
           
           const { data: docData, error: docError } = await supabase
             .from("contract_documents")
