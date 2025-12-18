@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
+import { AddressForm } from "@/components/AddressForm";
+import { AddressData } from "@/hooks/useCepLookup";
 
 interface ColaboradorData {
   id: string;
@@ -18,7 +20,6 @@ interface ColaboradorData {
   email: string;
   cpf: string;
   phone: string;
-  address: string;
   is_active: boolean;
   pj_cnpj: string;
   pj_razao_social: string;
@@ -39,11 +40,19 @@ const ColaboradorEditar = () => {
     email: "",
     cpf: "",
     phone: "",
-    address: "",
     is_active: true,
     pj_cnpj: "",
     pj_razao_social: "",
     pj_nome_fantasia: "",
+  });
+  const [addressData, setAddressData] = useState<AddressData>({
+    cep: "",
+    street: "",
+    number: "",
+    complement: "",
+    neighborhood: "",
+    city: "",
+    state: "",
   });
   const [errors, setErrors] = useState<{ cpf?: string; phone?: string; pj_cnpj?: string }>({});
 
@@ -69,11 +78,19 @@ const ColaboradorEditar = () => {
             email: data.email,
             cpf: data.cpf ? formatCPF(data.cpf) : "",
             phone: data.phone ? formatPhone(data.phone) : "",
-            address: data.address || "",
             is_active: data.is_active ?? true,
             pj_cnpj: data.pj_cnpj ? formatCNPJ(data.pj_cnpj) : "",
             pj_razao_social: data.pj_razao_social || "",
             pj_nome_fantasia: data.pj_nome_fantasia || "",
+          });
+          setAddressData({
+            cep: data.address_cep || "",
+            street: data.address_street || "",
+            number: data.address_number || "",
+            complement: data.address_complement || "",
+            neighborhood: data.address_neighborhood || "",
+            city: data.address_city || "",
+            state: data.address_state || "",
           });
         }
       } catch (error) {
@@ -166,11 +183,17 @@ const ColaboradorEditar = () => {
           full_name: formData.full_name,
           cpf: formData.cpf.replace(/\D/g, "") || null,
           phone: formData.phone.replace(/\D/g, "") || null,
-          address: formData.address || null,
           is_active: formData.is_active,
           pj_cnpj: formData.pj_cnpj.replace(/\D/g, "") || null,
           pj_razao_social: formData.pj_razao_social || null,
           pj_nome_fantasia: formData.pj_nome_fantasia || null,
+          address_cep: addressData.cep.replace(/\D/g, "") || null,
+          address_street: addressData.street || null,
+          address_number: addressData.number || null,
+          address_complement: addressData.complement || null,
+          address_neighborhood: addressData.neighborhood || null,
+          address_city: addressData.city || null,
+          address_state: addressData.state || null,
         })
         .eq("id", formData.id);
 
@@ -280,15 +303,20 @@ const ColaboradorEditar = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Endereço</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Rua, número, bairro, cidade - UF, CEP"
-              />
-            </div>
+          </CardContent>
+        </Card>
+
+        {/* Endereço */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Endereço</CardTitle>
+            <CardDescription>Digite o CEP para preencher automaticamente</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AddressForm
+              address={addressData}
+              onChange={setAddressData}
+            />
           </CardContent>
         </Card>
 

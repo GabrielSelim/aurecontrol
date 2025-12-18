@@ -486,6 +486,13 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          address_cep: string | null
+          address_city: string | null
+          address_complement: string | null
+          address_neighborhood: string | null
+          address_number: string | null
+          address_state: string | null
+          address_street: string | null
           avatar_url: string | null
           company_id: string | null
           cpf: string | null
@@ -503,6 +510,13 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_cep?: string | null
+          address_city?: string | null
+          address_complement?: string | null
+          address_neighborhood?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
           avatar_url?: string | null
           company_id?: string | null
           cpf?: string | null
@@ -520,6 +534,13 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_cep?: string | null
+          address_city?: string | null
+          address_complement?: string | null
+          address_neighborhood?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
           avatar_url?: string | null
           company_id?: string | null
           cpf?: string | null

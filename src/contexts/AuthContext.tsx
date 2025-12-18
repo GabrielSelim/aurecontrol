@@ -17,6 +17,13 @@ interface Profile {
   pj_razao_social: string | null;
   pj_nome_fantasia: string | null;
   address: string | null;
+  address_cep: string | null;
+  address_street: string | null;
+  address_number: string | null;
+  address_complement: string | null;
+  address_neighborhood: string | null;
+  address_city: string | null;
+  address_state: string | null;
 }
 
 interface UserRole {
