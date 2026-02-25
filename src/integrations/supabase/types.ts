@@ -567,36 +567,113 @@ export type Database = {
           },
         ]
       }
+      notification_delivery_logs: {
+        Row: {
+          attempt_number: number
+          attempted_at: string
+          channel: string
+          created_at: string
+          delivered_at: string | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          idempotency_key: string | null
+          notification_log_id: string | null
+          response_data: Json | null
+          status: string
+        }
+        Insert: {
+          attempt_number?: number
+          attempted_at?: string
+          channel?: string
+          created_at?: string
+          delivered_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string | null
+          notification_log_id?: string | null
+          response_data?: Json | null
+          status?: string
+        }
+        Update: {
+          attempt_number?: number
+          attempted_at?: string
+          channel?: string
+          created_at?: string
+          delivered_at?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string | null
+          notification_log_id?: string | null
+          response_data?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_delivery_logs_notification_log_id_fkey"
+            columns: ["notification_log_id"]
+            isOneToOne: false
+            referencedRelation: "notification_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_logs: {
         Row: {
+          channel: string | null
           company_id: string | null
           created_at: string
+          delivered_at: string | null
+          event_type: string | null
           id: string
+          idempotency_key: string | null
+          last_retry_at: string | null
+          max_retries: number | null
           metadata: Json | null
           notification_type: string
           recipient_email: string
+          retry_count: number | null
           status: string
           subject: string
+          user_id: string | null
         }
         Insert: {
+          channel?: string | null
           company_id?: string | null
           created_at?: string
+          delivered_at?: string | null
+          event_type?: string | null
           id?: string
+          idempotency_key?: string | null
+          last_retry_at?: string | null
+          max_retries?: number | null
           metadata?: Json | null
           notification_type: string
           recipient_email: string
+          retry_count?: number | null
           status?: string
           subject: string
+          user_id?: string | null
         }
         Update: {
+          channel?: string | null
           company_id?: string | null
           created_at?: string
+          delivered_at?: string | null
+          event_type?: string | null
           id?: string
+          idempotency_key?: string | null
+          last_retry_at?: string | null
+          max_retries?: number | null
           metadata?: Json | null
           notification_type?: string
           recipient_email?: string
+          retry_count?: number | null
           status?: string
           subject?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -614,6 +691,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_preferences: {
+        Row: {
+          channel_email: boolean
+          channel_in_app: boolean
+          created_at: string
+          id: string
+          is_enabled: boolean
+          notification_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_email?: boolean
+          channel_in_app?: boolean
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          notification_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_email?: boolean
+          channel_in_app?: boolean
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          notification_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       payments: {
         Row: {

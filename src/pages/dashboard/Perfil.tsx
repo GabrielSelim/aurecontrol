@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { User, Building2, Lock, Camera, Loader2, Save, Briefcase, MapPin } from "lucide-react";
+import { User, Building2, Lock, Camera, Loader2, Save, Briefcase, MapPin, Bell } from "lucide-react";
+import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
 import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
 import { AddressForm } from "@/components/AddressForm";
 import { AddressData } from "@/hooks/useCepLookup";
@@ -476,6 +477,10 @@ export default function Perfil() {
                 <Lock className="h-4 w-4" />
                 Segurança
               </TabsTrigger>
+              <TabsTrigger value="notifications" className="gap-2">
+                <Bell className="h-4 w-4" />
+                Notificações
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="personal">
@@ -817,6 +822,10 @@ export default function Perfil() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="notifications">
+              <NotificationPreferences />
             </TabsContent>
           </Tabs>
         </div>

@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.send-urgent-announcement]
 verify_jwt = true
+
+[functions.contract-signed-notification]
+verify_jwt = false
+
+[functions.retry-notifications]
+verify_jwt = false
