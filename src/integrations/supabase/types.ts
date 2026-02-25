@@ -1216,6 +1216,7 @@ export type Database = {
         Args: { _target_company_id: string; _user_id: string }
         Returns: boolean
       }
+      generate_document_hash: { Args: { content: string }; Returns: string }
       get_invite_by_token: {
         Args: { _token: string }
         Returns: {

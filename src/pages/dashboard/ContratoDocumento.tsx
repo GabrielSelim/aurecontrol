@@ -25,6 +25,7 @@ import {
   Move,
   Send,
   Shield,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -32,6 +33,8 @@ import { ptBR } from "date-fns/locale";
 import { SignaturePad } from "@/components/contracts/SignaturePad";
 import { SignaturePositionEditor } from "@/components/contracts/SignaturePositionEditor";
 import { SignatureCertificate } from "@/components/contracts/SignatureCertificate";
+import { ContractAuditTrail } from "@/components/contracts/ContractAuditTrail";
+import { logAuditAction, createContractVersion } from "@/lib/auditLog";
 
 interface ContractDocument {
   id: string;
@@ -253,6 +256,20 @@ const ContratoDocumento = () => {
           .eq("id", document.id);
       }
 
+      // Log audit
+      await logAuditAction({
+        contractId: contract!.id,
+        documentId: document.id,
+        action: allSigned ? "contract_completed" : "signature_completed",
+        actorName: signingAs.signer_name,
+        actorEmail: signingAs.signer_email,
+        details: {
+          signerType: signingAs.signer_type,
+          signerName: signingAs.signer_name,
+          allSigned,
+        },
+      });
+
       toast.success("Assinatura registrada com sucesso!");
       setSignatureDialogOpen(false);
       setSigningAs(null);
@@ -316,6 +333,15 @@ const ContratoDocumento = () => {
         .eq("id", contract.id);
       
       setContract({ ...contract, status: "enviado" });
+
+      await logAuditAction({
+        contractId: contract.id,
+        documentId: document?.id,
+        action: "contract_sent",
+        actorName: profile?.full_name || "",
+        actorEmail: profile?.email || "",
+      });
+
       toast.success("Contrato enviado para assinatura!");
     } catch (error) {
       console.error(error);
@@ -324,6 +350,15 @@ const ContratoDocumento = () => {
   };
 
   const handleDownloadPDF = () => {
+    if (contract && document) {
+      logAuditAction({
+        contractId: contract.id,
+        documentId: document.id,
+        action: "pdf_downloaded",
+        actorName: profile?.full_name || "",
+        actorEmail: profile?.email || "",
+      });
+    }
     const printWindow = window.open("", "_blank");
     if (printWindow && document) {
       // Group signatures by page
@@ -544,6 +579,10 @@ const ContratoDocumento = () => {
             <Shield className="h-4 w-4 mr-2" />
             Certificado
           </TabsTrigger>
+          <TabsTrigger value="auditoria">
+            <History className="h-4 w-4 mr-2" />
+            Auditoria
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="documento" className="mt-6">
@@ -719,6 +758,13 @@ const ContratoDocumento = () => {
               user_agent: s.user_agent,
               signature_image_url: s.signature_image_url,
             }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="auditoria" className="mt-6">
+          <ContractAuditTrail
+            contractId={contract?.id || ""}
+            documentId={document.id}
           />
         </TabsContent>
       </Tabs>
