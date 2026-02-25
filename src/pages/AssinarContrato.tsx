@@ -132,13 +132,21 @@ const AssinarContrato = () => {
     try {
       const signatureImage = signatureRef.current.toDataURL("image/png");
 
+      // Try to get real IP
+      let ipAddress = "browser";
+      try {
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const ipData = await ipRes.json();
+        ipAddress = ipData.ip || "browser";
+      } catch { /* fallback */ }
+
       // Update the signature record
       const { error } = await supabase
         .from("contract_signatures")
         .update({
           signed_at: new Date().toISOString(),
           signature_image_url: signatureImage,
-          ip_address: "browser",
+          ip_address: ipAddress,
           user_agent: navigator.userAgent,
         })
         .eq("id", signature.id)

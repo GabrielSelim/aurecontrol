@@ -23,12 +23,15 @@ import {
   AlertCircle,
   Pen,
   Move,
+  Send,
+  Shield,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { SignaturePad } from "@/components/contracts/SignaturePad";
 import { SignaturePositionEditor } from "@/components/contracts/SignaturePositionEditor";
+import { SignatureCertificate } from "@/components/contracts/SignatureCertificate";
 
 interface ContractDocument {
   id: string;
@@ -51,6 +54,8 @@ interface ContractSignature {
   signer_document: string | null;
   signed_at: string | null;
   signature_image_url: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
   position_x: number;
   position_y: number;
   position_page: number;
@@ -65,6 +70,7 @@ interface Contract {
   salary: number | null;
   start_date: string;
   end_date: string | null;
+  status: string;
   company_id: string;
   user_id: string;
 }
@@ -80,6 +86,8 @@ const ContratoDocumento = () => {
   const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
   const [signingAs, setSigningAs] = useState<ContractSignature | null>(null);
   const [activeTab, setActiveTab] = useState<string>("documento");
+  const [companyName, setCompanyName] = useState("");
+  const [contractorName, setContractorName] = useState("");
   
   const isAdmin = roles?.some(r => r.role === "admin" || r.role === "master_admin");
 
@@ -106,6 +114,14 @@ const ContratoDocumento = () => {
       }
 
       setContract(contractData);
+
+      // Fetch company and contractor names
+      const [companyRes, profileRes] = await Promise.all([
+        supabase.from("companies").select("name").eq("id", contractData.company_id).maybeSingle(),
+        supabase.from("profiles").select("full_name").eq("user_id", contractData.user_id).maybeSingle(),
+      ]);
+      setCompanyName(companyRes.data?.name || "N/A");
+      setContractorName(profileRes.data?.full_name || "N/A");
 
       // Fetch document
       const { data: docData, error: docError } = await supabase
@@ -146,6 +162,14 @@ const ContratoDocumento = () => {
     if (!signingAs || !document) return;
 
     try {
+      // Get real IP address
+      let ipAddress = "browser";
+      try {
+        const ipRes = await fetch("https://api.ipify.org?format=json");
+        const ipData = await ipRes.json();
+        ipAddress = ipData.ip || "browser";
+      } catch { /* fallback */ }
+
       // Upload signature image to storage
       const fileName = `signatures/${document.id}/${signingAs.id}.png`;
       const base64Data = signatureDataUrl.split(",")[1];
@@ -167,7 +191,7 @@ const ContratoDocumento = () => {
           .update({
             signed_at: new Date().toISOString(),
             signature_image_url: signatureDataUrl, // Store base64 directly
-            ip_address: "browser",
+            ip_address: ipAddress,
             user_agent: navigator.userAgent,
           })
           .eq("id", signingAs.id);
@@ -189,7 +213,7 @@ const ContratoDocumento = () => {
           .update({
             signed_at: new Date().toISOString(),
             signature_image_url: urlData.publicUrl,
-            ip_address: "browser",
+            ip_address: ipAddress,
             user_agent: navigator.userAgent,
           })
           .eq("id", signingAs.id);
@@ -214,6 +238,14 @@ const ContratoDocumento = () => {
             completed_at: new Date().toISOString(),
           })
           .eq("id", document.id);
+
+        // Update contract status to "assinado"
+        if (contract) {
+          await supabase
+            .from("contracts")
+            .update({ status: "assinado" })
+            .eq("id", contract.id);
+        }
       } else {
         await supabase
           .from("contract_documents")
@@ -243,21 +275,51 @@ const ContratoDocumento = () => {
 
   const getSignerTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      contractor: "Contratado",
+      contractor: "Contratado(a)",
       company_representative: "Representante da Empresa",
       witness: "Testemunha",
     };
     return labels[type] || type;
   };
 
-  const getStatusBadge = (status: string) => {
+  const getContractStatusLabel = (status: string) => {
+    const labels: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive"; icon: React.ReactNode }> = {
+      enviado: { label: "Enviado", variant: "secondary", icon: <Send className="mr-1 h-3 w-3" /> },
+      assinado: { label: "Assinado", variant: "default", icon: <Check className="mr-1 h-3 w-3" /> },
+      active: { label: "Vigente", variant: "default", icon: <Check className="mr-1 h-3 w-3" /> },
+      terminated: { label: "Encerrado", variant: "destructive", icon: <AlertCircle className="mr-1 h-3 w-3" /> },
+      inactive: { label: "Inativo", variant: "outline", icon: <Clock className="mr-1 h-3 w-3" /> },
+    };
+    const info = labels[status] || { label: status, variant: "outline" as const, icon: null };
+    return <Badge variant={info.variant}>{info.icon}{info.label}</Badge>;
+  };
+
+  const getSignatureStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
-        return <Badge className="bg-green-500"><Check className="mr-1 h-3 w-3" /> Assinado</Badge>;
+        return <Badge className="bg-green-500 hover:bg-green-600"><Check className="mr-1 h-3 w-3" /> Totalmente Assinado</Badge>;
       case "partial":
         return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" /> Parcialmente Assinado</Badge>;
+      case "cancelled":
+        return <Badge variant="destructive"><AlertCircle className="mr-1 h-3 w-3" /> Cancelado</Badge>;
       default:
         return <Badge variant="outline"><AlertCircle className="mr-1 h-3 w-3" /> Pendente</Badge>;
+    }
+  };
+
+  const handleSendForSignature = async () => {
+    if (!contract || !document) return;
+    try {
+      await supabase
+        .from("contracts")
+        .update({ status: "enviado" })
+        .eq("id", contract.id);
+      
+      setContract({ ...contract, status: "enviado" });
+      toast.success("Contrato enviado para assinatura!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao enviar contrato");
     }
   };
 
@@ -450,8 +512,15 @@ const ContratoDocumento = () => {
             <p className="text-muted-foreground">{contract?.job_title}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {getStatusBadge(document.signature_status)}
+        <div className="flex items-center gap-2 flex-wrap">
+          {contract && getContractStatusLabel(contract.status)}
+          {getSignatureStatusBadge(document.signature_status)}
+          {isAdmin && contract?.status !== "enviado" && contract?.status !== "assinado" && document.signature_status === "pending" && (
+            <Button variant="outline" onClick={handleSendForSignature}>
+              <Send className="mr-2 h-4 w-4" />
+              Enviar para Assinatura
+            </Button>
+          )}
           <Button onClick={handleDownloadPDF}>
             <Download className="mr-2 h-4 w-4" />
             Baixar PDF
@@ -471,6 +540,10 @@ const ContratoDocumento = () => {
               Posicionar Assinaturas
             </TabsTrigger>
           )}
+          <TabsTrigger value="certificado">
+            <Shield className="h-4 w-4 mr-2" />
+            Certificado
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="documento" className="mt-6">
@@ -495,6 +568,34 @@ const ContratoDocumento = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Bilateral Flow Indicator */}
+                  {signatures.length > 0 && (
+                    <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Fluxo de Assinatura</p>
+                      <div className="flex items-center gap-1">
+                        {signatures
+                          .sort((a, b) => a.signer_order - b.signer_order)
+                          .map((s, i) => (
+                          <div key={s.id} className="flex items-center gap-1">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              s.signed_at ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
+                            }`}>
+                              {s.signed_at ? <Check className="h-3 w-3" /> : i + 1}
+                            </div>
+                            {i < signatures.length - 1 && (
+                              <div className={`w-6 h-0.5 ${s.signed_at ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>Empresa</span>
+                        <span>PJ</span>
+                        {signatures.some(s => s.signer_type === "witness") && <span>Testemunhas</span>}
+                      </div>
+                    </div>
+                  )}
+
                   {signatures.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       Nenhuma assinatura configurada
@@ -522,16 +623,26 @@ const ContratoDocumento = () => {
                         <p className="text-sm">{signature.signer_name}</p>
                         <p className="text-xs text-muted-foreground">{signature.signer_email}</p>
                         
-                        {signature.signed_at && signature.signature_image_url && (
-                          <div className="mt-2">
-                            <img
-                              src={signature.signature_image_url}
-                              alt="Assinatura"
-                              className="max-w-[150px] h-auto border rounded"
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {format(new Date(signature.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        {signature.signed_at && (
+                          <div className="mt-2 space-y-1">
+                            {signature.signature_image_url && (
+                              <img
+                                src={signature.signature_image_url}
+                                alt="Assinatura"
+                                className="max-w-[150px] h-auto border rounded"
+                              />
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              📅 {format(new Date(signature.signed_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
                             </p>
+                            <p className="text-[10px] text-muted-foreground font-mono">
+                              UTC: {new Date(signature.signed_at).toISOString()}
+                            </p>
+                            {signature.ip_address && (
+                              <p className="text-[10px] text-muted-foreground">
+                                🌐 IP: {signature.ip_address}
+                              </p>
+                            )}
                           </div>
                         )}
 
@@ -552,14 +663,14 @@ const ContratoDocumento = () => {
               </Card>
 
               {document.completed_at && (
-                <Card className="bg-green-500/10 border-green-500/30">
+                <Card className="border-green-500/30 bg-green-500/5">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-2 text-green-600">
                       <Check className="h-5 w-5" />
                       <span className="font-medium">Contrato Totalmente Assinado</span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Concluído em {format(new Date(document.completed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      Concluído em {format(new Date(document.completed_at), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR })}
                     </p>
                   </CardContent>
                 </Card>
@@ -589,6 +700,27 @@ const ContratoDocumento = () => {
             />
           </TabsContent>
         )}
+
+        <TabsContent value="certificado" className="mt-6">
+          <SignatureCertificate
+            contractTitle={contract?.job_title || ""}
+            companyName={companyName}
+            contractorName={contractorName}
+            documentId={document.id}
+            completedAt={document.completed_at}
+            signatures={signatures.map(s => ({
+              id: s.id,
+              signer_type: s.signer_type,
+              signer_name: s.signer_name,
+              signer_email: s.signer_email,
+              signer_document: s.signer_document,
+              signed_at: s.signed_at,
+              ip_address: s.ip_address,
+              user_agent: s.user_agent,
+              signature_image_url: s.signature_image_url,
+            }))}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Signature Dialog */}

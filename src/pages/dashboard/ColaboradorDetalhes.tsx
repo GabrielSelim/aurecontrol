@@ -54,7 +54,7 @@ interface Contract {
   id: string;
   job_title: string;
   contract_type: "CLT" | "PJ" | "estagio" | "temporario";
-  status: "active" | "inactive" | "terminated";
+  status: "active" | "inactive" | "terminated" | "enviado" | "assinado";
   start_date: string;
   end_date: string | null;
   salary: number | null;
