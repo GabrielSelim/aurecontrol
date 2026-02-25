@@ -10,4 +10,5 @@ dist/
 .idea/
 supabase/
 docker/
+!docker/volumes/nginx/nginx.conf
 bun.lockb
