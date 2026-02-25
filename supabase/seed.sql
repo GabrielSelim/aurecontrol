@@ -3,9 +3,36 @@
 -- Gerado em: 2026-02-25
 -- ============================================================
 -- IMPORTANTE: Este seed deve ser executado APÓS todas as migrations.
--- Os dados de auth.users NÃO são incluídos aqui (gerenciados pelo Supabase Auth).
--- As senhas dos usuários de teste precisam ser recriadas manualmente.
 -- ============================================================
+
+-- 0. AUTH USERS (necessário para FK em profiles/user_roles/contracts)
+-- Senha padrão para todos os usuários de teste: Teste@123
+INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, confirmation_token, recovery_token, raw_app_meta_data, raw_user_meta_data, is_super_admin, phone, email_change, email_change_token_new, email_change_token_current, phone_change, phone_change_token, reauthentication_token, email_change_confirm_status, is_sso_user) VALUES
+  ('ee2f5a8c-358a-4e11-b687-8e5b5a60cfae', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'eng.gabrielsanz@hotmail.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Gabriel Sanz Selim de Sales"}', false, '', '', '', '', '', '', '', 0, false),
+  ('dfde18db-baf2-4477-908b-eb23658f2cf6', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin.tech@teste.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Sarah Isabela Brito"}', false, '', '', '', '', '', '', '', 0, false),
+  ('c6310333-ffc3-46e5-badd-6825b981524d', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'financeiro.tech@teste.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Isadora Bárbara Mariane Araújo"}', false, '', '', '', '', '', '', '', 0, false),
+  ('39a3f7b4-616a-40fe-b3d8-5c7ad0ea4f2a', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'gestor.tech@teste.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Amanda Mariana Corte Real"}', false, '', '', '', '', '', '', '', 0, false),
+  ('db58c284-3974-4b78-b68a-9e53f95fe6b5', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'colab.tech@teste.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Pietro Elias Alves"}', false, '', '', '', '', '', '', '', 0, false),
+  ('04e8de50-c456-44d9-a49f-2e39260522be', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin.inov@teste.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Emanuelly Alana Laís Oliveira"}', false, '', '', '', '', '', '', '', 0, false),
+  ('b0e5dbae-9a5b-48dc-9fe3-12ad5de61aa1', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'financeiro.inov@teste.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Isadora Alessandra Priscila Cardoso"}', false, '', '', '', '', '', '', '', 0, false),
+  ('9ed24ebf-8f93-4895-b63a-8697c9847afc', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'colab.inov@teste.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Colaborador Inovação"}', false, '', '', '', '', '', '', '', 0, false),
+  ('7627daf7-0458-4aaa-877c-7a32cc8090d3', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'juridico@inovacao.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Jurídico Inovação"}', false, '', '', '', '', '', '', '', 0, false),
+  ('8df9f69f-7076-4347-8f87-800270a795fc', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'juridico@techsolutions.com', crypt('Teste@123', gen_salt('bf')), NOW(), NOW(), NOW(), '', '', '{"provider":"email","providers":["email"]}', '{"full_name":"Jurídico Tech Solutions"}', false, '', '', '', '', '', '', '', 0, false)
+ON CONFLICT (id) DO NOTHING;
+
+-- Identities (necessário para login funcionar no GoTrue)
+INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at) VALUES
+  (gen_random_uuid(), 'ee2f5a8c-358a-4e11-b687-8e5b5a60cfae', 'ee2f5a8c-358a-4e11-b687-8e5b5a60cfae', jsonb_build_object('sub', 'ee2f5a8c-358a-4e11-b687-8e5b5a60cfae', 'email', 'eng.gabrielsanz@hotmail.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), 'dfde18db-baf2-4477-908b-eb23658f2cf6', 'dfde18db-baf2-4477-908b-eb23658f2cf6', jsonb_build_object('sub', 'dfde18db-baf2-4477-908b-eb23658f2cf6', 'email', 'admin.tech@teste.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), 'c6310333-ffc3-46e5-badd-6825b981524d', 'c6310333-ffc3-46e5-badd-6825b981524d', jsonb_build_object('sub', 'c6310333-ffc3-46e5-badd-6825b981524d', 'email', 'financeiro.tech@teste.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), '39a3f7b4-616a-40fe-b3d8-5c7ad0ea4f2a', '39a3f7b4-616a-40fe-b3d8-5c7ad0ea4f2a', jsonb_build_object('sub', '39a3f7b4-616a-40fe-b3d8-5c7ad0ea4f2a', 'email', 'gestor.tech@teste.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), 'db58c284-3974-4b78-b68a-9e53f95fe6b5', 'db58c284-3974-4b78-b68a-9e53f95fe6b5', jsonb_build_object('sub', 'db58c284-3974-4b78-b68a-9e53f95fe6b5', 'email', 'colab.tech@teste.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), '04e8de50-c456-44d9-a49f-2e39260522be', '04e8de50-c456-44d9-a49f-2e39260522be', jsonb_build_object('sub', '04e8de50-c456-44d9-a49f-2e39260522be', 'email', 'admin.inov@teste.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), 'b0e5dbae-9a5b-48dc-9fe3-12ad5de61aa1', 'b0e5dbae-9a5b-48dc-9fe3-12ad5de61aa1', jsonb_build_object('sub', 'b0e5dbae-9a5b-48dc-9fe3-12ad5de61aa1', 'email', 'financeiro.inov@teste.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), '9ed24ebf-8f93-4895-b63a-8697c9847afc', '9ed24ebf-8f93-4895-b63a-8697c9847afc', jsonb_build_object('sub', '9ed24ebf-8f93-4895-b63a-8697c9847afc', 'email', 'colab.inov@teste.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), '7627daf7-0458-4aaa-877c-7a32cc8090d3', '7627daf7-0458-4aaa-877c-7a32cc8090d3', jsonb_build_object('sub', '7627daf7-0458-4aaa-877c-7a32cc8090d3', 'email', 'juridico@inovacao.com'), 'email', NOW(), NOW(), NOW()),
+  (gen_random_uuid(), '8df9f69f-7076-4347-8f87-800270a795fc', '8df9f69f-7076-4347-8f87-800270a795fc', jsonb_build_object('sub', '8df9f69f-7076-4347-8f87-800270a795fc', 'email', 'juridico@techsolutions.com'), 'email', NOW(), NOW(), NOW())
+ON CONFLICT DO NOTHING;
 
 -- 1. PRICING TIERS
 INSERT INTO public.pricing_tiers (id, name, min_contracts, max_contracts, price_per_contract, is_active) VALUES
@@ -20,7 +47,7 @@ INSERT INTO public.system_settings (id, key, value, description) VALUES
   ('1601dc59-8e3a-46d6-8b6d-e54e6d1dbd42', 'billing_reminder_days', '{"days": 3}'::jsonb, 'Número de dias de antecedência para envio de lembretes de vencimento de faturas'),
   ('31028bfa-0d96-433e-ad91-2ec20018eeef', 'contract_expiration_alert_days', '{"days": 30}'::jsonb, 'Dias antes do vencimento para enviar alerta de contrato'),
   ('3adb7a40-8162-4184-abd0-73f29ed2190e', 'pj_contract_price', '{"amount": 49.9, "currency": "BRL"}'::jsonb, 'Preço base por contrato PJ ativo')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (key) DO NOTHING;
 
 -- 3. COMPANIES
 INSERT INTO public.companies (id, name, cnpj, email, phone, address, is_active) VALUES

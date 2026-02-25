@@ -1,0 +1,275 @@
+# ============================================================
+# AureControl - Docker Compose (Self-Hosted)
+# ============================================================
+# Uso:
+#   1. cp .env.example .env
+#   2. Preencha as variáveis no .env
+#   3. docker compose up -d --build
+# ============================================================
+
+services:
+  # ─── PostgreSQL ──────────────────────────────────────────
+  db:
+    image: supabase/postgres:15.8.1.060
+    container_name: aurecontrol-db
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - aurecontrol
+
+  # ─── DB Init (migrations + seed) ────────────────────────
+  db-init:
+    image: supabase/postgres:15.8.1.060
+    container_name: aurecontrol-db-init
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./supabase/migrations:/migrations:ro
+      - ./supabase/seed.sql:/seed/seed.sql:ro
+      - ./docker/init-db.sh:/init-db.sh:ro
+    entrypoint: ["bash", "/init-db.sh"]
+    restart: "no"
+    networks:
+      - aurecontrol
+
+  # ─── PostgREST (API REST) ───────────────────────────────
+  rest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: aurecontrol-rest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      PGRST_DB_SCHEMAS: public,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY:-3600}
+    networks:
+      - aurecontrol
+
+  # ─── GoTrue (Auth) ──────────────────────────────────────
+  auth:
+    image: supabase/gotrue:v2.164.0
+    container_name: aurecontrol-auth
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-}
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-noreply@aurecontrol.com}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-AureControl}
+      GOTRUE_MAILER_URLPATHS_INVITE: "${SITE_URL}/auth/v1/verify"
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: "${SITE_URL}/auth/v1/verify"
+      GOTRUE_MAILER_URLPATHS_RECOVERY: "${SITE_URL}/auth/v1/verify"
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: "${SITE_URL}/auth/v1/verify"
+    networks:
+      - aurecontrol
+
+  # ─── Realtime ───────────────────────────────────────────
+  realtime:
+    image: supabase/realtime:v2.30.34
+    container_name: aurecontrol-realtime
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB:-postgres}
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: supabaserealtime
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+      ENABLE_TAILSCALE: "false"
+      DNS_NODES: "''"
+    networks:
+      - aurecontrol
+
+  # ─── Storage ────────────────────────────────────────────
+  storage:
+    image: supabase/storage-api:v1.11.13
+    container_name: aurecontrol-storage
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "true"
+      IMGPROXY_URL: http://imgproxy:8080
+    volumes:
+      - storage-data:/var/lib/storage
+    networks:
+      - aurecontrol
+
+  # ─── Image Proxy ────────────────────────────────────────
+  imgproxy:
+    image: darthsim/imgproxy:v3.8.0
+    container_name: aurecontrol-imgproxy
+    restart: unless-stopped
+    environment:
+      IMGPROXY_BIND: ":8080"
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /
+      IMGPROXY_USE_ETAG: "true"
+    volumes:
+      - storage-data:/var/lib/storage
+    networks:
+      - aurecontrol
+
+  # ─── pg-meta ────────────────────────────────────────────
+  meta:
+    image: supabase/postgres-meta:v0.83.2
+    container_name: aurecontrol-meta
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: ${POSTGRES_DB:-postgres}
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - aurecontrol
+
+  # ─── Kong (API Gateway) ─────────────────────────────────
+  kong:
+    image: kong:2.8.1
+    container_name: aurecontrol-kong
+    restart: unless-stopped
+    depends_on:
+      - rest
+      - auth
+      - realtime
+      - storage
+      - meta
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    volumes:
+      - ./docker/volumes/kong/kong.yml:/var/lib/kong/kong.yml:ro
+    networks:
+      - aurecontrol
+
+  # ─── Studio (Dashboard Admin - opcional) ────────────────
+  studio:
+    image: supabase/studio:20240923-2e3e90c
+    container_name: aurecontrol-studio
+    restart: unless-stopped
+    depends_on:
+      - kong
+    ports:
+      - "${STUDIO_PORT:-3333}:3000"
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DEFAULT_ORGANIZATION_NAME: AureControl
+      DEFAULT_PROJECT_NAME: aurecontrol
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${API_EXTERNAL_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    networks:
+      - aurecontrol
+
+  # ─── Frontend (React + Nginx) ──────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${API_EXTERNAL_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${ANON_KEY}
+        VITE_SUPABASE_PROJECT_ID: aurecontrol
+    container_name: aurecontrol-frontend
+    restart: unless-stopped
+    depends_on:
+      - kong
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - aurecontrol
+
+volumes:
+  db-data:
+    driver: local
+  storage-data:
+    driver: local
+
+networks:
+  aurecontrol:
+    driver: bridge
