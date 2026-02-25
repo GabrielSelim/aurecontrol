@@ -1283,7 +1283,12 @@ export type Database = {
         | "gestor"
         | "colaborador"
         | "juridico"
-      contract_status: "active" | "inactive" | "terminated"
+      contract_status:
+        | "active"
+        | "inactive"
+        | "terminated"
+        | "enviado"
+        | "assinado"
       contract_type: "CLT" | "PJ" | "estagio" | "temporario"
       invite_status: "pending" | "accepted" | "expired" | "cancelled"
       payment_status: "pending" | "approved" | "paid" | "rejected"
@@ -1424,7 +1429,13 @@ export const Constants = {
         "colaborador",
         "juridico",
       ],
-      contract_status: ["active", "inactive", "terminated"],
+      contract_status: [
+        "active",
+        "inactive",
+        "terminated",
+        "enviado",
+        "assinado",
+      ],
       contract_type: ["CLT", "PJ", "estagio", "temporario"],
       invite_status: ["pending", "accepted", "expired", "cancelled"],
       payment_status: ["pending", "approved", "paid", "rejected"],

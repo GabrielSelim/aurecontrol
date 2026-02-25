@@ -712,10 +712,13 @@ const Contratos = () => {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      active: "Ativo",
+      active: "Vigente",
+      enviado: "Enviado",
+      assinado: "Assinado",
       suspended: "Suspenso",
       terminated: "Encerrado",
       expired: "Expirado",
+      inactive: "Inativo",
     };
     return labels[status] || status;
   };
