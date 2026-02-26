@@ -1,0 +1,41 @@
+# ============================================================
+# AureControl - Git Attributes
+# ============================================================
+# Forçar LF em scripts e SQL para evitar problemas de CRLF
+# quando arquivos são montados em containers Linux.
+# ============================================================
+
+# Shell scripts - SEMPRE LF
+*.sh text eol=lf
+
+# SQL files - SEMPRE LF
+*.sql text eol=lf
+
+# Docker files
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+.dockerignore text eol=lf
+
+# Config files
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+
+# Web files
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+
+# Binários
+bun.lockb binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text eol=lf
