@@ -26,29 +26,15 @@ services:
       - ./docker/volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
       # Initialize database settings with JWT_SECRET and JWT_EXP
       - ./docker/volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
+      # Apply app migrations + seed during first boot
+      - ./docker/volumes/db/init-migrations.sh:/docker-entrypoint-initdb.d/init-scripts/zz-migrations.sh:Z
+      - ./supabase/migrations:/app-migrations:ro
+      - ./supabase/seed-app.sql:/app-seed/seed-app.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
-    networks:
-      - aurecontrol
-
-  # ─── DB Init (migrations + seed) ────────────────────────
-  db-init:
-    image: supabase/postgres:15.8.1.060
-    container_name: aurecontrol-db-init
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - ./supabase/migrations:/migrations:ro
-      - ./supabase/seed-app.sql:/seed/seed-app.sql:ro
-      - ./docker/init-db.sh:/init-db.sh:ro
-    entrypoint: ["bash", "/init-db.sh"]
-    restart: "no"
     networks:
       - aurecontrol
 
@@ -59,8 +45,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
       auth:
         condition: service_healthy
     environment:
@@ -83,8 +67,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
     environment:
       PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
       PGRST_DB_SCHEMAS: public,graphql_public
@@ -117,8 +99,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
@@ -156,8 +136,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      db-init:
-        condition: service_completed_successfully
     environment:
       PORT: 4000
       DB_HOST: db
@@ -185,8 +163,6 @@ services:
         condition: service_healthy
       rest:
         condition: service_started
-      db-init:
-        condition: service_completed_successfully
     environment:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
