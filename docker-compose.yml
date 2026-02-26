@@ -62,7 +62,7 @@ services:
       db-init:
         condition: service_completed_successfully
       auth:
-        condition: service_started
+        condition: service_healthy
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DB_HOST: db
@@ -101,6 +101,19 @@ services:
     image: supabase/gotrue:v2.164.0
     container_name: aurecontrol-auth
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9999/health"
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
     depends_on:
       db:
         condition: service_healthy
@@ -128,10 +141,10 @@ services:
       GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
       GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-noreply@aurecontrol.com}
       GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-AureControl}
-      GOTRUE_MAILER_URLPATHS_INVITE: "${SITE_URL}/auth/v1/verify"
-      GOTRUE_MAILER_URLPATHS_CONFIRMATION: "${SITE_URL}/auth/v1/verify"
-      GOTRUE_MAILER_URLPATHS_RECOVERY: "${SITE_URL}/auth/v1/verify"
-      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: "${SITE_URL}/auth/v1/verify"
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
     networks:
       - aurecontrol
 
