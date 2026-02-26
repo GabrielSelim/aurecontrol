@@ -41,9 +41,32 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./supabase/migrations:/migrations:ro
-      - ./supabase/seed.sql:/seed/seed.sql:ro
+      - ./supabase/seed-app.sql:/seed/seed-app.sql:ro
       - ./docker/init-db.sh:/init-db.sh:ro
     entrypoint: ["bash", "/init-db.sh"]
+    restart: "no"
+    networks:
+      - aurecontrol
+
+  # ─── Seed Users (após GoTrue aplicar migrations) ────────
+  seed-users:
+    image: supabase/postgres:15.8.1.060
+    container_name: aurecontrol-seed-users
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+      auth:
+        condition: service_started
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_HOST: db
+      DB_USER: postgres
+      DB_NAME: ${POSTGRES_DB:-postgres}
+    volumes:
+      - ./docker/seed-users.sh:/seed-users.sh:ro
+    entrypoint: ["bash", "/seed-users.sh"]
     restart: "no"
     networks:
       - aurecontrol

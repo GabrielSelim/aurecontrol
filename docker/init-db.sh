@@ -59,11 +59,12 @@ fi
 
 echo "Migrations: $APPLIED aplicadas, $SKIPPED já existentes."
 
-# Aplicar seed (apenas na primeira inicialização)
-if [ "$INITIALIZED" != "t" ] && [ -f "/seed/seed.sql" ]; then
-  echo "Aplicando seed data..."
-  PGPASSWORD="$POSTGRES_PASSWORD" psql -h db -U postgres -d postgres -f /seed/seed.sql
-  echo "Seed aplicado com sucesso!"
+# Aplicar seed de dados do app (apenas na primeira inicialização)
+# NOTA: Seed de auth.users é feito pelo seed-users container (após GoTrue iniciar)
+if [ "$INITIALIZED" != "t" ] && [ -f "/seed/seed-app.sql" ]; then
+  echo "Aplicando seed de dados do app..."
+  PGPASSWORD="$POSTGRES_PASSWORD" psql -h db -U postgres -d postgres -f /seed/seed-app.sql
+  echo "Seed do app aplicado com sucesso!"
 fi
 
 echo "=== DB Init concluído ==="
