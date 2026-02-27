@@ -44,6 +44,16 @@ echo "============================================"
 echo ""
 
 # ──────────────────────────────────────────────
+# 0. Gerar Kong YAML a partir do template
+# ──────────────────────────────────────────────
+KONG_TEMPLATE="docker/volumes/kong/kong.yml.template"
+KONG_YML="docker/volumes/kong/kong.yml"
+echo "[pre] Gerando kong.yml a partir do template..."
+sed "s|\${SUPABASE_ANON_KEY}|${ANON_KEY}|g; s|\${SUPABASE_SERVICE_KEY}|${SERVICE_ROLE_KEY}|g" "$KONG_TEMPLATE" > "$KONG_YML"
+echo "  kong.yml gerado com tokens reais."
+echo ""
+
+# ──────────────────────────────────────────────
 # 1. Build e start dos containers
 # ──────────────────────────────────────────────
 echo "[1/6] Subindo containers..."

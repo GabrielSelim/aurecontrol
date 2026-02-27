@@ -109,6 +109,9 @@ services:
       ERL_AFLAGS: "-proto_dist inet_tcp"
       ENABLE_TAILSCALE: "false"
       DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
     networks:
       - aurecontrol
 
@@ -190,8 +193,6 @@ services:
       KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
-      SUPABASE_ANON_KEY: ${ANON_KEY}
-      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
     volumes:
       - ./docker/volumes/kong/kong.yml:/var/lib/kong/kong.yml:ro
     networks:
