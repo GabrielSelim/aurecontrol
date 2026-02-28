@@ -1,6 +1,15 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchSignatureByToken,
+  fetchContractDocumentById,
+  fetchContract,
+  recordSignature,
+  checkAllSignaturesCompleted,
+  updateDocumentStatus,
+} from "@/services/contractService";
+import { fetchProfileByUserIdMaybe } from "@/services/profileService";
+import { fetchCompanyName } from "@/services/companyService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +22,8 @@ import {
   Trash2,
 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
+import { logger } from "@/lib/logger";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface SignatureData {
   id: string;
@@ -29,6 +40,7 @@ interface ContractInfo {
 }
 
 const AssinarContrato = () => {
+  useDocumentTitle("Assinar Contrato");
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const { toast } = useToast();
@@ -54,14 +66,8 @@ const AssinarContrato = () => {
   const fetchSignatureData = async () => {
     try {
       // Fetch signature by token
-      const { data: sigData, error: sigError } = await supabase
-        .from("contract_signatures")
-        .select("id, signer_name, signer_email, signed_at, document_id")
-        .eq("signing_token", token)
-        .maybeSingle();
+      const sigData = await fetchSignatureByToken(token!);
 
-      if (sigError) throw sigError;
-      
       if (!sigData) {
         setError("Link de assinatura inválido ou expirado");
         setIsLoading(false);
@@ -78,34 +84,26 @@ const AssinarContrato = () => {
       setSignature(sigData);
 
       // Fetch contract info
-      const { data: docData } = await supabase
-        .from("contract_documents")
-        .select("contract_id")
-        .eq("id", sigData.document_id)
-        .maybeSingle();
+      const docData = await fetchContractDocumentById(sigData.document_id);
 
       if (docData) {
-        const { data: contractData } = await supabase
-          .from("contracts")
-          .select("job_title, company_id, user_id")
-          .eq("id", docData.contract_id)
-          .maybeSingle();
+        const contractData = await fetchContract(docData.contract_id);
 
         if (contractData) {
-          const [profileRes, companyRes] = await Promise.all([
-            supabase.from("profiles").select("full_name").eq("user_id", contractData.user_id).maybeSingle(),
-            supabase.from("companies").select("name").eq("id", contractData.company_id).maybeSingle(),
+          const [profileData, companyName] = await Promise.all([
+            fetchProfileByUserIdMaybe(contractData.user_id, "full_name"),
+            fetchCompanyName(contractData.company_id),
           ]);
 
           setContractInfo({
             job_title: contractData.job_title,
-            contractor_name: profileRes.data?.full_name || "N/A",
-            company_name: companyRes.data?.name || "N/A",
+            contractor_name: profileData?.full_name || "N/A",
+            company_name: companyName || "N/A",
           });
         }
       }
     } catch (error) {
-      console.error("Error fetching signature data:", error);
+      logger.error("Error fetching signature data:", error);
       setError("Erro ao carregar dados da assinatura");
     } finally {
       setIsLoading(false);
@@ -141,42 +139,27 @@ const AssinarContrato = () => {
       } catch { /* fallback */ }
 
       // Update the signature record
-      const { error } = await supabase
-        .from("contract_signatures")
-        .update({
-          signed_at: new Date().toISOString(),
-          signature_image_url: signatureImage,
-          ip_address: ipAddress,
-          user_agent: navigator.userAgent,
-        })
-        .eq("id", signature.id)
-        .eq("signing_token", token);
-
-      if (error) throw error;
+      await recordSignature(
+        signature.id,
+        signatureImage,
+        ipAddress,
+        navigator.userAgent,
+        token ?? undefined
+      );
 
       // Check if all signatures are complete
-      const { data: allSignatures } = await supabase
-        .from("contract_signatures")
-        .select("signed_at")
-        .eq("document_id", signature.document_id);
-
-      const allSigned = allSignatures?.every(s => s.signed_at !== null);
+      const allSigned = await checkAllSignaturesCompleted(signature.document_id);
 
       if (allSigned) {
         // Update document status to completed
-        await supabase
-          .from("contract_documents")
-          .update({
-            signature_status: "completed",
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", signature.document_id);
+        await updateDocumentStatus(
+          signature.document_id,
+          "completed",
+          new Date().toISOString()
+        );
       } else {
         // Update to partial
-        await supabase
-          .from("contract_documents")
-          .update({ signature_status: "partial" })
-          .eq("id", signature.document_id);
+        await updateDocumentStatus(signature.document_id, "partial");
       }
 
       setSuccess(true);
@@ -185,7 +168,7 @@ const AssinarContrato = () => {
         description: "Contrato assinado com sucesso!",
       });
     } catch (error) {
-      console.error("Error signing contract:", error);
+      logger.error("Error signing contract:", error);
       toast({
         title: "Erro",
         description: "Não foi possível assinar o contrato. Tente novamente.",

@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchProfilesByCompany, fetchUserRoles, updateProfileById } from "@/services/profileService";
+import { fetchContractsByUser } from "@/services/contractService";
+import { fetchPaymentsByUser } from "@/services/paymentService";
+import { sendEmail } from "@/services/edgeFunctionService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, UserPlus, MoreHorizontal, Phone, UserCheck, UserX, Users, Download, ChevronLeft, ChevronRight, ArrowUpDown, X, Info, LayoutGrid, List, Mail, Building2, FileText, Briefcase } from "lucide-react";
+import { Search, UserPlus, MoreHorizontal, UserCheck, UserX, Users, Download, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, X, Info, LayoutGrid, List, Mail, Building2, FileText, Briefcase, AlertTriangle, Send } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -42,9 +45,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
-import { formatCPF, formatPhone } from "@/lib/masks";
+import { formatCPF, formatPhone, formatBRL } from "@/lib/masks";
 import { toast } from "sonner";
 import { ColaboradoresChart } from "@/components/dashboard/ColaboradoresChart";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useDebounce } from "@/hooks/useDebounce";
+import { logger } from "@/lib/logger";
 
 interface Colaborador {
   id: string;
@@ -60,70 +67,67 @@ interface Colaborador {
   has_contract: boolean;
   contract_type: string | null;
   job_title: string | null;
+  totalPaid: number;
+  contractEndDate: string | null;
 }
 
 const Colaboradores = () => {
+  useDocumentTitle("Colaboradores");
   const { profile, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
   const [contractTypeFilter, setContractTypeFilter] = useState<"all" | "pj" | "clt" | "none">("all");
-  const [sortBy, setSortBy] = useState<"name" | "email" | "created_at">("name");
+  const [sortBy, setSortBy] = useState<"name" | "email" | "created_at" | "job_title" | "contract_type" | "total_paid" | "role" | "status">("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [colaboradorToToggle, setColaboradorToToggle] = useState<Colaborador | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchColaboradores = async () => {
       if (!profile?.company_id) return;
 
       try {
-        const { data: profiles, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("company_id", profile.company_id)
-          .order("full_name");
-
-        if (error) throw error;
+        const profiles = await fetchProfilesByCompany(profile.company_id);
 
         // Fetch roles and contracts for each profile
         const colaboradoresWithRolesAndDept = await Promise.all(
-          (profiles || []).map(async (p) => {
-            const [rolesRes, contractsRes] = await Promise.all([
-              supabase
-                .from("user_roles")
-                .select("role")
-                .eq("user_id", p.user_id),
-              supabase
-                .from("contracts")
-                .select("department, contract_type, job_title, status")
-                .eq("user_id", p.user_id)
-                .eq("status", "active")
-                .limit(1)
+          profiles.map(async (p) => {
+            const [roles, contracts, payments] = await Promise.all([
+              fetchUserRoles(p.user_id),
+              fetchContractsByUser(p.user_id),
+              fetchPaymentsByUser(p.user_id),
             ]);
 
-            const activeContract = contractsRes.data?.[0];
+            const activeContract = contracts.find((c) => c.status === "active");
+            const totalPaid = payments
+              .filter((pay) => pay.status === "paid")
+              .reduce((sum, pay) => sum + Number(pay.amount), 0);
 
             return {
               ...p,
-              roles: rolesRes.data || [],
+              roles,
               department: activeContract?.department || null,
               has_contract: !!activeContract,
               contract_type: activeContract?.contract_type || null,
               job_title: activeContract?.job_title || null,
+              totalPaid,
+              contractEndDate: activeContract?.end_date || null,
             };
           })
         );
 
         setColaboradores(colaboradoresWithRolesAndDept);
       } catch (error) {
-        console.error("Error fetching colaboradores:", error);
+        logger.error("Error fetching colaboradores:", error);
       } finally {
         setIsLoading(false);
       }
@@ -139,6 +143,27 @@ const Colaboradores = () => {
       .slice(0, 2)
       .join("")
       .toUpperCase();
+  };
+
+  const AVATAR_COLORS = [
+    "bg-blue-100 text-blue-700",
+    "bg-emerald-100 text-emerald-700",
+    "bg-violet-100 text-violet-700",
+    "bg-amber-100 text-amber-700",
+    "bg-rose-100 text-rose-700",
+    "bg-cyan-100 text-cyan-700",
+    "bg-fuchsia-100 text-fuchsia-700",
+    "bg-lime-100 text-lime-700",
+    "bg-orange-100 text-orange-700",
+    "bg-teal-100 text-teal-700",
+  ];
+
+  const getAvatarColor = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   };
 
   const getRoleLabel = (role: string) => {
@@ -163,33 +188,14 @@ const Colaboradores = () => {
     return variants[role] || "outline";
   };
 
-  const displayCPF = (cpf: string | null) => {
-    if (!cpf) return "-";
-    // If already formatted, return as is
-    if (cpf.includes(".")) return cpf;
-    // Otherwise format it
-    return formatCPF(cpf);
-  };
 
-  const displayPhone = (phone: string | null) => {
-    if (!phone) return "-";
-    // If already formatted, return as is
-    if (phone.includes("(")) return phone;
-    // Otherwise format it
-    return formatPhone(phone);
-  };
 
   const confirmToggleStatus = async () => {
     if (!colaboradorToToggle) return;
     
     try {
       const newStatus = !colaboradorToToggle.is_active;
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_active: newStatus })
-        .eq("id", colaboradorToToggle.id);
-
-      if (error) throw error;
+      await updateProfileById(colaboradorToToggle.id, { is_active: newStatus });
 
       setColaboradores(prev =>
         prev.map(c =>
@@ -203,7 +209,7 @@ const Colaboradores = () => {
           : `${colaboradorToToggle.full_name} foi desativado`
       );
     } catch (error) {
-      console.error("Error toggling status:", error);
+      logger.error("Error toggling status:", error);
       toast.error("Erro ao alterar status do colaborador");
     } finally {
       setColaboradorToToggle(null);
@@ -211,12 +217,13 @@ const Colaboradores = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ["Nome", "E-mail", "Profissão", "Tipo Contrato", "Cargo(s)", "Status"];
+    const headers = ["Nome", "E-mail", "Profissão", "Tipo Contrato", "Custo Total", "Cargo(s)", "Status"];
     const rows = filteredColaboradores.map(c => [
       c.full_name,
       c.email,
       c.job_title || "",
       c.has_contract ? (c.contract_type === "pj" ? "PJ" : "CLT") : "Sem contrato",
+      c.totalPaid > 0 ? c.totalPaid.toFixed(2) : "0.00",
       c.roles.map(r => getRoleLabel(r.role)).join("; "),
       c.is_active ? "Ativo" : "Inativo"
     ]);
@@ -237,10 +244,105 @@ const Colaboradores = () => {
     toast.success("Lista exportada com sucesso!");
   };
 
-  const filteredColaboradores = colaboradores.filter((c) => {
+  const exportSelectedToCSV = () => {
+    const selected = colaboradores.filter(c => selectedIds.has(c.id));
+    if (selected.length === 0) return;
+    const headers = ["Nome", "E-mail", "Profissão", "Tipo Contrato", "Custo Total", "Cargo(s)", "Status"];
+    const rows = selected.map(c => [
+      c.full_name,
+      c.email,
+      c.job_title || "",
+      c.has_contract ? (c.contract_type === "pj" ? "PJ" : "CLT") : "Sem contrato",
+      c.totalPaid > 0 ? c.totalPaid.toFixed(2) : "0.00",
+      c.roles.map(r => getRoleLabel(r.role)).join("; "),
+      c.is_active ? "Ativo" : "Inativo"
+    ]);
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `colaboradores_selecionados_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${selected.length} colaborador(es) exportado(s)`);
+    setSelectedIds(new Set());
+  };
+
+  const sendBulkReminder = async () => {
+    const selected = colaboradores.filter(c => selectedIds.has(c.id));
+    if (selected.length === 0) return;
+
+    toast.loading(`Enviando lembretes para ${selected.length} colaborador(es)...`, { id: "bulk-reminder" });
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const collab of selected) {
+      try {
+        const missingItems: string[] = [];
+        if (!collab.cpf) missingItems.push("CPF");
+        if (!collab.phone) missingItems.push("Telefone");
+        if (!collab.has_contract) missingItems.push("Contrato vinculado");
+
+        const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{font-family:Arial,sans-serif;line-height:1.6;color:#333}.container{max-width:600px;margin:0 auto;padding:20px}.header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:30px;text-align:center;border-radius:8px 8px 0 0}.content{background:#f9f9f9;padding:30px;border-radius:0 0 8px 8px}.button{display:inline-block;background:#667eea;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;margin:20px 0}.footer{text-align:center;margin-top:20px;color:#666;font-size:12px}</style>
+</head><body><div class="container">
+<div class="header"><h1>📝 Lembrete de Cadastro</h1></div>
+<div class="content">
+<p>Olá <strong>${collab.full_name}</strong>,</p>
+<p>Identificamos que alguns dados do seu perfil estão pendentes de preenchimento:</p>
+<ul>${missingItems.map(item => `<li>${item}</li>`).join("")}</ul>
+<p>Por favor, acesse o sistema e complete seu cadastro para que possamos dar continuidade aos processos:</p>
+<p style="text-align:center"><a href="${window.location.origin}/dashboard" class="button">Acessar Aure</a></p>
+<div class="footer"><p>Aure System - Gestão de Colaboradores</p></div>
+</div></div></body></html>`;
+
+        await sendEmail({
+          to: collab.email,
+          subject: "📝 Lembrete: Complete seu cadastro - Aure System",
+          html,
+          from_name: "Aure System",
+        });
+        sent++;
+      } catch {
+        failed++;
+      }
+    }
+
+    toast.dismiss("bulk-reminder");
+    if (failed === 0) {
+      toast.success(`Lembrete enviado para ${sent} colaborador(es)!`);
+    } else {
+      toast.warning(`${sent} enviado(s), ${failed} falha(s)`);
+    }
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === paginatedColaboradores.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedColaboradores.map(c => c.id)));
+    }
+  }, [selectedIds.size, paginatedColaboradores]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const filteredColaboradores = useMemo(() => colaboradores.filter((c) => {
     const matchesSearch =
-      c.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchTerm.toLowerCase());
+      c.full_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      c.email.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     
     const matchesStatus =
       statusFilter === "all" ||
@@ -262,13 +364,13 @@ const Colaboradores = () => {
       (contractTypeFilter === "none" && !c.has_contract);
     
     return matchesSearch && matchesStatus && matchesRole && matchesDepartment && matchesContractType;
-  });
+  }), [colaboradores, debouncedSearchTerm, statusFilter, roleFilter, departmentFilter, contractTypeFilter]);
 
   // Get unique departments for filter
-  const departments = [...new Set(colaboradores.map(c => c.department).filter(Boolean))] as string[];
+  const departments = useMemo(() => [...new Set(colaboradores.map(c => c.department).filter(Boolean))] as string[], [colaboradores]);
 
   // Sort collaborators
-  const sortedColaboradores = [...filteredColaboradores].sort((a, b) => {
+  const sortedColaboradores = useMemo(() => [...filteredColaboradores].sort((a, b) => {
     let comparison = 0;
     if (sortBy === "name") {
       comparison = a.full_name.localeCompare(b.full_name);
@@ -276,14 +378,43 @@ const Colaboradores = () => {
       comparison = a.email.localeCompare(b.email);
     } else if (sortBy === "created_at") {
       comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    } else if (sortBy === "job_title") {
+      comparison = (a.job_title || "").localeCompare(b.job_title || "");
+    } else if (sortBy === "contract_type") {
+      comparison = (a.contract_type || "").localeCompare(b.contract_type || "");
+    } else if (sortBy === "total_paid") {
+      comparison = a.totalPaid - b.totalPaid;
+    } else if (sortBy === "role") {
+      const roleA = a.roles?.[0]?.role || "";
+      const roleB = b.roles?.[0]?.role || "";
+      comparison = roleA.localeCompare(roleB);
+    } else if (sortBy === "status") {
+      comparison = Number(a.is_active) - Number(b.is_active);
     }
     return sortOrder === "asc" ? comparison : -comparison;
-  });
+  }), [filteredColaboradores, sortBy, sortOrder]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, roleFilter, departmentFilter, contractTypeFilter, sortBy, sortOrder, itemsPerPage]);
+
+  // Toggle sort when clicking column header
+  const handleColumnSort = useCallback((column: typeof sortBy) => {
+    if (sortBy === column) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+  }, [sortBy]);
+
+  const SortIcon = ({ column }: { column: typeof sortBy }) => {
+    if (sortBy !== column) return <ArrowUpDown className="ml-1 h-3 w-3 text-muted-foreground/50" />;
+    return sortOrder === "asc"
+      ? <ArrowUp className="ml-1 h-3 w-3 text-primary" />
+      : <ArrowDown className="ml-1 h-3 w-3 text-primary" />;
+  };
 
   // Check if any filter is active
   const hasActiveFilters = searchTerm !== "" || statusFilter !== "all" || roleFilter !== "all" || departmentFilter !== "all" || contractTypeFilter !== "all" || sortBy !== "name" || sortOrder !== "asc";
@@ -307,7 +438,20 @@ const Colaboradores = () => {
   const inactiveCount = colaboradores.filter(c => !c.is_active).length;
   const pjCount = colaboradores.filter(c => c.contract_type === "pj").length;
   const cltCount = colaboradores.filter(c => c.contract_type === "clt").length;
-  const noContractCount = colaboradores.filter(c => !c.has_contract).length;
+  const isContractExpiringSoon = (endDate: string | null): boolean => {
+    if (!endDate) return false;
+    const end = new Date(endDate);
+    const now = new Date();
+    const diffDays = (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 30;
+  };
+
+  const daysUntilExpiry = (endDate: string | null): number | null => {
+    if (!endDate) return null;
+    const end = new Date(endDate);
+    const now = new Date();
+    return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  };
 
   return (
     <div className="space-y-6">
@@ -561,7 +705,7 @@ const Colaboradores = () => {
                 </Select>
               )}
               <Select value={`${sortBy}-${sortOrder}`} onValueChange={(value) => {
-                const [field, order] = value.split("-") as ["name" | "email" | "created_at", "asc" | "desc"];
+                const [field, order] = value.split("-") as [typeof sortBy, "asc" | "desc"];
                 setSortBy(field);
                 setSortOrder(order);
               }}>
@@ -574,6 +718,8 @@ const Colaboradores = () => {
                   <SelectItem value="name-desc">Nome (Z-A)</SelectItem>
                   <SelectItem value="email-asc">E-mail (A-Z)</SelectItem>
                   <SelectItem value="email-desc">E-mail (Z-A)</SelectItem>
+                  <SelectItem value="total_paid-desc">Maior custo</SelectItem>
+                  <SelectItem value="total_paid-asc">Menor custo</SelectItem>
                   <SelectItem value="created_at-desc">Mais recentes</SelectItem>
                   <SelectItem value="created_at-asc">Mais antigos</SelectItem>
                 </SelectContent>
@@ -605,17 +751,55 @@ const Colaboradores = () => {
             </div>
           </div>
 
+          {/* Bulk Actions Bar */}
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/10 border border-primary/30 animate-in fade-in">
+              <span className="text-sm font-medium">{selectedIds.size} selecionado(s)</span>
+              <Button size="sm" variant="outline" onClick={exportSelectedToCSV} className="gap-1">
+                <Download className="h-3.5 w-3.5" />
+                Exportar selecionados
+              </Button>
+              <Button size="sm" variant="outline" onClick={sendBulkReminder} className="gap-1">
+                <Send className="h-3.5 w-3.5" />
+                Enviar lembrete
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="ml-auto gap-1">
+                <X className="h-3.5 w-3.5" />
+                Limpar seleção
+              </Button>
+            </div>
+          )}
+
           {/* Table View */}
           {viewMode === "table" && (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Colaborador</TableHead>
-                    <TableHead className="hidden md:table-cell">Profissão</TableHead>
-                    <TableHead className="hidden lg:table-cell">Tipo Contrato</TableHead>
-                    <TableHead>Cargo</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[40px]">
+                      <Checkbox
+                        checked={paginatedColaboradores.length > 0 && selectedIds.size === paginatedColaboradores.length}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => handleColumnSort("name")}>
+                      <span className="flex items-center">Colaborador<SortIcon column="name" /></span>
+                    </TableHead>
+                    <TableHead className="hidden md:table-cell cursor-pointer select-none" onClick={() => handleColumnSort("job_title")}>
+                      <span className="flex items-center">Profissão<SortIcon column="job_title" /></span>
+                    </TableHead>
+                    <TableHead className="hidden lg:table-cell cursor-pointer select-none" onClick={() => handleColumnSort("contract_type")}>
+                      <span className="flex items-center">Tipo Contrato<SortIcon column="contract_type" /></span>
+                    </TableHead>
+                    <TableHead className="hidden lg:table-cell cursor-pointer select-none" onClick={() => handleColumnSort("total_paid")}>
+                      <span className="flex items-center">Custo Total<SortIcon column="total_paid" /></span>
+                    </TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => handleColumnSort("role")}>
+                      <span className="flex items-center">Cargo<SortIcon column="role" /></span>
+                    </TableHead>
+                    <TableHead className="cursor-pointer select-none" onClick={() => handleColumnSort("status")}>
+                      <span className="flex items-center">Status<SortIcon column="status" /></span>
+                    </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -623,6 +807,7 @@ const Colaboradores = () => {
                   {isLoading ? (
                     Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Skeleton className="h-10 w-10 rounded-full" />
@@ -638,6 +823,9 @@ const Colaboradores = () => {
                         <TableCell className="hidden lg:table-cell">
                           <Skeleton className="h-6 w-16" />
                         </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <Skeleton className="h-4 w-20" />
+                        </TableCell>
                         <TableCell>
                           <Skeleton className="h-6 w-20" />
                         </TableCell>
@@ -651,7 +839,7 @@ const Colaboradores = () => {
                     ))
                   ) : sortedColaboradores.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-32 text-center">
+                      <TableCell colSpan={8} className="h-32 text-center">
                         <p className="text-muted-foreground">
                           Nenhum colaborador encontrado
                         </p>
@@ -659,11 +847,17 @@ const Colaboradores = () => {
                     </TableRow>
                   ) : (
                     paginatedColaboradores.map((colaborador) => (
-                      <TableRow key={colaborador.id}>
+                      <TableRow key={colaborador.id} className={selectedIds.has(colaborador.id) ? "bg-primary/5" : ""}>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(colaborador.id)}
+                            onCheckedChange={() => toggleSelect(colaborador.id)}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar>
-                              <AvatarFallback className="bg-primary/10 text-primary">
+                              <AvatarFallback className={getAvatarColor(colaborador.full_name)}>
                                 {getInitials(colaborador.full_name)}
                               </AvatarFallback>
                             </Avatar>
@@ -682,20 +876,40 @@ const Colaboradores = () => {
                               {colaborador.job_title}
                             </div>
                           ) : (
-                            <span className="text-sm text-muted-foreground">-</span>
+                            <span className="text-sm text-muted-foreground italic">Não informado</span>
                           )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           {colaborador.has_contract ? (
-                            <Badge variant={colaborador.contract_type === "pj" ? "default" : "secondary"}>
-                              <FileText className="h-3 w-3 mr-1" />
-                              {colaborador.contract_type === "pj" ? "PJ" : "CLT"}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={colaborador.contract_type === "pj" ? "default" : "secondary"}>
+                                <FileText className="h-3 w-3 mr-1" />
+                                {colaborador.contract_type === "pj" ? "PJ" : "CLT"}
+                              </Badge>
+                              {isContractExpiringSoon(colaborador.contractEndDate) && (
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-600 gap-1">
+                                      <AlertTriangle className="h-3 w-3" />
+                                      Vence em {daysUntilExpiry(colaborador.contractEndDate)}d
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Contrato expira em {daysUntilExpiry(colaborador.contractEndDate)} dia(s)</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
                           ) : (
-                            <Badge variant="outline" className="text-muted-foreground">
+                            <Badge variant="outline" className="text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700">
                               Sem contrato
                             </Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <span className={colaborador.totalPaid > 0 ? "font-medium" : "text-muted-foreground"}>
+                            {colaborador.totalPaid > 0 ? formatBRL(colaborador.totalPaid) : "—"}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
@@ -793,7 +1007,7 @@ const Colaboradores = () => {
                       <CardContent className="pt-6">
                         <div className="flex flex-col items-center text-center space-y-3">
                           <Avatar className="h-16 w-16">
-                            <AvatarFallback className="bg-primary/10 text-primary text-xl">
+                            <AvatarFallback className={`${getAvatarColor(colaborador.full_name)} text-xl`}>
                               {getInitials(colaborador.full_name)}
                             </AvatarFallback>
                           </Avatar>
@@ -803,12 +1017,10 @@ const Colaboradores = () => {
                               <Mail className="h-3 w-3" />
                               {colaborador.email}
                             </p>
-                            {colaborador.job_title && (
-                              <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
-                                <Briefcase className="h-3 w-3" />
-                                {colaborador.job_title}
-                              </p>
-                            )}
+                            <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
+                              <Briefcase className="h-3 w-3" />
+                              {colaborador.job_title || <span className="italic">Não informado</span>}
+                            </p>
                             {colaborador.department && (
                               <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
                                 <Building2 className="h-3 w-3" />
@@ -827,7 +1039,18 @@ const Colaboradores = () => {
                                 Sem contrato
                               </Badge>
                             )}
+                            {isContractExpiringSoon(colaborador.contractEndDate) && (
+                              <Badge variant="outline" className="text-amber-600 border-amber-400 dark:text-amber-400 dark:border-amber-600 gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                Vence em {daysUntilExpiry(colaborador.contractEndDate)}d
+                              </Badge>
+                            )}
                           </div>
+                          {colaborador.totalPaid > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Custo total: <span className="font-medium text-foreground">{formatBRL(colaborador.totalPaid)}</span>
+                            </p>
+                          )}
                           <div className="flex flex-wrap justify-center gap-1">
                             {colaborador.roles.map((r, i) => (
                               <Badge key={i} variant={getRoleBadgeVariant(r.role)}>

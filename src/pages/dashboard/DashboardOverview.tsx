@@ -1,51 +1,36 @@
-import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, FileText, CreditCard, TrendingUp, Clock, CheckCircle, PenTool, AlertCircle, User, Building2, UserPlus } from "lucide-react";
+import { Users, FileText, CreditCard, TrendingUp, Clock, CheckCircle, PenTool, AlertCircle, User, Building2, UserPlus, AlertTriangle, CalendarClock, Wallet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-interface AdminStats {
-  totalColaboradores: number;
-  contratosAtivos: number;
-  pagamentosPendentes: number;
-  pagamentosMes: number;
-}
-
-interface ColaboradorStats {
-  meusContratos: number;
-  contratosPendentesAssinatura: number;
-  meusPagamentos: number;
-}
-
-interface PendingSignature {
-  id: string;
-  contractId: string;
-  jobTitle: string;
-  companyName: string;
-  createdAt: string;
-}
-
-interface MyContract {
-  id: string;
-  jobTitle: string;
-  contractType: string;
-  status: string;
-  startDate: string;
-}
+import { BarChart, Bar, ResponsiveContainer } from "recharts";
+import { logger } from "@/lib/logger";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import {
+  useDashboardAdmin,
+  useDashboardColaborador,
+} from "@/hooks/queries";
+import type {
+  AdminStats,
+  ColaboradorStats,
+  PendingSignature,
+  MyContract,
+  DashboardAlert as Alert,
+  RecentActivity,
+  HealthData,
+  NextAction,
+} from "@/hooks/queries";
 
 const DashboardOverview = () => {
-  const { profile, roles, hasRole, user } = useAuth();
-  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
-  const [colaboradorStats, setColaboradorStats] = useState<ColaboradorStats | null>(null);
-  const [pendingSignatures, setPendingSignatures] = useState<PendingSignature[]>([]);
-  const [myContracts, setMyContracts] = useState<MyContract[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  useDocumentTitle("Visão Geral");
+  const { profile, hasRole, user } = useAuth();
+  const navigate = useNavigate();
 
   const isAdmin = hasRole("admin");
   const isFinanceiro = hasRole("financeiro");
@@ -57,132 +42,28 @@ const DashboardOverview = () => {
   // Determina se o usuário tem acesso administrativo
   const hasAdminAccess = isAdmin || isFinanceiro || isGestor || isJuridico || isMasterAdmin;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!profile?.company_id && !user?.id) return;
+  // ---- TanStack Query hooks ----
+  const adminQuery = useDashboardAdmin(
+    hasAdminAccess ? profile?.company_id : undefined
+  );
+  const colaboradorQuery = useDashboardColaborador(
+    !hasAdminAccess ? user?.id : undefined,
+    !hasAdminAccess ? profile?.email : undefined
+  );
 
-      try {
-        // Se for colaborador sem acesso admin, buscar dados do colaborador
-        if (!hasAdminAccess && user?.id) {
-          // Buscar contratos do colaborador
-          const { data: contracts } = await supabase
-            .from("contracts")
-            .select(`
-              id,
-              job_title,
-              contract_type,
-              status,
-              start_date,
-              company_id,
-              companies(name)
-            `)
-            .eq("user_id", user.id);
+  // Derived data from queries
+  const adminStats = adminQuery.data?.adminStats ?? null;
+  const sparklineData = adminQuery.data?.sparklineData ?? [];
+  const alerts = adminQuery.data?.alerts ?? [];
+  const healthData = adminQuery.data?.healthData ?? null;
+  const nextActions = adminQuery.data?.nextActions ?? [];
+  const recentActivities = adminQuery.data?.recentActivities ?? [];
 
-          // Buscar assinaturas pendentes
-          const { data: signatures } = await supabase
-            .from("contract_signatures")
-            .select(`
-              id,
-              document_id,
-              signed_at,
-              contract_documents(
-                contract_id,
-                contracts(
-                  id,
-                  job_title,
-                  company_id,
-                  companies(name)
-                )
-              )
-            `)
-            .eq("signer_email", profile?.email || "")
-            .is("signed_at", null);
+  const colaboradorStats = colaboradorQuery.data?.colaboradorStats ?? null;
+  const pendingSignatures = colaboradorQuery.data?.pendingSignatures ?? [];
+  const myContracts = colaboradorQuery.data?.myContracts ?? [];
 
-          // Buscar pagamentos do colaborador
-          const { count: pagamentosCount } = await supabase
-            .from("payments")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.id);
-
-          const pendingSignaturesList: PendingSignature[] = (signatures || [])
-            .filter((sig: any) => sig.contract_documents?.contracts)
-            .map((sig: any) => ({
-              id: sig.id,
-              contractId: sig.contract_documents.contracts.id,
-              jobTitle: sig.contract_documents.contracts.job_title,
-              companyName: sig.contract_documents.contracts.companies?.name || "",
-              createdAt: sig.contract_documents.contracts.created_at || "",
-            }));
-
-          const myContractsList: MyContract[] = (contracts || []).map((contract: any) => ({
-            id: contract.id,
-            jobTitle: contract.job_title,
-            contractType: contract.contract_type,
-            status: contract.status,
-            startDate: contract.start_date,
-          }));
-
-          setPendingSignatures(pendingSignaturesList);
-          setMyContracts(myContractsList);
-          setColaboradorStats({
-            meusContratos: contracts?.length || 0,
-            contratosPendentesAssinatura: pendingSignaturesList.length,
-            meusPagamentos: pagamentosCount || 0,
-          });
-        }
-
-        // Se tiver acesso admin, buscar estatísticas da empresa
-        if (hasAdminAccess && profile?.company_id) {
-          const { count: colaboradoresCount } = await supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .eq("company_id", profile.company_id)
-            .eq("is_active", true);
-
-          const { count: contratosCount } = await supabase
-            .from("contracts")
-            .select("*", { count: "exact", head: true })
-            .eq("company_id", profile.company_id)
-            .eq("status", "active");
-
-          const { count: pagamentosPendentesCount } = await supabase
-            .from("payments")
-            .select("*", { count: "exact", head: true })
-            .eq("company_id", profile.company_id)
-            .eq("status", "pending");
-
-          const startOfMonth = new Date();
-          startOfMonth.setDate(1);
-          startOfMonth.setHours(0, 0, 0, 0);
-
-          const { data: pagamentosMes } = await supabase
-            .from("payments")
-            .select("amount")
-            .eq("company_id", profile.company_id)
-            .eq("status", "paid")
-            .gte("payment_date", startOfMonth.toISOString());
-
-          const totalPagamentosMes = pagamentosMes?.reduce(
-            (sum, p) => sum + Number(p.amount),
-            0
-          ) || 0;
-
-          setAdminStats({
-            totalColaboradores: colaboradoresCount || 0,
-            contratosAtivos: contratosCount || 0,
-            pagamentosPendentes: pagamentosPendentesCount || 0,
-            pagamentosMes: totalPagamentosMes,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching stats:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [profile?.company_id, profile?.email, user?.id, hasAdminAccess]);
+  const isLoading = hasAdminAccess ? adminQuery.isLoading : colaboradorQuery.isLoading;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -209,6 +90,21 @@ const DashboardOverview = () => {
       temporario: "Temporário",
     };
     return labels[type] || type;
+  };
+
+  const getAuditLabel = (action: string) => {
+    const labels: Record<string, string> = {
+      contract_created: "Contrato criado",
+      contract_updated: "Contrato atualizado",
+      contract_status_changed: "Status alterado",
+      document_generated: "Documento gerado",
+      signature_requested: "Assinatura solicitada",
+      signature_completed: "Assinatura realizada",
+      contract_sent: "Contrato enviado",
+      contract_completed: "Contrato assinado",
+      pdf_downloaded: "PDF baixado",
+    };
+    return labels[action] || action;
   };
 
   const getStatusBadge = (status: string) => {
@@ -429,78 +325,268 @@ const DashboardOverview = () => {
         </Badge>
       </div>
 
+      {/* Alertas Inteligentes */}
+      {!isLoading && alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((alert) => (
+            <Card
+              key={alert.id}
+              className={`cursor-pointer transition-colors hover:shadow-md ${
+                alert.type === "danger"
+                  ? "border-red-400 bg-red-50 dark:bg-red-950/20"
+                  : alert.type === "warning"
+                  ? "border-amber-400 bg-amber-50 dark:bg-amber-950/20"
+                  : "border-blue-400 bg-blue-50 dark:bg-blue-950/20"
+              }`}
+              onClick={() => navigate(alert.link)}
+            >
+              <CardContent className="flex items-center gap-3 py-3">
+                {alert.type === "danger" ? (
+                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                ) : alert.type === "warning" ? (
+                  <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                ) : (
+                  <CalendarClock className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                )}
+                <p className={`text-sm font-medium ${
+                  alert.type === "danger" ? "text-red-700 dark:text-red-400"
+                  : alert.type === "warning" ? "text-amber-700 dark:text-amber-400"
+                  : "text-blue-700 dark:text-blue-400"
+                }`}>
+                  {alert.message}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Colaboradores</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{adminStats?.totalColaboradores}</div>
-                <p className="text-xs text-muted-foreground">Ativos na empresa</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+      <TooltipProvider>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card 
+              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+              onClick={() => navigate("/dashboard/colaboradores")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Colaboradores</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">{adminStats?.totalColaboradores}</div>
+                    <p className="text-xs text-muted-foreground">Ativos na empresa</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>Perfis com status ativo na empresa</TooltipContent>
+        </Tooltip>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Contratos Ativos</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{adminStats?.contratosAtivos}</div>
-                <p className="text-xs text-muted-foreground">Em vigência</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card 
+              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+              onClick={() => navigate("/dashboard/contratos")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Contratos Ativos</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">{adminStats?.contratosAtivos}</div>
+                    <p className="text-xs text-muted-foreground">Em vigência</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>Contratos com status "ativo"</TooltipContent>
+        </Tooltip>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pagamentos Pendentes</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-16" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">{adminStats?.pagamentosPendentes}</div>
-                <p className="text-xs text-muted-foreground">Aguardando aprovação</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card 
+              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+              onClick={() => navigate("/dashboard/pagamentos")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pagamentos Pendentes</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">{adminStats?.pagamentosPendentes}</div>
+                    <p className="text-xs text-muted-foreground">Aguardando aprovação</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>Pagamentos com status "pendente"</TooltipContent>
+        </Tooltip>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pago este mês</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {formatCurrency(adminStats?.pagamentosMes || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground">Total em pagamentos</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card 
+              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+              onClick={() => navigate("/dashboard/pagamentos")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pago este mês</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">
+                      {adminStats?.pagamentosMes ? formatCurrency(adminStats.pagamentosMes) : "—"}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Total em pagamentos</p>
+                    {sparklineData.length > 0 && (
+                      <div className="mt-2 h-8">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={sparklineData} barSize={10}>
+                            <Bar dataKey="value" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} opacity={0.6} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>Soma dos pagamentos aprovados no mês atual</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card 
+              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+              onClick={() => navigate("/dashboard/contratos")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Custo Previsto</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">
+                      {adminStats?.custoPrevistoProximoMes ? formatCurrency(adminStats.custoPrevistoProximoMes) : "—"}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Próximo mês (salários)</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>Soma dos salários dos contratos ativos</TooltipContent>
+        </Tooltip>
       </div>
+      </TooltipProvider>
+
+      {/* Saúde da Empresa + Próximas Ações */}
+      {!isLoading && (healthData || nextActions.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Saúde da Empresa */}
+          {healthData && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  Saúde da Empresa
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4 mb-3">
+                  <div className={`text-4xl font-bold ${healthData.color}`}>
+                    {healthData.score}%
+                  </div>
+                  <div>
+                    <Badge
+                      variant="outline"
+                      className={
+                        healthData.score >= 80
+                          ? "border-green-400 text-green-700 dark:text-green-400"
+                          : healthData.score >= 50
+                          ? "border-amber-400 text-amber-700 dark:text-amber-400"
+                          : "border-red-400 text-red-700 dark:text-red-400"
+                      }
+                    >
+                      {healthData.label}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Baseado em contratos e pagamentos
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {healthData.details.map((detail, i) => (
+                    <p key={i} className="text-sm text-muted-foreground flex items-center gap-1.5">
+                      <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                        healthData.score >= 80 ? "bg-green-500" : healthData.score >= 50 ? "bg-amber-500" : "bg-red-500"
+                      }`} />
+                      {detail}
+                    </p>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Próximas Ações */}
+          {nextActions.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarClock className="h-5 w-5" />
+                  Próximas Ações
+                </CardTitle>
+                <CardDescription>Tarefas pendentes que precisam da sua atenção</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {nextActions.map((action) => (
+                  <Link
+                    key={action.id}
+                    to={action.link}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors"
+                  >
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      {action.icon === "payment" ? (
+                        <CreditCard className="h-4 w-4 text-primary" />
+                      ) : action.icon === "contract" ? (
+                        <FileText className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Users className="h-4 w-4 text-primary" />
+                      )}
+                    </div>
+                    <span className="text-sm font-medium">{action.label}</span>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -571,10 +657,40 @@ const DashboardOverview = () => {
             <CardDescription>Últimas ações na plataforma</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-muted-foreground">
-              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhuma atividade recente</p>
-            </div>
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : recentActivities.length > 0 ? (
+              <div className="space-y-3">
+                {recentActivities.map((activity) => (
+                  <div key={activity.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <FileText className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {getAuditLabel(activity.action)}
+                        {activity.contractJobTitle && (
+                          <span className="text-muted-foreground font-normal"> — {activity.contractJobTitle}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {activity.actorName} • {format(new Date(activity.createdAt), "dd/MM HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhuma atividade recente</p>
+                <p className="text-xs mt-1">As atividades aparecerão aqui conforme ações forem realizadas</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchNotificationLogs } from "@/services/notificationService";
 import { useAuth } from "@/contexts/AuthContext";
+import { queryKeys } from "@/hooks/queries";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,8 @@ import { Bell, Mail, Search, Filter, Calendar, Building2, BarChart3, RefreshCw }
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { NotificationDeliveryLogs } from "@/components/notifications/NotificationDeliveryLogs";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface NotificationLog {
   id: string;
@@ -33,37 +36,28 @@ interface NotificationLog {
 }
 
 export default function Notificacoes() {
+  useDocumentTitle("Notificações");
   const { hasRole } = useAuth();
   const isMasterAdmin = hasRole("master_admin");
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm);
   const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const { data: notifications, isLoading } = useQuery({
-    queryKey: ["notification-logs", typeFilter],
+    queryKey: queryKeys.notifications.logs(typeFilter),
     queryFn: async () => {
-      let query = supabase
-        .from("notification_logs")
-        .select(`*, companies:company_id (name)`)
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (typeFilter !== "all") {
-        query = query.eq("notification_type", typeFilter);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const data = await fetchNotificationLogs(typeFilter);
       return data as NotificationLog[];
     },
   });
 
-  const filteredNotifications = notifications?.filter((n) => {
+  const filteredNotifications = useMemo(() => notifications?.filter((n) => {
     const matchesSearch =
-      n.recipient_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.companies?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+      n.recipient_email.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      n.subject.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      n.companies?.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     return matchesSearch;
-  });
+  }), [notifications, debouncedSearchTerm]);
 
   const getTypeBadgeVariant = (type: string): "default" | "secondary" | "outline" | "destructive" => {
     switch (type) {

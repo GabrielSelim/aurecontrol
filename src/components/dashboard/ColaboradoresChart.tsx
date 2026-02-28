@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Area, AreaChart, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { Area, AreaChart, XAxis, YAxis } from "recharts";
 import { format, parseISO, startOfMonth, eachMonthOfInterval, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 

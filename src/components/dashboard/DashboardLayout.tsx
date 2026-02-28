@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
   LayoutDashboard,
   Users,
@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FileSignature,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -32,6 +33,11 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NotificationBell } from "./NotificationBell";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { CommandPalette } from "./CommandPalette";
+import { Breadcrumbs } from "./Breadcrumbs";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -65,9 +71,24 @@ const masterAdminNavigation = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, roles, signOut, isAdmin, hasRole } = useAuth();
+  const { profile, roles, signOut, hasRole } = useAuth();
+  useKeyboardShortcuts();
+  useSessionTimeout();
+
+  // Ctrl+K to open command palette
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const isMasterAdmin = hasRole("master_admin");
 
@@ -168,6 +189,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             size="icon"
             onClick={() => setIsCollapsed(!collapsed)}
             className="h-8 w-8"
+            aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4" />
@@ -183,7 +205,33 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         "flex-1 py-4 transition-all duration-300",
         collapsed ? "px-2" : "px-3"
       )}>
-        <nav className="space-y-1">
+        {/* Search trigger */}
+        {collapsed ? (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setCommandOpen(true)}
+                className="flex w-full items-center justify-center rounded-lg p-2.5 mb-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Buscar (Ctrl+K)</TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            onClick={() => setCommandOpen(true)}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 mb-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors border border-border"
+          >
+            <Search className="h-4 w-4" />
+            <span className="flex-1 text-left">Buscar...</span>
+            <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              <span className="text-xs">Ctrl</span>K
+            </kbd>
+          </button>
+        )}
+
+        <nav className="space-y-1" aria-label="Menu principal">
           {filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href;
             
@@ -243,6 +291,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {collapsed && (
         <div className="px-2 py-2 border-t border-border flex justify-center">
           <NotificationBell />
+        </div>
+      )}
+
+      {/* Theme Toggle */}
+      {!collapsed && (
+        <div className="px-4 py-1 border-t border-border">
+          <ThemeToggle />
+        </div>
+      )}
+      {collapsed && (
+        <div className="px-2 py-1 border-t border-border flex justify-center">
+          <ThemeToggle collapsed />
         </div>
       )}
 
@@ -308,6 +368,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Skip to content - accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg focus:outline-none"
+      >
+        Ir para o conteúdo principal
+      </a>
+
+      {/* Command Palette */}
+      <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+
       {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="p-0 w-72">
@@ -335,6 +406,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="ghost"
               size="icon"
               onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir menu"
             >
               <Menu className="h-6 w-6" />
             </Button>
@@ -349,7 +421,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="p-6">{children}</main>
+        <main id="main-content" className="p-6" role="main">
+          <Breadcrumbs />
+          {children}
+        </main>
       </div>
     </div>
   );

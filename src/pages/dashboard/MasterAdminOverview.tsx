@@ -1,92 +1,32 @@
-import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  useMasterAdminOverview,
+  type MasterAdminGlobalStats,
+  type RecentCompanyWithCounts,
+} from "@/hooks/queries/useCompanyQueries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, FileText, CreditCard, Plus, Eye, Settings, TrendingUp, AlertCircle } from "lucide-react";
+import { Building2, FileText, CreditCard, Plus, Eye, TrendingUp, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
-interface GlobalStats {
-  totalCompanies: number;
-  activeCompanies: number;
-  totalPJContracts: number;
-  estimatedRevenue: number;
-}
-
-interface Company {
-  id: string;
-  name: string;
-  cnpj: string;
-  email: string | null;
-  is_active: boolean;
-  created_at: string;
-  _count?: {
-    users: number;
-    pjContracts: number;
-  };
-}
+type GlobalStats = MasterAdminGlobalStats;
+type Company = RecentCompanyWithCounts;
 
 const MasterAdminOverview = () => {
   const { profile } = useAuth();
+  useDocumentTitle("Painel Master Admin");
   const navigate = useNavigate();
-  const [stats, setStats] = useState<GlobalStats | null>(null);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch global stats - focusing on PJ contracts for billing
-        const [companiesResult, activeCompaniesResult, pjContractsResult] = await Promise.all([
-          supabase.from("companies").select("*", { count: "exact", head: true }),
-          supabase.from("companies").select("*", { count: "exact", head: true }).eq("is_active", true),
-          supabase.from("contracts").select("*", { count: "exact", head: true }).eq("contract_type", "PJ").eq("status", "active"),
-        ]);
+  // --- TanStack Query -------------------------------------------------------
+  const overviewQuery = useMasterAdminOverview();
 
-        const totalPJContracts = pjContractsResult.count || 0;
-        // Exemplo: R$ 49,90 por contrato PJ ativo
-        const pricePerContract = 49.90;
-
-        setStats({
-          totalCompanies: companiesResult.count || 0,
-          activeCompanies: activeCompaniesResult.count || 0,
-          totalPJContracts: totalPJContracts,
-          estimatedRevenue: totalPJContracts * pricePerContract,
-        });
-
-        // Fetch companies list with counts
-        const { data: companiesData } = await supabase
-          .from("companies")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(5);
-
-        if (companiesData) {
-          const companiesWithCounts = await Promise.all(
-            companiesData.map(async (company) => {
-              const [usersResult, pjContractsResult] = await Promise.all([
-                supabase.from("profiles").select("*", { count: "exact", head: true }).eq("company_id", company.id),
-                supabase.from("contracts").select("*", { count: "exact", head: true }).eq("company_id", company.id).eq("contract_type", "PJ").eq("status", "active"),
-              ]);
-              return {
-                ...company,
-                _count: { users: usersResult.count || 0, pjContracts: pjContractsResult.count || 0 },
-              };
-            })
-          );
-          setCompanies(companiesWithCounts);
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+  // Derived server state
+  const stats = overviewQuery.data?.stats ?? null;
+  const companies = overviewQuery.data?.companies ?? [];
+  const isLoading = overviewQuery.isLoading;
 
   const formatCNPJ = (cnpj: string) => {
     const cleaned = cnpj.replace(/\D/g, "");
@@ -257,6 +197,7 @@ const MasterAdminOverview = () => {
                       variant="ghost"
                       size="icon"
                       onClick={() => navigate(`/dashboard/empresas/${company.id}`)}
+                      aria-label="Ver detalhes da empresa"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>

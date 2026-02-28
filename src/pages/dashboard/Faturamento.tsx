@@ -1,10 +1,22 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { billingGenerateSchema, type BillingGenerateFormData } from "@/schemas/forms";
+import {
+  useBillingsWithCompanies,
+  useActiveCompaniesForBilling,
+  useCreateBilling,
+  useMarkBillingAsPaid,
+  useCancelBilling,
+  type BillingWithCompany,
+} from "@/hooks/queries/useBillingQueries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ErrorState";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { toast } from "sonner";
 import {
   CreditCard,
@@ -35,7 +47,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -51,27 +62,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useDebounce } from "@/hooks/useDebounce";
 
-interface Billing {
-  id: string;
-  company_id: string;
-  reference_month: string;
-  pj_contracts_count: number;
-  unit_price: number;
-  discount_amount: number;
-  discount_description: string | null;
-  subtotal: number;
-  total: number;
-  status: "pending" | "paid" | "overdue" | "cancelled";
-  due_date: string;
-  paid_at: string | null;
-  payment_method: string | null;
-  created_at: string;
-  company?: {
-    name: string;
-    cnpj: string;
-  };
-}
+type Billing = BillingWithCompany;
 
 interface Company {
   id: string;
@@ -79,206 +73,71 @@ interface Company {
   cnpj: string;
 }
 
-interface BillingStats {
-  totalPending: number;
-  totalPaid: number;
-  totalOverdue: number;
-  pendingCount: number;
-  paidCount: number;
-  overdueCount: number;
-}
-
 const Faturamento = () => {
-  const [billings, setBillings] = useState<Billing[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [stats, setStats] = useState<BillingStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  useDocumentTitle("Faturamento");
+
+  // --- TanStack Query hooks ------------------------------------------------
+  const billingsQuery = useBillingsWithCompanies();
+  const companiesQuery = useActiveCompaniesForBilling();
+  const createBillingMutation = useCreateBilling();
+  const markPaidMutation = useMarkBillingAsPaid();
+  const cancelBillingMutation = useCancelBilling();
+
+  // Derived server state
+  const billings = (billingsQuery.data?.billings ?? []) as Billing[];
+  const companies = (companiesQuery.data ?? []) as Company[];
+  const stats = billingsQuery.data?.stats ?? null;
+  const isLoading = billingsQuery.isLoading;
+  const loadError = billingsQuery.isError;
+
+  // --- Local UI state -------------------------------------------------------
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const [markPaidDialogOpen, setMarkPaidDialogOpen] = useState(false);
   const [selectedBilling, setSelectedBilling] = useState<Billing | null>(null);
 
-  // Generate billing form state
-  const [selectedCompany, setSelectedCompany] = useState<string>("");
-  const [referenceMonth, setReferenceMonth] = useState<string>("");
-  const [isGenerating, setIsGenerating] = useState(false);
+  // Generate billing form
+  const billingForm = useForm<BillingGenerateFormData>({
+    resolver: zodResolver(billingGenerateSchema),
+    defaultValues: { selectedCompany: "", referenceMonth: "" },
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const generateBilling = async (data: BillingGenerateFormData) => {
     try {
-      // Fetch billings with company info
-      const { data: billingsData, error: billingsError } = await supabase
-        .from("company_billings")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (billingsError) throw billingsError;
-
-      // Fetch company names for each billing
-      if (billingsData && billingsData.length > 0) {
-        const companyIds = [...new Set(billingsData.map((b) => b.company_id))];
-        const { data: companiesData } = await supabase
-          .from("companies")
-          .select("id, name, cnpj")
-          .in("id", companyIds);
-
-        const billingsWithCompany = billingsData.map((billing) => ({
-          ...billing,
-          company: companiesData?.find((c) => c.id === billing.company_id),
-        }));
-
-        setBillings(billingsWithCompany as Billing[]);
-      } else {
-        setBillings([]);
-      }
-
-      // Fetch all companies for generate dialog
-      const { data: allCompanies } = await supabase
-        .from("companies")
-        .select("id, name, cnpj")
-        .eq("is_active", true)
-        .order("name");
-
-      if (allCompanies) setCompanies(allCompanies);
-
-      // Calculate stats
-      const pending = billingsData?.filter((b) => b.status === "pending") || [];
-      const paid = billingsData?.filter((b) => b.status === "paid") || [];
-      const overdue = billingsData?.filter((b) => b.status === "overdue") || [];
-
-      setStats({
-        totalPending: pending.reduce((sum, b) => sum + Number(b.total), 0),
-        totalPaid: paid.reduce((sum, b) => sum + Number(b.total), 0),
-        totalOverdue: overdue.reduce((sum, b) => sum + Number(b.total), 0),
-        pendingCount: pending.length,
-        paidCount: paid.length,
-        overdueCount: overdue.length,
+      await createBillingMutation.mutateAsync({
+        selectedCompany: data.selectedCompany,
+        referenceMonth: data.referenceMonth,
       });
-    } catch (error) {
-      console.error("Error fetching billings:", error);
-      toast.error("Erro ao carregar faturamento");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const generateBilling = async () => {
-    if (!selectedCompany || !referenceMonth) {
-      toast.error("Selecione a empresa e o mês de referência");
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      // Get PJ contracts count for the company
-      const { count: pjCount } = await supabase
-        .from("contracts")
-        .select("*", { count: "exact", head: true })
-        .eq("company_id", selectedCompany)
-        .eq("contract_type", "PJ")
-        .eq("status", "active");
-
-      // Get base price from settings
-      const { data: settings } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "pj_contract_price")
-        .maybeSingle();
-
-      const basePrice = (settings?.value as { amount: number })?.amount || 49.90;
-
-      // Get pricing tier based on contract count
-      const { data: tiers } = await supabase
-        .from("pricing_tiers")
-        .select("*")
-        .eq("is_active", true)
-        .order("min_contracts");
-
-      let unitPrice = basePrice;
-      if (tiers && pjCount) {
-        const applicableTier = tiers.find(
-          (t) => pjCount >= t.min_contracts && (t.max_contracts === null || pjCount <= t.max_contracts)
-        );
-        if (applicableTier) {
-          unitPrice = applicableTier.price_per_contract;
-        }
-      }
-
-      const contractsCount = pjCount || 0;
-      const subtotal = contractsCount * unitPrice;
-      const total = subtotal; // Could apply discounts here
-
-      // Calculate due date (10th of next month)
-      const refDate = new Date(referenceMonth + "-01");
-      const dueDate = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 10);
-
-      const { error } = await supabase.from("company_billings").insert([{
-        company_id: selectedCompany,
-        reference_month: referenceMonth + "-01",
-        pj_contracts_count: contractsCount,
-        unit_price: unitPrice,
-        subtotal,
-        total,
-        due_date: dueDate.toISOString().split("T")[0],
-        status: "pending",
-      }]);
-
-      if (error) throw error;
-
       toast.success("Fatura gerada com sucesso!");
       setGenerateDialogOpen(false);
-      setSelectedCompany("");
-      setReferenceMonth("");
-      fetchData();
-    } catch (error) {
-      console.error("Error generating billing:", error);
+      billingForm.reset();
+    } catch {
       toast.error("Erro ao gerar fatura");
-    } finally {
-      setIsGenerating(false);
     }
   };
 
   const markAsPaid = async (paymentMethod: string) => {
     if (!selectedBilling) return;
-
     try {
-      const { error } = await supabase
-        .from("company_billings")
-        .update({
-          status: "paid",
-          paid_at: new Date().toISOString(),
-          payment_method: paymentMethod,
-        })
-        .eq("id", selectedBilling.id);
-
-      if (error) throw error;
-
+      await markPaidMutation.mutateAsync({
+        billingId: selectedBilling.id,
+        paymentMethod,
+      });
       toast.success("Pagamento registrado!");
       setMarkPaidDialogOpen(false);
       setSelectedBilling(null);
-      fetchData();
-    } catch (error) {
-      console.error("Error marking as paid:", error);
+    } catch {
       toast.error("Erro ao registrar pagamento");
     }
   };
 
   const cancelBilling = async (billing: Billing) => {
     try {
-      const { error } = await supabase
-        .from("company_billings")
-        .update({ status: "cancelled" })
-        .eq("id", billing.id);
-
-      if (error) throw error;
+      await cancelBillingMutation.mutateAsync(billing.id);
       toast.success("Fatura cancelada!");
-      fetchData();
-    } catch (error) {
-      console.error("Error cancelling billing:", error);
+    } catch {
       toast.error("Erro ao cancelar fatura");
     }
   };
@@ -315,13 +174,13 @@ const Faturamento = () => {
     );
   };
 
-  const filteredBillings = billings.filter((billing) => {
+  const filteredBillings = useMemo(() => billings.filter((billing) => {
     const matchesSearch =
-      billing.company?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      billing.company?.cnpj.includes(searchTerm);
+      billing.company?.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      billing.company?.cnpj.includes(debouncedSearchTerm);
     const matchesStatus = statusFilter === "all" || billing.status === statusFilter;
     return matchesSearch && matchesStatus;
-  });
+  }), [billings, debouncedSearchTerm, statusFilter]);
 
   if (isLoading) {
     return (
@@ -335,6 +194,10 @@ const Faturamento = () => {
         <Skeleton className="h-[400px]" />
       </div>
     );
+  }
+
+  if (loadError) {
+    return <ErrorState title="Erro ao carregar faturamento" onRetry={() => billingsQuery.refetch()} />;
   }
 
   return (
@@ -488,7 +351,7 @@ const Faturamento = () => {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" aria-label="Mais opções">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -533,7 +396,7 @@ const Faturamento = () => {
       </Card>
 
       {/* Generate Billing Dialog */}
-      <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
+      <Dialog open={generateDialogOpen} onOpenChange={(open) => { setGenerateDialogOpen(open); if (!open) billingForm.reset(); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Gerar Nova Fatura</DialogTitle>
@@ -541,39 +404,55 @@ const Faturamento = () => {
               Selecione a empresa e o mês de referência para gerar a fatura
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Empresa</Label>
-              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Mês de Referência</Label>
-              <Input
-                type="month"
-                value={referenceMonth}
-                onChange={(e) => setReferenceMonth(e.target.value)}
+          <Form {...billingForm}>
+            <form onSubmit={billingForm.handleSubmit(generateBilling)} className="space-y-4 py-4">
+              <FormField
+                control={billingForm.control}
+                name="selectedCompany"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Empresa</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a empresa" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setGenerateDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={generateBilling} disabled={isGenerating}>
-              {isGenerating ? "Gerando..." : "Gerar Fatura"}
-            </Button>
-          </DialogFooter>
+              <FormField
+                control={billingForm.control}
+                name="referenceMonth"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mês de Referência</FormLabel>
+                    <FormControl>
+                      <Input type="month" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setGenerateDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={createBillingMutation.isPending}>
+                  {createBillingMutation.isPending ? "Gerando..." : "Gerar Fatura"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchCompanyMaybe, updateCompany } from "@/services/companyService";
+import { fetchContractsByCompany } from "@/services/contractService";
+import { fetchProfilesByCompany, fetchUserRolesByUserIds } from "@/services/profileService";
+import { fetchBillingsByCompany, fetchPaymentsByCompany } from "@/services/paymentService";
+import { validateCnpj } from "@/services/edgeFunctionService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ErrorState";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -45,6 +50,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatCNPJ as formatCNPJMask, validateCNPJ } from "@/lib/masks";
+import { logger } from "@/lib/logger";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface CNPJValidationResult {
   valid: boolean;
@@ -122,6 +129,7 @@ interface Payment {
 const ITEMS_PER_PAGE = 10;
 
 const EmpresaDetalhes = () => {
+  useDocumentTitle("Detalhes da Empresa");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [company, setCompany] = useState<Company | null>(null);
@@ -130,6 +138,7 @@ const EmpresaDetalhes = () => {
   const [billings, setBillings] = useState<Billing[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -166,17 +175,14 @@ const EmpresaDetalhes = () => {
   }, [id]);
 
   const fetchAllData = async () => {
+    setLoadError(false);
+    setIsLoading(true);
     try {
       setIsLoading(true);
       
       // Fetch company
-      const { data: companyData, error: companyError } = await supabase
-        .from("companies")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+      const companyData = await fetchCompanyMaybe(id!);
 
-      if (companyError) throw companyError;
       if (!companyData) {
         toast.error("Empresa não encontrada");
         navigate("/dashboard/empresas");
@@ -185,53 +191,22 @@ const EmpresaDetalhes = () => {
       setCompany(companyData);
 
       // Fetch all related data in parallel
-      const [usersResult, contractsResult, billingsResult, paymentsResult] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, full_name, email, phone, is_active, created_at, user_id")
-          .eq("company_id", id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("contracts")
-          .select("id, job_title, contract_type, status, start_date, end_date, salary, user_id")
-          .eq("company_id", id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("company_billings")
-          .select("*")
-          .eq("company_id", id)
-          .order("reference_month", { ascending: false }),
-        supabase
-          .from("payments")
-          .select("id, amount, reference_month, status, payment_date, contract_id, user_id")
-          .eq("company_id", id)
-          .order("created_at", { ascending: false }),
-      ]);
-
-      if (usersResult.error) throw usersResult.error;
-      if (contractsResult.error) throw contractsResult.error;
-      if (billingsResult.error) throw billingsResult.error;
-      if (paymentsResult.error) throw paymentsResult.error;
-
-      const usersData = (usersResult.data || []) as Profile[];
-      const contractsData = (contractsResult.data || []) as Contract[];
-      const billingsData = (billingsResult.data || []) as Billing[];
-      const paymentsData = (paymentsResult.data || []) as Payment[];
+      const [usersData, contractsData, billingsData, paymentsData] = await Promise.all([
+        fetchProfilesByCompany(id!),
+        fetchContractsByCompany(id!),
+        fetchBillingsByCompany(id!),
+        fetchPaymentsByCompany(id!),
+      ]) as [Profile[], Contract[], Billing[], Payment[]];
 
       // Fetch user roles for each user
       const userIds = usersData.map(u => u.user_id);
       if (userIds.length > 0) {
-        const { data: rolesData } = await supabase
-          .from("user_roles")
-          .select("user_id, role")
-          .in("user_id", userIds);
+        const rolesData = await fetchUserRolesByUserIds(userIds);
         
-        if (rolesData) {
-          usersData.forEach(user => {
-            const userRole = rolesData.find(r => r.user_id === user.user_id);
-            user.role = userRole?.role;
-          });
-        }
+        usersData.forEach(user => {
+          const userRole = rolesData.find(r => r.user_id === user.user_id);
+          user.role = userRole?.role;
+        });
       }
 
       // Create user lookup for contracts and payments
@@ -270,8 +245,9 @@ const EmpresaDetalhes = () => {
         totalRevenue,
       });
     } catch (error) {
-      console.error("Error fetching data:", error);
+      logger.error("Error fetching data:", error);
       toast.error("Erro ao carregar dados da empresa");
+      setLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -456,27 +432,19 @@ const EmpresaDetalhes = () => {
     setCnpjData(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('validate-cnpj', {
-        body: { 
-          cnpj: cleanCNPJ,
-          check_duplicate: true,
-          exclude_company_id: company?.id 
-        }
-      });
+      const result = await validateCnpj(cleanCNPJ);
 
-      if (error) throw error;
-
-      setCnpjData(data);
+      setCnpjData(result);
       
-      if (data.valid) {
+      if (result.valid) {
         setCnpjValidated(true);
         setCnpjError("");
         toast.success("CNPJ válido!");
       } else {
-        setCnpjError(data.error || "CNPJ inválido");
+        setCnpjError(result.error || "CNPJ inválido");
       }
     } catch (error) {
-      console.error("Error validating CNPJ:", error);
+      logger.error("Error validating CNPJ:", error);
       setCnpjError("Erro ao validar CNPJ. Tente novamente.");
     } finally {
       setIsValidatingCNPJ(false);
@@ -540,19 +508,14 @@ const EmpresaDetalhes = () => {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("companies")
-        .update({
+      await updateCompany(company.id, {
           name: editForm.name.trim(),
           cnpj: cleanCNPJ,
           email: editForm.email.trim() || null,
           phone: editForm.phone.trim() || null,
           address: editForm.address.trim() || null,
           is_active: editForm.is_active,
-        })
-        .eq("id", company.id);
-
-      if (error) throw error;
+        });
 
       setCompany({
         ...company,
@@ -567,7 +530,7 @@ const EmpresaDetalhes = () => {
       toast.success("Empresa atualizada com sucesso");
       setIsEditOpen(false);
     } catch (error) {
-      console.error("Error updating company:", error);
+      logger.error("Error updating company:", error);
       toast.error("Erro ao atualizar empresa");
     } finally {
       setIsSaving(false);
@@ -588,6 +551,10 @@ const EmpresaDetalhes = () => {
     );
   }
 
+  if (loadError) {
+    return <ErrorState title="Erro ao carregar dados da empresa" onRetry={fetchAllData} />;
+  }
+
   if (!company) return null;
 
   return (
@@ -595,7 +562,7 @@ const EmpresaDetalhes = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/empresas")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/empresas")} aria-label="Voltar para empresas">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>

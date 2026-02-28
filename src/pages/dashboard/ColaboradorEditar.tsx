@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchProfile, updateProfileById } from "@/services/profileService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -12,6 +13,8 @@ import { toast } from "sonner";
 import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
 import { AddressForm } from "@/components/AddressForm";
 import { AddressData } from "@/hooks/useCepLookup";
+import { logger } from "@/lib/logger";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface ColaboradorData {
   id: string;
@@ -28,6 +31,7 @@ interface ColaboradorData {
 
 const ColaboradorEditar = () => {
   const { id } = useParams<{ id: string }>();
+  useDocumentTitle("Editar Colaborador");
   const navigate = useNavigate();
   const { profile, isAdmin } = useAuth();
   
@@ -61,14 +65,7 @@ const ColaboradorEditar = () => {
       if (!id || !profile?.company_id) return;
 
       try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", id)
-          .eq("company_id", profile.company_id)
-          .single();
-
-        if (error) throw error;
+        const data = await fetchProfile(id, profile.company_id);
 
         if (data) {
           setFormData({
@@ -94,7 +91,7 @@ const ColaboradorEditar = () => {
           });
         }
       } catch (error) {
-        console.error("Error fetching colaborador:", error);
+        logger.error("Error fetching colaborador:", error);
         toast.error("Erro ao carregar dados do colaborador");
         navigate("/dashboard/colaboradores");
       } finally {
@@ -177,9 +174,7 @@ const ColaboradorEditar = () => {
     setIsSaving(true);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      await updateProfileById(formData.id, {
           full_name: formData.full_name,
           cpf: formData.cpf.replace(/\D/g, "") || null,
           phone: formData.phone.replace(/\D/g, "") || null,
@@ -194,15 +189,12 @@ const ColaboradorEditar = () => {
           address_neighborhood: addressData.neighborhood || null,
           address_city: addressData.city || null,
           address_state: addressData.state || null,
-        })
-        .eq("id", formData.id);
-
-      if (error) throw error;
+      });
 
       toast.success("Colaborador atualizado com sucesso!");
       navigate("/dashboard/colaboradores");
     } catch (error) {
-      console.error("Error updating colaborador:", error);
+      logger.error("Error updating colaborador:", error);
       toast.error("Erro ao atualizar colaborador");
     } finally {
       setIsSaving(false);
@@ -219,8 +211,38 @@ const ColaboradorEditar = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-10" />
+              <Skeleton className="h-10" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-10" />
+              <Skeleton className="h-10" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <Skeleton className="h-10" />
+            <Skeleton className="h-10" />
+          </CardContent>
+        </Card>
       </div>
     );
   }

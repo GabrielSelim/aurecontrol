@@ -2,8 +2,9 @@ import { Check, FileText, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchSystemSetting } from "@/services/settingsService";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logger } from "@/lib/logger";
 
 export function PricingSection() {
   const navigate = useNavigate();
@@ -13,20 +14,16 @@ export function PricingSection() {
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        const { data } = await supabase
-          .from("system_settings")
-          .select("value")
-          .eq("key", "pj_contract_price")
-          .maybeSingle();
+        const value = await fetchSystemSetting("pj_contract_price");
 
-        if (data?.value) {
-          const priceValue = (data.value as { amount: number })?.amount;
+        if (value) {
+          const priceValue = (value as { amount: number })?.amount;
           setBasePrice(priceValue || 49.90);
         } else {
           setBasePrice(49.90);
         }
       } catch (error) {
-        console.error("Error fetching price:", error);
+        logger.error("Error fetching price:", error);
         setBasePrice(49.90);
       } finally {
         setIsLoading(false);

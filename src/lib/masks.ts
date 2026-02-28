@@ -7,6 +7,22 @@ export const formatCPF = (value: string): string => {
     .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 };
 
+// Currency Mask: R$ 0.000,00
+export const formatCurrency = (value: string): string => {
+  const numbers = value.replace(/\D/g, "");
+  if (!numbers) return "";
+  const cents = parseInt(numbers, 10);
+  const reais = (cents / 100).toFixed(2);
+  return `R$ ${reais.replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+};
+
+// Parse currency string back to number
+export const parseCurrency = (value: string): number => {
+  const cleaned = value.replace(/[R$\s.]/g, "").replace(",", ".");
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+};
+
 // Phone Mask: (00) 00000-0000 or (00) 0000-0000
 export const formatPhone = (value: string): string => {
   const numbers = value.replace(/\D/g, "").slice(0, 11);
@@ -105,4 +121,9 @@ export const validateCNPJ = (cnpj: string): boolean => {
   if (result !== parseInt(digits.charAt(1))) return false;
   
   return true;
+};
+
+// Display currency: formats a numeric value (in reais) as "R$ 1.234,56"
+export const formatBRL = (value: number): string => {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };

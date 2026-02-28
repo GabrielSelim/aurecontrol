@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ErrorState";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Settings, CreditCard, Tag, Percent, Package, Plus, Pencil, Trash2, Save, Bell, FileText, MessageSquare, Send, Building2, Users } from "lucide-react";
+import { Settings, CreditCard, Tag, Percent, Package, Plus, Pencil, Trash2, Save, Bell, MessageSquare, Send, Building2, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useAuth } from "@/contexts/AuthContext";
+import { logger } from "@/lib/logger";
+import {
+  useSystemSetting,
+  useUpsertSystemSetting,
+  usePricingTiers,
+  useSavePricingTier,
+  useDeletePricingTier,
+  useDiscountCoupons,
+  useSaveCoupon,
+  useDeleteCoupon,
+  usePromotions,
+  useSavePromotion,
+  useDeletePromotion,
+  useSettingsAnnouncements,
+  useSaveAnnouncement,
+  useDeleteAnnouncement,
+  useToggleAnnouncement,
+  useActiveCompanies,
+} from "@/hooks/queries";
+import { sendUrgentAnnouncement } from "@/services/edgeFunctionService";
 
 interface PricingTier {
   id: string;
@@ -90,18 +112,91 @@ const ROLE_OPTIONS = [
 ];
 
 const Configuracoes = () => {
+  useDocumentTitle("Configurações");
+  const { user } = useAuth();
+
+  // ---- TanStack Query: server state ----
+  const priceQuery = useSystemSetting("pj_contract_price");
+  const reminderQuery = useSystemSetting("billing_reminder_days");
+  const contractAlertQuery = useSystemSetting("contract_expiration_alert_days");
+  const tiersQuery = usePricingTiers();
+  const couponsQuery = useDiscountCoupons();
+  const promotionsQuery = usePromotions();
+  const announcementsQuery = useSettingsAnnouncements();
+  const companiesQuery = useActiveCompanies();
+
+  // ---- Mutations ----
+  const upsertSetting = useUpsertSystemSetting();
+  const saveTierMut = useSavePricingTier();
+  const deleteTierMut = useDeletePricingTier();
+  const saveCouponMut = useSaveCoupon();
+  const deleteCouponMut = useDeleteCoupon();
+  const savePromotionMut = useSavePromotion();
+  const deletePromotionMut = useDeletePromotion();
+  const saveAnnouncementMut = useSaveAnnouncement();
+  const deleteAnnouncementMut = useDeleteAnnouncement();
+  const toggleAnnouncementMut = useToggleAnnouncement();
+
+  // ---- Derived server data ----
+  const priceValue = priceQuery.data as unknown as { amount: number } | null;
+  const reminderValue = reminderQuery.data as unknown as { days: number } | null;
+  const contractAlertValue = contractAlertQuery.data as unknown as { days: number } | null;
+  const pricingTiers = (tiersQuery.data ?? []) as PricingTier[];
+  const coupons = (couponsQuery.data ?? []) as Coupon[];
+  const promotions = (promotionsQuery.data ?? []) as Promotion[];
+  const companiesData = (companiesQuery.data ?? []) as Company[];
+
+  const announcements: Announcement[] = useMemo(() => {
+    const raw = announcementsQuery.data ?? [];
+    const companiesMap = new Map(companiesData.map((c) => [c.id, c.name]));
+    return raw.map((a: Record<string, unknown>) => ({
+      ...(a as unknown as Announcement),
+      company_name: a.target_company_id
+        ? companiesMap.get(a.target_company_id as string)
+        : undefined,
+    }));
+  }, [announcementsQuery.data, companiesData]);
+
+  const companies = companiesData;
+
+  // ---- Local form state ----
   const [basePrice, setBasePrice] = useState<number>(49.90);
   const [reminderDays, setReminderDays] = useState<number>(3);
   const [contractAlertDays, setContractAlertDays] = useState<number>(30);
-  const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSavingReminder, setIsSavingReminder] = useState(false);
-  const [isSavingContractAlert, setIsSavingContractAlert] = useState(false);
+
+  // Sync local form state from queries (one-time seed)
+  const basePriceSeeded = useState(false);
+  if (!basePriceSeeded[0] && priceValue) {
+    setBasePrice(priceValue.amount);
+    basePriceSeeded[1](true);
+  }
+  const reminderSeeded = useState(false);
+  if (!reminderSeeded[0] && reminderValue) {
+    setReminderDays(reminderValue.days);
+    reminderSeeded[1](true);
+  }
+  const alertSeeded = useState(false);
+  if (!alertSeeded[0] && contractAlertValue) {
+    setContractAlertDays(contractAlertValue.days);
+    alertSeeded[1](true);
+  }
+
+  // ---- Loading / error ----
+  const isLoading =
+    priceQuery.isLoading ||
+    tiersQuery.isLoading ||
+    couponsQuery.isLoading ||
+    promotionsQuery.isLoading ||
+    announcementsQuery.isLoading ||
+    companiesQuery.isLoading;
+
+  const loadError =
+    priceQuery.isError ||
+    tiersQuery.isError ||
+    couponsQuery.isError ||
+    promotionsQuery.isError ||
+    announcementsQuery.isError ||
+    companiesQuery.isError;
 
   // Dialog states
   const [tierDialogOpen, setTierDialogOpen] = useState(false);
@@ -113,119 +208,33 @@ const Configuracoes = () => {
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [settingsResult, reminderResult, contractAlertResult, tiersResult, couponsResult, promotionsResult, announcementsResult, companiesResult] = await Promise.all([
-        supabase.from("system_settings").select("*").eq("key", "pj_contract_price").maybeSingle(),
-        supabase.from("system_settings").select("*").eq("key", "billing_reminder_days").maybeSingle(),
-        supabase.from("system_settings").select("*").eq("key", "contract_expiration_alert_days").maybeSingle(),
-        supabase.from("pricing_tiers").select("*").order("min_contracts"),
-        supabase.from("discount_coupons").select("*").order("created_at", { ascending: false }),
-        supabase.from("promotions").select("*").order("created_at", { ascending: false }),
-        supabase.from("system_announcements").select("*, companies(name)").order("created_at", { ascending: false }),
-        supabase.from("companies").select("id, name").eq("is_active", true).order("name"),
-      ]);
-
-      if (settingsResult.data) {
-        const value = settingsResult.data.value as { amount: number };
-        setBasePrice(value.amount);
-      }
-
-      if (reminderResult.data) {
-        const value = reminderResult.data.value as { days: number };
-        setReminderDays(value.days);
-      }
-
-      if (contractAlertResult.data) {
-        const value = contractAlertResult.data.value as { days: number };
-        setContractAlertDays(value.days);
-      }
-
-      if (tiersResult.data) setPricingTiers(tiersResult.data);
-      if (couponsResult.data) setCoupons(couponsResult.data as Coupon[]);
-      if (promotionsResult.data) setPromotions(promotionsResult.data as Promotion[]);
-      if (announcementsResult.data) {
-        setAnnouncements(announcementsResult.data.map((a: any) => ({
-          ...a,
-          company_name: a.companies?.name,
-        })));
-      }
-      if (companiesResult.data) setCompanies(companiesResult.data);
-    } catch (error) {
-      console.error("Error fetching settings:", error);
-      toast.error("Erro ao carregar configurações");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const saveBasePrice = async () => {
-    setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("system_settings")
-        .update({ value: { amount: basePrice, currency: "BRL" } })
-        .eq("key", "pj_contract_price");
-
-      if (error) throw error;
+      await upsertSetting.mutateAsync({ key: "pj_contract_price", value: { amount: basePrice, currency: "BRL" } });
       toast.success("Preço base atualizado com sucesso!");
     } catch (error) {
-      console.error("Error saving base price:", error);
+      logger.error("Error saving base price:", error);
       toast.error("Erro ao salvar preço base");
-    } finally {
-      setIsSaving(false);
     }
   };
 
   const saveReminderDays = async () => {
-    setIsSavingReminder(true);
     try {
-      const { data: existing } = await supabase
-        .from("system_settings")
-        .select("id")
-        .eq("key", "billing_reminder_days")
-        .maybeSingle();
-
-      if (existing) {
-        const { error } = await supabase
-          .from("system_settings")
-          .update({ value: { days: reminderDays } })
-          .eq("key", "billing_reminder_days");
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("system_settings")
-          .insert({ key: "billing_reminder_days", value: { days: reminderDays }, description: "Dias de antecedência para lembrete de vencimento" });
-        if (error) throw error;
-      }
+      await upsertSetting.mutateAsync({ key: "billing_reminder_days", value: { days: reminderDays } });
       toast.success("Configuração de lembrete atualizada!");
     } catch (error) {
-      console.error("Error saving reminder days:", error);
+      logger.error("Error saving reminder days:", error);
       toast.error("Erro ao salvar configuração");
-    } finally {
-      setIsSavingReminder(false);
     }
   };
 
   const saveContractAlertDays = async () => {
-    setIsSavingContractAlert(true);
     try {
-      const { error } = await supabase
-        .from("system_settings")
-        .update({ value: { days: contractAlertDays } })
-        .eq("key", "contract_expiration_alert_days");
-      
-      if (error) throw error;
+      await upsertSetting.mutateAsync({ key: "contract_expiration_alert_days", value: { days: contractAlertDays } });
       toast.success("Configuração de alerta de contratos atualizada!");
     } catch (error) {
-      console.error("Error saving contract alert days:", error);
+      logger.error("Error saving contract alert days:", error);
       toast.error("Erro ao salvar configuração");
-    } finally {
-      setIsSavingContractAlert(false);
     }
   };
 
@@ -244,34 +253,26 @@ const Configuracoes = () => {
   const saveTier = async (tier: Partial<PricingTier>) => {
     try {
       if (editingTier) {
-        const { error } = await supabase
-          .from("pricing_tiers")
-          .update(tier)
-          .eq("id", editingTier.id);
-        if (error) throw error;
+        await saveTierMut.mutateAsync({ ...tier, id: editingTier.id });
         toast.success("Pacote atualizado!");
       } else {
-        const { error } = await supabase.from("pricing_tiers").insert([tier as any]);
-        if (error) throw error;
+        await saveTierMut.mutateAsync(tier as Record<string, unknown>);
         toast.success("Pacote criado!");
       }
-      fetchData();
       setTierDialogOpen(false);
       setEditingTier(null);
     } catch (error) {
-      console.error("Error saving tier:", error);
+      logger.error("Error saving tier:", error);
       toast.error("Erro ao salvar pacote");
     }
   };
 
   const deleteTier = async (id: string) => {
     try {
-      const { error } = await supabase.from("pricing_tiers").delete().eq("id", id);
-      if (error) throw error;
+      await deleteTierMut.mutateAsync(id);
       toast.success("Pacote removido!");
-      fetchData();
     } catch (error) {
-      console.error("Error deleting tier:", error);
+      logger.error("Error deleting tier:", error);
       toast.error("Erro ao remover pacote");
     }
   };
@@ -280,34 +281,26 @@ const Configuracoes = () => {
   const saveCoupon = async (coupon: Partial<Coupon>) => {
     try {
       if (editingCoupon) {
-        const { error } = await supabase
-          .from("discount_coupons")
-          .update(coupon)
-          .eq("id", editingCoupon.id);
-        if (error) throw error;
+        await saveCouponMut.mutateAsync({ ...coupon, id: editingCoupon.id });
         toast.success("Cupom atualizado!");
       } else {
-        const { error } = await supabase.from("discount_coupons").insert([coupon as any]);
-        if (error) throw error;
+        await saveCouponMut.mutateAsync(coupon as Record<string, unknown>);
         toast.success("Cupom criado!");
       }
-      fetchData();
       setCouponDialogOpen(false);
       setEditingCoupon(null);
     } catch (error) {
-      console.error("Error saving coupon:", error);
+      logger.error("Error saving coupon:", error);
       toast.error("Erro ao salvar cupom");
     }
   };
 
   const deleteCoupon = async (id: string) => {
     try {
-      const { error } = await supabase.from("discount_coupons").delete().eq("id", id);
-      if (error) throw error;
+      await deleteCouponMut.mutateAsync(id);
       toast.success("Cupom removido!");
-      fetchData();
     } catch (error) {
-      console.error("Error deleting coupon:", error);
+      logger.error("Error deleting coupon:", error);
       toast.error("Erro ao remover cupom");
     }
   };
@@ -316,34 +309,26 @@ const Configuracoes = () => {
   const savePromotion = async (promotion: Partial<Promotion>) => {
     try {
       if (editingPromotion) {
-        const { error } = await supabase
-          .from("promotions")
-          .update(promotion)
-          .eq("id", editingPromotion.id);
-        if (error) throw error;
+        await savePromotionMut.mutateAsync({ ...promotion, id: editingPromotion.id });
         toast.success("Promoção atualizada!");
       } else {
-        const { error } = await supabase.from("promotions").insert([promotion as any]);
-        if (error) throw error;
+        await savePromotionMut.mutateAsync(promotion as Record<string, unknown>);
         toast.success("Promoção criada!");
       }
-      fetchData();
       setPromotionDialogOpen(false);
       setEditingPromotion(null);
     } catch (error) {
-      console.error("Error saving promotion:", error);
+      logger.error("Error saving promotion:", error);
       toast.error("Erro ao salvar promoção");
     }
   };
 
   const deletePromotion = async (id: string) => {
     try {
-      const { error } = await supabase.from("promotions").delete().eq("id", id);
-      if (error) throw error;
+      await deletePromotionMut.mutateAsync(id);
       toast.success("Promoção removida!");
-      fetchData();
     } catch (error) {
-      console.error("Error deleting promotion:", error);
+      logger.error("Error deleting promotion:", error);
       toast.error("Erro ao remover promoção");
     }
   };
@@ -351,91 +336,55 @@ const Configuracoes = () => {
   // Announcement functions
   const saveAnnouncement = async (announcement: Partial<Announcement>) => {
     try {
-      const { data: userData } = await supabase.auth.getUser();
       const dataToSave = {
         ...announcement,
-        created_by: userData.user?.id,
+        created_by: user?.id,
       };
-      delete (dataToSave as any).company_name;
+      const { company_name: _, ...cleanData } = dataToSave as Partial<Announcement> & { company_name?: string };
 
       if (editingAnnouncement) {
-        const { error } = await supabase
-          .from("system_announcements")
-          .update(dataToSave)
-          .eq("id", editingAnnouncement.id);
-        if (error) throw error;
+        await saveAnnouncementMut.mutateAsync({ ...cleanData, id: editingAnnouncement.id });
         toast.success("Mensagem atualizada!");
       } else {
-        const { data: insertedData, error } = await supabase
-          .from("system_announcements")
-          .insert([dataToSave as any])
-          .select()
-          .single();
-        if (error) throw error;
+        const savedData = await saveAnnouncementMut.mutateAsync(cleanData as Record<string, unknown>);
         toast.success("Mensagem enviada!");
 
         // Send email notifications for urgent announcements
         if (announcement.priority === "urgent" && announcement.is_active) {
           toast.info("Enviando notificações por email...");
           try {
-            const { data: emailResult, error: emailError } = await supabase.functions.invoke(
-              "send-urgent-announcement",
-              {
-                body: {
-                  announcement_id: insertedData.id,
-                  title: announcement.title,
-                  message: announcement.message,
-                  target_type: announcement.target_type,
-                  target_company_id: announcement.target_company_id,
-                  target_roles: announcement.target_roles,
-                },
-              }
-            );
-
-            if (emailError) {
-              console.error("Error sending emails:", emailError);
-              toast.error("Erro ao enviar emails de notificação");
-            } else {
-              toast.success(`Emails enviados: ${emailResult?.sent_count || 0}`);
-            }
+            await sendUrgentAnnouncement(savedData.id);
+            toast.success("Emails de notificação enviados!");
           } catch (emailErr) {
-            console.error("Error calling email function:", emailErr);
+            logger.error("Error calling email function:", emailErr);
             toast.error("Erro ao enviar emails de notificação");
           }
         }
       }
-      fetchData();
       setAnnouncementDialogOpen(false);
       setEditingAnnouncement(null);
     } catch (error) {
-      console.error("Error saving announcement:", error);
+      logger.error("Error saving announcement:", error);
       toast.error("Erro ao salvar mensagem");
     }
   };
 
   const deleteAnnouncement = async (id: string) => {
     try {
-      const { error } = await supabase.from("system_announcements").delete().eq("id", id);
-      if (error) throw error;
+      await deleteAnnouncementMut.mutateAsync(id);
       toast.success("Mensagem removida!");
-      fetchData();
     } catch (error) {
-      console.error("Error deleting announcement:", error);
+      logger.error("Error deleting announcement:", error);
       toast.error("Erro ao remover mensagem");
     }
   };
 
   const toggleAnnouncementStatus = async (id: string, isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from("system_announcements")
-        .update({ is_active: isActive })
-        .eq("id", id);
-      if (error) throw error;
+      await toggleAnnouncementMut.mutateAsync({ id, isActive });
       toast.success(isActive ? "Mensagem ativada!" : "Mensagem desativada!");
-      fetchData();
     } catch (error) {
-      console.error("Error toggling announcement:", error);
+      logger.error("Error toggling announcement:", error);
       toast.error("Erro ao atualizar status");
     }
   };
@@ -447,6 +396,10 @@ const Configuracoes = () => {
         <Skeleton className="h-[400px] w-full" />
       </div>
     );
+  }
+
+  if (loadError) {
+    return <ErrorState title="Erro ao carregar configurações" onRetry={() => { priceQuery.refetch(); tiersQuery.refetch(); couponsQuery.refetch(); promotionsQuery.refetch(); announcementsQuery.refetch(); companiesQuery.refetch(); }} />;
   }
 
   return (
@@ -515,9 +468,9 @@ const Configuracoes = () => {
                     />
                   </div>
                 </div>
-                <Button onClick={saveBasePrice} disabled={isSaving}>
+                <Button onClick={saveBasePrice} disabled={upsertSetting.isPending}>
                   <Save className="h-4 w-4 mr-2" />
-                  {isSaving ? "Salvando..." : "Salvar"}
+                  {upsertSetting.isPending ? "Salvando..." : "Salvar"}
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -574,6 +527,7 @@ const Configuracoes = () => {
                           variant="ghost"
                           size="icon"
                           onClick={() => { setEditingTier(tier); setTierDialogOpen(true); }}
+                          aria-label="Editar pacote"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -581,6 +535,7 @@ const Configuracoes = () => {
                           variant="ghost"
                           size="icon"
                           onClick={() => deleteTier(tier.id)}
+                          aria-label="Excluir pacote"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -648,6 +603,7 @@ const Configuracoes = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => { setEditingCoupon(coupon); setCouponDialogOpen(true); }}
+                            aria-label="Editar cupom"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -655,6 +611,7 @@ const Configuracoes = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => deleteCoupon(coupon.id)}
+                            aria-label="Excluir cupom"
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -723,6 +680,7 @@ const Configuracoes = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => { setEditingPromotion(promo); setPromotionDialogOpen(true); }}
+                            aria-label="Editar promoção"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -730,6 +688,7 @@ const Configuracoes = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => deletePromotion(promo.id)}
+                            aria-label="Excluir promoção"
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -779,9 +738,9 @@ const Configuracoes = () => {
                         <span className="text-muted-foreground">dias antes</span>
                       </div>
                     </div>
-                    <Button onClick={saveReminderDays} disabled={isSavingReminder}>
+                    <Button onClick={saveReminderDays} disabled={upsertSetting.isPending}>
                       <Save className="h-4 w-4 mr-2" />
-                      {isSavingReminder ? "Salvando..." : "Salvar"}
+                      {upsertSetting.isPending ? "Salvando..." : "Salvar"}
                     </Button>
                   </div>
                 </div>
@@ -808,9 +767,9 @@ const Configuracoes = () => {
                         <span className="text-muted-foreground">dias antes</span>
                       </div>
                     </div>
-                    <Button onClick={saveContractAlertDays} disabled={isSavingContractAlert}>
+                    <Button onClick={saveContractAlertDays} disabled={upsertSetting.isPending}>
                       <Save className="h-4 w-4 mr-2" />
-                      {isSavingContractAlert ? "Salvando..." : "Salvar"}
+                      {upsertSetting.isPending ? "Salvando..." : "Salvar"}
                     </Button>
                   </div>
                 </div>
@@ -923,6 +882,7 @@ const Configuracoes = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => { setEditingAnnouncement(announcement); setAnnouncementDialogOpen(true); }}
+                            aria-label="Editar mensagem"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -930,6 +890,7 @@ const Configuracoes = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => deleteAnnouncement(announcement.id)}
+                            aria-label="Excluir mensagem"
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>

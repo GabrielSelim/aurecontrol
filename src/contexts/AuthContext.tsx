@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { logger } from "@/lib/logger";
 
 interface Profile {
   id: string;
@@ -24,6 +24,12 @@ interface Profile {
   address_neighborhood: string | null;
   address_city: string | null;
   address_state: string | null;
+  nationality: string | null;
+  marital_status: string | null;
+  birth_date: string | null;
+  profession: string | null;
+  identity_number: string | null;
+  identity_issuer: string | null;
 }
 
 interface UserRole {
@@ -143,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (rolesError) throw rolesError;
       setRoles(rolesData as UserRole[]);
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      logger.error("Error fetching user data:", error);
     } finally {
       setIsLoading(false);
     }

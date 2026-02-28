@@ -1,4 +1,4 @@
-import { Building2, Target, Heart, Shield } from "lucide-react";
+import { Target, Heart, Shield } from "lucide-react";
 
 const values = [
   {

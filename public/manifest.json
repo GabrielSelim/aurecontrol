@@ -1,0 +1,21 @@
+{
+  "name": "Aure - Gestão Empresarial e Contratos",
+  "short_name": "Aure",
+  "description": "Plataforma completa para gestão empresarial, contratos e colaboradores",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"]
+}

@@ -52,7 +52,7 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" aria-label="Notificações">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge
@@ -130,6 +130,7 @@ export function NotificationBell() {
                               size="icon"
                               className="h-6 w-6 flex-shrink-0"
                               onClick={(e) => handleMarkAsRead(announcement.id, e)}
+                              aria-label="Marcar como lida"
                             >
                               <Check className="h-3 w-3" />
                             </Button>

@@ -38,3 +38,4 @@ docker/volumes/storage-data/
 # Supabase local temp
 supabase/.branches/
 supabase/.temp/
+docs

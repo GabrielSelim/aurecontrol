@@ -1,41 +1,34 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { ArrowLeft, Mail, CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { z } from "zod";
-
-const emailSchema = z.string().email("E-mail inválido");
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { recuperarSenhaSchema, type RecuperarSenhaFormData } from "@/schemas/auth";
 
 const RecuperarSenha = () => {
-  const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  useDocumentTitle("Recuperar Senha");
   const [emailSent, setEmailSent] = useState(false);
   const { resetPassword } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const validation = emailSchema.safeParse(email);
-    if (!validation.success) {
-      toast.error("Por favor, insira um e-mail válido");
-      return;
-    }
+  const form = useForm<RecuperarSenhaFormData>({
+    resolver: zodResolver(recuperarSenhaSchema),
+    defaultValues: { email: "" },
+  });
 
-    setIsLoading(true);
-
-    const { error } = await resetPassword(email);
+  const onSubmit = async (data: RecuperarSenhaFormData) => {
+    const { error } = await resetPassword(data.email);
 
     if (error) {
       toast.error("Erro ao enviar e-mail de recuperação");
     } else {
       setEmailSent(true);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -73,24 +66,32 @@ const RecuperarSenha = () => {
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="h-12"
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-mail</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="seu@email.com"
+                            className="h-12"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
 
-                <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Enviando..." : "Enviar e-mail de recuperação"}
-                </Button>
-              </form>
+                  <Button type="submit" size="lg" className="w-full" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? "Enviando..." : "Enviar e-mail de recuperação"}
+                  </Button>
+                </form>
+              </Form>
             </>
           ) : (
             <div className="text-center">
@@ -101,7 +102,7 @@ const RecuperarSenha = () => {
                 E-mail enviado!
               </h2>
               <p className="text-muted-foreground mb-6">
-                Se existe uma conta com o e-mail <strong>{email}</strong>, você receberá
+                Se existe uma conta com o e-mail <strong>{form.getValues("email")}</strong>, você receberá
                 as instruções para redefinir sua senha.
               </p>
               <Button asChild variant="outline" size="lg" className="w-full">

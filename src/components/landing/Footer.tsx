@@ -33,7 +33,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
+                <a href="/integracoes" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
                   Integrações
                 </a>
               </li>
@@ -50,12 +50,12 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
+                <a href="/blog" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
                   Blog
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
+                <a href="/contato" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
                   Contato
                 </a>
               </li>
@@ -67,17 +67,17 @@ export function Footer() {
             <h4 className="font-semibold text-primary-foreground mb-4">Legal</h4>
             <ul className="space-y-3">
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
+                <a href="/termos" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
                   Termos de Uso
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
+                <a href="/privacidade" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
                   Política de Privacidade
                 </a>
               </li>
               <li>
-                <a href="#" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
+                <a href="/lgpd" className="text-muted-foreground hover:text-primary-foreground text-sm transition-colors">
                   LGPD
                 </a>
               </li>
@@ -87,7 +87,7 @@ export function Footer() {
 
         <div className="border-t border-muted-foreground/20 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-muted-foreground text-sm">
-            © 2025 Aure. Todos os direitos reservados.
+            © {new Date().getFullYear()} Aure. Todos os direitos reservados.
           </p>
           <p className="text-muted-foreground text-sm">
             Feito com ❤️ no Brasil

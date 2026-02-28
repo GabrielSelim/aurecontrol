@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { updateProfile, uploadAvatar } from "@/services/profileService";
+import { fetchCompany as fetchCompanyData } from "@/services/companyService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +16,9 @@ import { NotificationPreferences } from "@/components/notifications/Notification
 import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
 import { AddressForm } from "@/components/AddressForm";
 import { AddressData } from "@/hooks/useCepLookup";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { logger } from "@/lib/logger";
+import { handleApiError } from "@/lib/handleApiError";
 
 interface ProfileData {
   full_name: string;
@@ -41,6 +47,7 @@ interface CompanyData {
 }
 
 export default function Perfil() {
+  useDocumentTitle("Meu Perfil");
   const { user, profile, roles, hasRole } = useAuth();
   
   // Check if user can edit restricted fields (profession, etc.)
@@ -104,12 +111,12 @@ export default function Perfil() {
         pj_cnpj: profile.pj_cnpj ? formatCNPJ(profile.pj_cnpj) : null,
         pj_razao_social: profile.pj_razao_social,
         pj_nome_fantasia: profile.pj_nome_fantasia,
-        nationality: (profile as any).nationality || null,
-        marital_status: (profile as any).marital_status || null,
-        birth_date: (profile as any).birth_date || null,
-        profession: (profile as any).profession || null,
-        identity_number: (profile as any).identity_number || null,
-        identity_issuer: (profile as any).identity_issuer || null,
+        nationality: profile.nationality || null,
+        marital_status: profile.marital_status || null,
+        birth_date: profile.birth_date || null,
+        profession: profile.profession || null,
+        identity_number: profile.identity_number || null,
+        identity_issuer: profile.identity_issuer || null,
       });
       setAddressData({
         cep: profile.address_cep || "",
@@ -128,16 +135,10 @@ export default function Perfil() {
     if (!profile?.company_id) return;
     
     try {
-      const { data, error } = await supabase
-        .from("companies")
-        .select("name, cnpj, email, phone, address")
-        .eq("id", profile.company_id)
-        .single();
-      
-      if (error) throw error;
+      const data = await fetchCompanyData(profile.company_id);
       setCompanyData(data);
     } catch (error) {
-      console.error("Error fetching company:", error);
+      logger.error("Error fetching company:", error);
     }
   };
 
@@ -200,29 +201,15 @@ export default function Perfil() {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/avatar.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
+      const publicUrl = await uploadAvatar(fileName, file);
+      const avatarUrl = `${publicUrl}?t=${Date.now()}`;
 
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrl } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(fileName);
-
-      const avatarUrl = `${publicUrl.publicUrl}?t=${Date.now()}`;
-
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: avatarUrl })
-        .eq("user_id", user.id);
-
-      if (updateError) throw updateError;
+      await updateProfile(user.id, { avatar_url: avatarUrl });
 
       setProfileData((prev) => ({ ...prev, avatar_url: avatarUrl }));
       toast.success("Foto atualizada com sucesso!");
     } catch (error) {
-      console.error("Error uploading avatar:", error);
+      logger.error("Error uploading avatar:", error);
       toast.error("Erro ao atualizar foto");
     } finally {
       setIsUploading(false);
@@ -275,9 +262,7 @@ export default function Perfil() {
     
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      await updateProfile(user.id, {
           full_name: profileData.full_name,
           phone: profileData.phone,
           cpf: profileData.cpf,
@@ -287,13 +272,10 @@ export default function Perfil() {
           profession: profileData.profession,
           identity_number: profileData.identity_number,
           identity_issuer: profileData.identity_issuer,
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      });
       toast.success("Perfil atualizado com sucesso!");
     } catch (error) {
-      console.error("Error updating profile:", error);
+      logger.error("Error updating profile:", error);
       toast.error("Erro ao atualizar perfil");
     } finally {
       setIsSaving(false);
@@ -305,9 +287,7 @@ export default function Perfil() {
     
     setIsSavingAddress(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      await updateProfile(user.id, {
           address_cep: addressData.cep.replace(/\D/g, "") || null,
           address_street: addressData.street || null,
           address_number: addressData.number || null,
@@ -315,13 +295,10 @@ export default function Perfil() {
           address_neighborhood: addressData.neighborhood || null,
           address_city: addressData.city || null,
           address_state: addressData.state || null,
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      });
       toast.success("Endereço atualizado com sucesso!");
     } catch (error) {
-      console.error("Error updating address:", error);
+      logger.error("Error updating address:", error);
       toast.error("Erro ao atualizar endereço");
     } finally {
       setIsSavingAddress(false);
@@ -339,19 +316,14 @@ export default function Perfil() {
     
     setIsSavingPJ(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      await updateProfile(user.id, {
           pj_cnpj: profileData.pj_cnpj?.replace(/\D/g, "") || null,
           pj_razao_social: profileData.pj_razao_social || null,
           pj_nome_fantasia: profileData.pj_nome_fantasia || null,
-        })
-        .eq("user_id", user.id);
-
-      if (error) throw error;
+      });
       toast.success("Dados PJ atualizados com sucesso!");
     } catch (error) {
-      console.error("Error updating PJ data:", error);
+      logger.error("Error updating PJ data:", error);
       toast.error("Erro ao atualizar dados PJ");
     } finally {
       setIsSavingPJ(false);
@@ -383,13 +355,57 @@ export default function Perfil() {
         newPassword: "",
         confirmPassword: "",
       });
-    } catch (error: any) {
-      console.error("Error changing password:", error);
-      toast.error(error.message || "Erro ao alterar senha");
+    } catch (error) {
+      toast.error(handleApiError(error, "Erro ao alterar senha"));
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!profile) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-9 w-48" />
+          <Skeleton className="mt-2 h-5 w-80" />
+        </div>
+        <div className="flex flex-col md:flex-row gap-6">
+          <Card className="md:w-80">
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center space-y-4">
+                <Skeleton className="h-32 w-32 rounded-full" />
+                <Skeleton className="h-5 w-36" />
+                <Skeleton className="h-4 w-48" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <div className="flex-1 space-y-4">
+            <Skeleton className="h-10 w-full max-w-md" />
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-44" />
+                <Skeleton className="h-4 w-56" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -418,6 +434,7 @@ export default function Perfil() {
                   className="absolute bottom-0 right-0 rounded-full"
                   onClick={handleAvatarClick}
                   disabled={isUploading}
+                  aria-label="Alterar foto de perfil"
                 >
                   {isUploading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

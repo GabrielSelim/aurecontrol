@@ -1,11 +1,24 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchContract,
+  fetchContractDocument,
+  fetchSignaturesByDocument,
+  checkSignatureStorageAvailable,
+  uploadSignatureImage,
+  recordSignature,
+  updateDocumentStatus,
+  updateContractStatus,
+  checkAllSignaturesCompleted,
+} from "@/services/contractService";
+import { fetchCompanyName } from "@/services/companyService";
+import { fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/ErrorState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -34,7 +47,11 @@ import { SignaturePad } from "@/components/contracts/SignaturePad";
 import { SignaturePositionEditor } from "@/components/contracts/SignaturePositionEditor";
 import { SignatureCertificate } from "@/components/contracts/SignatureCertificate";
 import { ContractAuditTrail } from "@/components/contracts/ContractAuditTrail";
-import { logAuditAction, createContractVersion } from "@/lib/auditLog";
+import { logAuditAction } from "@/lib/auditLog";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { logger } from "@/lib/logger";
+import { handleApiError } from "@/lib/handleApiError";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 interface ContractDocument {
   id: string;
@@ -79,6 +96,7 @@ interface Contract {
 }
 
 const ContratoDocumento = () => {
+  useDocumentTitle("Documento do Contrato");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile, user, roles } = useAuth();
@@ -86,6 +104,7 @@ const ContratoDocumento = () => {
   const [contract, setContract] = useState<Contract | null>(null);
   const [signatures, setSignatures] = useState<ContractSignature[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
   const [signingAs, setSigningAs] = useState<ContractSignature | null>(null);
   const [activeTab, setActiveTab] = useState<string>("documento");
@@ -101,15 +120,11 @@ const ContratoDocumento = () => {
   }, [id]);
 
   const fetchDocumentData = async () => {
+    setLoadError(false);
+    setIsLoading(true);
     try {
       // Fetch contract
-      const { data: contractData, error: contractError } = await supabase
-        .from("contracts")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (contractError) throw contractError;
+      const contractData = await fetchContract(id!);
       if (!contractData) {
         toast.error("Contrato não encontrado");
         navigate("/dashboard/contratos");
@@ -119,38 +134,27 @@ const ContratoDocumento = () => {
       setContract(contractData);
 
       // Fetch company and contractor names
-      const [companyRes, profileRes] = await Promise.all([
-        supabase.from("companies").select("name").eq("id", contractData.company_id).maybeSingle(),
-        supabase.from("profiles").select("full_name").eq("user_id", contractData.user_id).maybeSingle(),
+      const [companyNameResult, profileResult] = await Promise.all([
+        fetchCompanyName(contractData.company_id).catch(() => null),
+        fetchProfileByUserIdMaybe(contractData.user_id, "full_name"),
       ]);
-      setCompanyName(companyRes.data?.name || "N/A");
-      setContractorName(profileRes.data?.full_name || "N/A");
+      setCompanyName(companyNameResult || "N/A");
+      setContractorName(profileResult?.full_name || "N/A");
 
       // Fetch document
-      const { data: docData, error: docError } = await supabase
-        .from("contract_documents")
-        .select("*")
-        .eq("contract_id", id)
-        .maybeSingle();
-
-      if (docError) throw docError;
+      const docData = await fetchContractDocument(id!);
 
       if (docData) {
         setDocument(docData);
 
         // Fetch signatures
-        const { data: sigData, error: sigError } = await supabase
-          .from("contract_signatures")
-          .select("*")
-          .eq("document_id", docData.id)
-          .order("signer_order");
-
-        if (sigError) throw sigError;
-        setSignatures(sigData || []);
+        const sigData = await fetchSignaturesByDocument(docData.id);
+        setSignatures(sigData);
       }
     } catch (error) {
-      console.error("Error fetching document:", error);
+      logger.error("Error fetching document:", error);
       toast.error("Erro ao carregar documento");
+      setLoadError(true);
     } finally {
       setIsLoading(false);
     }
@@ -183,77 +187,29 @@ const ContratoDocumento = () => {
       }
       const blob = new Blob([arrayBuffer], { type: "image/png" });
 
-      // Check if bucket exists, create if not
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const signaturesBucket = buckets?.find(b => b.name === 'contract-signatures');
+      // Check if bucket exists
+      const storageAvailable = await checkSignatureStorageAvailable();
       
-      if (!signaturesBucket) {
+      if (!storageAvailable) {
         // We'll store as base64 URL for now since bucket creation requires admin
-        const { error: updateError } = await supabase
-          .from("contract_signatures")
-          .update({
-            signed_at: new Date().toISOString(),
-            signature_image_url: signatureDataUrl, // Store base64 directly
-            ip_address: ipAddress,
-            user_agent: navigator.userAgent,
-          })
-          .eq("id", signingAs.id);
-
-        if (updateError) throw updateError;
+        await recordSignature(signingAs.id, signatureDataUrl, ipAddress, navigator.userAgent);
       } else {
-        const { error: uploadError } = await supabase.storage
-          .from("contract-signatures")
-          .upload(fileName, blob, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("contract-signatures")
-          .getPublicUrl(fileName);
-
-        const { error: updateError } = await supabase
-          .from("contract_signatures")
-          .update({
-            signed_at: new Date().toISOString(),
-            signature_image_url: urlData.publicUrl,
-            ip_address: ipAddress,
-            user_agent: navigator.userAgent,
-          })
-          .eq("id", signingAs.id);
-
-        if (updateError) throw updateError;
+        const publicUrl = await uploadSignatureImage(fileName, blob);
+        await recordSignature(signingAs.id, publicUrl, ipAddress, navigator.userAgent);
       }
 
       // Check if all signatures are complete
-      const updatedSignatures = signatures.map(s => 
-        s.id === signingAs.id 
-          ? { ...s, signed_at: new Date().toISOString(), signature_image_url: signatureDataUrl }
-          : s
-      );
-      
-      const allSigned = updatedSignatures.every(s => s.signed_at);
+      const allSigned = await checkAllSignaturesCompleted(document.id);
       
       if (allSigned) {
-        await supabase
-          .from("contract_documents")
-          .update({
-            signature_status: "completed",
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", document.id);
+        await updateDocumentStatus(document.id, "completed", new Date().toISOString());
 
         // Update contract status to "assinado"
         if (contract) {
-          await supabase
-            .from("contracts")
-            .update({ status: "assinado" })
-            .eq("id", contract.id);
+          await updateContractStatus(contract.id, "assinado");
         }
       } else {
-        await supabase
-          .from("contract_documents")
-          .update({ signature_status: "partial" })
-          .eq("id", document.id);
+        await updateDocumentStatus(document.id, "partial");
       }
 
       // Log audit
@@ -274,9 +230,8 @@ const ContratoDocumento = () => {
       setSignatureDialogOpen(false);
       setSigningAs(null);
       fetchDocumentData();
-    } catch (error: any) {
-      console.error("Error saving signature:", error);
-      toast.error(error?.message || "Erro ao salvar assinatura");
+    } catch (error) {
+      toast.error(handleApiError(error, "Erro ao salvar assinatura"));
     }
   };
 
@@ -327,10 +282,7 @@ const ContratoDocumento = () => {
   const handleSendForSignature = async () => {
     if (!contract || !document) return;
     try {
-      await supabase
-        .from("contracts")
-        .update({ status: "enviado" })
-        .eq("id", contract.id);
+      await updateContractStatus(contract.id, "enviado");
       
       setContract({ ...contract, status: "enviado" });
 
@@ -344,7 +296,7 @@ const ContratoDocumento = () => {
 
       toast.success("Contrato enviado para assinatura!");
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       toast.error("Erro ao enviar contrato");
     }
   };
@@ -512,6 +464,10 @@ const ContratoDocumento = () => {
     );
   }
 
+  if (loadError) {
+    return <ErrorState title="Erro ao carregar documento" onRetry={fetchDocumentData} />;
+  }
+
   if (!document) {
     return (
       <div className="space-y-6">
@@ -592,7 +548,7 @@ const ContratoDocumento = () => {
               <CardContent className="p-6">
                 <div
                   className="prose prose-sm max-w-none bg-white text-black p-8 rounded-lg border"
-                  dangerouslySetInnerHTML={{ __html: document.document_html }}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(document.document_html) }}
                 />
               </CardContent>
             </Card>

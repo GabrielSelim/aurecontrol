@@ -78,6 +78,7 @@ export function AddressForm({ address, onChange, disabled = false }: AddressForm
               size="icon"
               onClick={handleLookupClick}
               disabled={disabled || isLoading || address.cep.replace(/\D/g, "").length !== 8}
+              aria-label="Buscar CEP"
             >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchNotificationPreferences, upsertNotificationPreferences } from "@/services/notificationService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Bell, Mail, Monitor, Save, Loader2 } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 const NOTIFICATION_TYPES = [
   {
@@ -76,12 +77,7 @@ export function NotificationPreferences() {
 
   const fetchPreferences = async () => {
     try {
-      const { data, error } = await supabase
-        .from("notification_preferences")
-        .select("*")
-        .eq("user_id", user!.id);
-
-      if (error) throw error;
+      const data = await fetchNotificationPreferences(user!.id);
 
       const prefsMap: Record<string, Preference> = {};
       
@@ -96,7 +92,7 @@ export function NotificationPreferences() {
       });
 
       // Override with saved preferences
-      data?.forEach((pref: any) => {
+      data?.forEach((pref: { notification_type: string; channel_email: boolean; channel_in_app: boolean; is_enabled: boolean }) => {
         prefsMap[pref.notification_type] = {
           notification_type: pref.notification_type,
           channel_email: pref.channel_email,
@@ -107,7 +103,7 @@ export function NotificationPreferences() {
 
       setPreferences(prefsMap);
     } catch (error) {
-      console.error("Error fetching preferences:", error);
+      logger.error("Error fetching preferences:", error);
       toast.error("Erro ao carregar preferências");
     } finally {
       setIsLoading(false);
@@ -129,22 +125,18 @@ export function NotificationPreferences() {
     setIsSaving(true);
 
     try {
-      const upserts = Object.values(preferences).map((pref) => ({
-        user_id: user.id,
-        notification_type: pref.notification_type,
-        channel_email: pref.channel_email,
-        channel_in_app: pref.channel_in_app,
-        is_enabled: pref.is_enabled,
-      }));
-
-      const { error } = await supabase
-        .from("notification_preferences")
-        .upsert(upserts, { onConflict: "user_id,notification_type" });
-
-      if (error) throw error;
+      await upsertNotificationPreferences(
+        user.id,
+        Object.values(preferences).map((pref) => ({
+          notification_type: pref.notification_type,
+          channel_email: pref.channel_email,
+          channel_in_app: pref.channel_in_app,
+          is_enabled: pref.is_enabled,
+        }))
+      );
       toast.success("Preferências salvas com sucesso!");
     } catch (error) {
-      console.error("Error saving preferences:", error);
+      logger.error("Error saving preferences:", error);
       toast.error("Erro ao salvar preferências");
     } finally {
       setIsSaving(false);

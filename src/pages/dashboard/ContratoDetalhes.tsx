@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  fetchContract as fetchContractService,
+  fetchContractDocument as fetchContractDocumentService,
+  fetchSignaturesByDocument,
+  updateSignature,
+  fetchSignatureToken,
+} from "@/services/contractService";
+import { fetchProfileByUserIdMaybe } from "@/services/profileService";
+import { sendEmail } from "@/services/edgeFunctionService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +37,9 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { logger } from "@/lib/logger";
+import { buildWitnessNotificationEmail } from "@/lib/emailTemplates";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface Contract {
   id: string;
@@ -76,6 +87,7 @@ interface ContractSignature {
 }
 
 const ContratoDetalhes = () => {
+  useDocumentTitle("Detalhes do Contrato");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -98,13 +110,8 @@ const ContratoDetalhes = () => {
 
   const fetchContract = async () => {
     try {
-      const { data: contractData, error: contractError } = await supabase
-        .from("contracts")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+      const contractData = await fetchContractService(id!);
 
-      if (contractError) throw contractError;
       if (!contractData) {
         navigate("/dashboard/contratos");
         return;
@@ -113,37 +120,33 @@ const ContratoDetalhes = () => {
       setContract(contractData);
 
       // Fetch profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("full_name, email, phone, avatar_url")
-        .eq("user_id", contractData.user_id)
-        .maybeSingle();
+      const profileData = await fetchProfileByUserIdMaybe(
+        contractData.user_id,
+        "full_name, email, phone, avatar_url"
+      );
 
       setProfile(profileData);
 
       // Fetch document if PJ contract
       if (contractData.contract_type === "PJ") {
-        const { data: docData } = await supabase
-          .from("contract_documents")
-          .select("id, signature_status, completed_at, witness_count")
-          .eq("contract_id", contractData.id)
-          .maybeSingle();
+        const docData = await fetchContractDocumentService(contractData.id);
         
         setDocument(docData);
 
         // Fetch signatures
         if (docData) {
-          const { data: signaturesData } = await supabase
-            .from("contract_signatures")
-            .select("id, document_id, signer_type, signer_name, signer_email, signed_at, signing_token")
-            .eq("document_id", docData.id)
-            .order("signer_order");
+          const signaturesData = await fetchSignaturesByDocument(docData.id);
           
           setSignatures(signaturesData || []);
         }
       }
     } catch (error) {
-      console.error("Error fetching contract:", error);
+      logger.error("Error fetching contract:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os dados do contrato.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -165,39 +168,21 @@ const ContratoDetalhes = () => {
       const contractorName = profile?.full_name || "Contratado";
       const baseUrl = window.location.origin;
       const signingLink = signingToken ? `${baseUrl}/assinar-contrato?token=${signingToken}` : null;
-      
-      await supabase.functions.invoke("send-email", {
-        body: {
-          to: email,
-          subject: "Você foi adicionado como testemunha em um contrato - Aure System",
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">Olá ${name},</h2>
-              <p>Você foi adicionado como <strong>testemunha</strong> em um contrato PJ no sistema Aure.</p>
-              <p><strong>Contrato de:</strong> ${contractorName}</p>
-              ${signingLink ? `
-                <p>Clique no botão abaixo para assinar o contrato:</p>
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="${signingLink}" 
-                     style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                    Assinar Contrato
-                  </a>
-                </div>
-                <p style="color: #666; font-size: 12px;">Ou copie e cole este link no seu navegador:</p>
-                <p style="color: #666; font-size: 12px; word-break: break-all;">${signingLink}</p>
-              ` : `
-                <p>Em breve você receberá instruções para assinar o documento.</p>
-              `}
-              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-              <p style="color: #666; font-size: 12px;">Este é um email automático do sistema Aure.</p>
-            </div>
-          `,
-          from_name: "Aure System",
-        },
+
+      const { subject, html } = buildWitnessNotificationEmail({
+        recipientName: name,
+        contractorName,
+        signingLink,
       });
-      console.log("Email notification sent to witness:", email);
+
+      await sendEmail({
+        to: email,
+        subject,
+        html,
+        from_name: "Aure System",
+      });
     } catch (error) {
-      console.error("Error sending witness notification email:", error);
+      logger.error("Error sending witness notification email:", error);
       // Don't throw - email failure shouldn't block the main operation
     }
   };
@@ -225,25 +210,16 @@ const ContratoDetalhes = () => {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("contract_signatures")
-        .update({
-          signer_name: witnessName.trim(),
-          signer_email: witnessEmail.trim(),
-        })
-        .eq("id", editingWitness.id);
-
-      if (error) throw error;
+      await updateSignature(editingWitness.id, {
+        signer_name: witnessName.trim(),
+        signer_email: witnessEmail.trim(),
+      });
 
       // Fetch the updated signature with the signing token
-      const { data: updatedSig } = await supabase
-        .from("contract_signatures")
-        .select("signing_token")
-        .eq("id", editingWitness.id)
-        .maybeSingle();
+      const signingToken = await fetchSignatureToken(editingWitness.id);
 
       // Send email notification to the witness with signing link
-      await sendWitnessNotificationEmail(witnessName.trim(), witnessEmail.trim(), updatedSig?.signing_token || null);
+      await sendWitnessNotificationEmail(witnessName.trim(), witnessEmail.trim(), signingToken);
 
       toast({
         title: "Sucesso",
@@ -253,7 +229,7 @@ const ContratoDetalhes = () => {
       setEditingWitness(null);
       fetchContract();
     } catch (error) {
-      console.error("Error updating witness:", error);
+      logger.error("Error updating witness:", error);
       toast({
         title: "Erro",
         description: "Não foi possível atualizar a testemunha",
@@ -282,7 +258,7 @@ const ContratoDetalhes = () => {
         description: "Link de assinatura reenviado por email",
       });
     } catch (error) {
-      console.error("Error resending signing link:", error);
+      logger.error("Error resending signing link:", error);
       toast({
         title: "Erro",
         description: "Não foi possível reenviar o email",
@@ -291,15 +267,6 @@ const ContratoDetalhes = () => {
     } finally {
       setIsSendingEmail(null);
     }
-  };
-
-  const getSignerTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      contractor: "Contratado",
-      company_representative: "Representante da Empresa",
-      witness: "Testemunha",
-    };
-    return labels[type] || type;
   };
 
   const getContractTypeLabel = (type: string) => {
@@ -435,7 +402,7 @@ const ContratoDetalhes = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/contratos")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/contratos")} aria-label="Voltar para contratos">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">

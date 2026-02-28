@@ -1,6 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  subscribeToAnnouncements,
+} from "@/services/announcementService";
 import { useAuth } from "@/contexts/AuthContext";
+import { logger } from "@/lib/logger";
+import {
+  useActiveAnnouncements,
+  useAnnouncementReads,
+  useMarkAnnouncementRead,
+  useMarkAllAnnouncementsRead,
+  queryKeys,
+} from "@/hooks/queries";
 
 interface Announcement {
   id: string;
@@ -13,135 +24,65 @@ interface Announcement {
 }
 
 export function useAnnouncements() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const fetchAnnouncements = useCallback(async () => {
-    if (!user) {
-      setAnnouncements([]);
-      setUnreadCount(0);
-      setIsLoading(false);
-      return;
-    }
+  const { data: announcementsData, isLoading: loadingAnnouncements } = useActiveAnnouncements();
+  const { data: readsData, isLoading: loadingReads } = useAnnouncementReads(user?.id);
+  const markReadMutation = useMarkAnnouncementRead();
+  const markAllReadMutation = useMarkAllAnnouncementsRead();
 
-    try {
-      // Fetch announcements (RLS will filter based on user's role and company)
-      const { data: announcementsData, error: announcementsError } = await supabase
-        .from("system_announcements")
-        .select("id, title, message, priority, created_at, expires_at")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false });
+  const isLoading = loadingAnnouncements || loadingReads;
 
-      if (announcementsError) throw announcementsError;
+  const announcements: Announcement[] = useMemo(() => {
+    if (!announcementsData) return [];
+    const readIds = new Set(readsData?.map((r) => r.announcement_id) || []);
+    return announcementsData.map((a) => ({
+      ...a,
+      priority: a.priority as "low" | "normal" | "high" | "urgent",
+      is_read: readIds.has(a.id),
+    }));
+  }, [announcementsData, readsData]);
 
-      // Fetch read status for current user
-      const { data: readsData, error: readsError } = await supabase
-        .from("announcement_reads")
-        .select("announcement_id")
-        .eq("user_id", user.id);
+  const unreadCount = useMemo(
+    () => announcements.filter((a) => !a.is_read).length,
+    [announcements]
+  );
 
-      if (readsError) throw readsError;
-
-      const readIds = new Set(readsData?.map((r) => r.announcement_id) || []);
-
-      const announcementsWithReadStatus = (announcementsData || []).map((a) => ({
-        ...a,
-        priority: a.priority as "low" | "normal" | "high" | "urgent",
-        is_read: readIds.has(a.id),
-      }));
-
-      setAnnouncements(announcementsWithReadStatus);
-      setUnreadCount(announcementsWithReadStatus.filter((a) => !a.is_read).length);
-    } catch (error) {
-      console.error("Error fetching announcements:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  const markAsRead = useCallback(async (announcementId: string) => {
-    if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from("announcement_reads")
-        .upsert({
-          announcement_id: announcementId,
-          user_id: user.id,
-        }, {
-          onConflict: "announcement_id,user_id",
-        });
-
-      if (error) throw error;
-
-      setAnnouncements((prev) =>
-        prev.map((a) =>
-          a.id === announcementId ? { ...a, is_read: true } : a
-        )
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (error) {
-      console.error("Error marking announcement as read:", error);
-    }
-  }, [user]);
+  const markAsRead = useCallback(
+    async (announcementId: string) => {
+      if (!user) return;
+      try {
+        await markReadMutation.mutateAsync({ announcementId, userId: user.id });
+      } catch (error) {
+        logger.error("Error marking announcement as read:", error);
+      }
+    },
+    [user, markReadMutation]
+  );
 
   const markAllAsRead = useCallback(async () => {
     if (!user) return;
-
-    const unreadAnnouncements = announcements.filter((a) => !a.is_read);
-    if (unreadAnnouncements.length === 0) return;
-
+    const unread = announcements.filter((a) => !a.is_read);
+    if (unread.length === 0) return;
     try {
-      const { error } = await supabase
-        .from("announcement_reads")
-        .upsert(
-          unreadAnnouncements.map((a) => ({
-            announcement_id: a.id,
-            user_id: user.id,
-          })),
-          { onConflict: "announcement_id,user_id" }
-        );
-
-      if (error) throw error;
-
-      setAnnouncements((prev) =>
-        prev.map((a) => ({ ...a, is_read: true }))
-      );
-      setUnreadCount(0);
+      await markAllReadMutation.mutateAsync({
+        announcementIds: unread.map((a) => a.id),
+        userId: user.id,
+      });
     } catch (error) {
-      console.error("Error marking all as read:", error);
+      logger.error("Error marking all as read:", error);
     }
-  }, [user, announcements]);
+  }, [user, announcements, markAllReadMutation]);
 
-  useEffect(() => {
-    fetchAnnouncements();
-  }, [fetchAnnouncements]);
-
-  // Subscribe to realtime changes
+  // Realtime subscription → invalidate cache instead of manual fetch
   useEffect(() => {
     if (!user) return;
-
-    const channel = supabase
-      .channel("announcements-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "system_announcements",
-        },
-        () => {
-          fetchAnnouncements();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, fetchAnnouncements]);
+    const unsubscribe = subscribeToAnnouncements(() => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.announcements.all });
+    });
+    return unsubscribe;
+  }, [user, queryClient]);
 
   return {
     announcements,
@@ -149,6 +90,7 @@ export function useAnnouncements() {
     isLoading,
     markAsRead,
     markAllAsRead,
-    refresh: fetchAnnouncements,
+    refresh: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.announcements.all }),
   };
 }

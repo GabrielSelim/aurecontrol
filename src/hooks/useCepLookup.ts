@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 export interface ViaCepResponse {
   cep: string;
@@ -62,7 +63,7 @@ export function useCepLookup() {
         state: data.uf || "",
       };
     } catch (error) {
-      console.error("Error looking up CEP:", error);
+      logger.error("Error looking up CEP:", error);
       toast.error("Erro ao buscar CEP. Tente novamente.");
       return null;
     } finally {

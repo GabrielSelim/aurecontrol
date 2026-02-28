@@ -4,13 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, ArrowLeft, Loader2, UserPlus, CheckCircle2, XCircle, Search } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Loader2, UserPlus, CheckCircle2, XCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getInviteByToken } from "@/services/inviteService";
+import { validateCnpj } from "@/services/edgeFunctionService";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
+import { logger } from "@/lib/logger";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const step1Schema = z.object({
   fullName: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
@@ -52,6 +55,7 @@ interface CNPJValidationResult {
 }
 
 const Registro = () => {
+  useDocumentTitle("Registro");
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get("token") || searchParams.get("convite");
 
@@ -91,11 +95,7 @@ const Registro = () => {
       if (!inviteToken) return;
 
       try {
-        const { data, error } = await supabase.rpc("get_invite_by_token", {
-          _token: inviteToken,
-        });
-
-        if (error) throw error;
+        const data = await getInviteByToken(inviteToken);
 
         if (!data || data.length === 0) {
           setInviteError("Convite inválido ou expirado");
@@ -107,7 +107,7 @@ const Registro = () => {
         setInviteData(invite);
         setEmail(invite.email);
       } catch (error) {
-        console.error("Error fetching invite:", error);
+        logger.error("Error fetching invite:", error);
         setInviteError("Erro ao carregar convite");
       } finally {
         setIsLoadingInvite(false);
@@ -146,11 +146,7 @@ const Registro = () => {
     setCnpjData(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('validate-cnpj', {
-        body: { cnpj: cleanCNPJ }
-      });
-
-      if (error) throw error;
+      const data = await validateCnpj(cleanCNPJ);
 
       setCnpjData(data);
       
@@ -166,7 +162,7 @@ const Registro = () => {
         setErrors(prev => ({ ...prev, cnpj: data.error || "CNPJ não encontrado na Receita Federal" }));
       }
     } catch (error) {
-      console.error("Error validating CNPJ:", error);
+      logger.error("Error validating CNPJ:", error);
       setErrors(prev => ({ ...prev, cnpj: "Erro ao validar CNPJ. Tente novamente." }));
     } finally {
       setIsValidatingCNPJ(false);
@@ -524,7 +520,7 @@ const Registro = () => {
                       />
                       <label htmlFor="terms" className="text-sm text-muted-foreground leading-tight cursor-pointer">
                         Li e aceito os{" "}
-                        <a href="#" className="text-primary hover:underline">
+                        <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                           Termos de Uso
                         </a>
                       </label>
@@ -538,7 +534,7 @@ const Registro = () => {
                       />
                       <label htmlFor="privacy" className="text-sm text-muted-foreground leading-tight cursor-pointer">
                         Li e aceito a{" "}
-                        <a href="#" className="text-primary hover:underline">
+                        <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                           Política de Privacidade
                         </a>
                       </label>
@@ -637,7 +633,7 @@ const Registro = () => {
                     />
                     <label htmlFor="terms" className="text-sm text-muted-foreground leading-tight cursor-pointer">
                       Li e aceito os{" "}
-                      <a href="#" className="text-primary hover:underline">
+                      <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                         Termos de Uso
                       </a>
                     </label>
@@ -651,7 +647,7 @@ const Registro = () => {
                     />
                     <label htmlFor="privacy" className="text-sm text-muted-foreground leading-tight cursor-pointer">
                       Li e aceito a{" "}
-                      <a href="#" className="text-primary hover:underline">
+                      <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                         Política de Privacidade
                       </a>
                     </label>

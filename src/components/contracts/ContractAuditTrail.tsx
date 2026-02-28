@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { auditLogsTable, contractVersionsTable } from "@/integrations/supabase/extraTypes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import {
   Download,
   FileText,
   Pen,
-  Send,
   Eye,
   Shield,
   Filter,
@@ -20,6 +19,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getAuditActionLabel, getAuditCategoryLabel } from "@/lib/auditLog";
+import { logger } from "@/lib/logger";
 
 interface AuditLog {
   id: string;
@@ -62,7 +62,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   general: "bg-muted text-muted-foreground border-border",
 };
 
-export const ContractAuditTrail = ({ contractId, documentId }: ContractAuditTrailProps) => {
+export const ContractAuditTrail = ({ contractId, documentId: _documentId }: ContractAuditTrailProps) => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [versions, setVersions] = useState<ContractVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,14 +78,12 @@ export const ContractAuditTrail = ({ contractId, documentId }: ContractAuditTrai
     setIsLoading(true);
     try {
       const [logsRes, versionsRes] = await Promise.all([
-        (supabase as any)
-          .from("contract_audit_logs")
+        auditLogsTable()
           .select("*")
           .eq("contract_id", contractId)
           .order("created_at", { ascending: false })
           .limit(100),
-        (supabase as any)
-          .from("contract_versions")
+        contractVersionsTable()
           .select("*")
           .eq("contract_id", contractId)
           .order("version_number", { ascending: false }),
@@ -94,7 +92,7 @@ export const ContractAuditTrail = ({ contractId, documentId }: ContractAuditTrai
       setLogs((logsRes.data as AuditLog[]) || []);
       setVersions((versionsRes.data as ContractVersion[]) || []);
     } catch (error) {
-      console.error("Error fetching audit data:", error);
+      logger.error("Error fetching audit data:", error);
     } finally {
       setIsLoading(false);
     }

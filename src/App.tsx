@@ -3,38 +3,56 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import Registro from "./pages/Registro";
-import RegistroMaster from "./pages/RegistroMaster";
-import RecuperarSenha from "./pages/RecuperarSenha";
-import AtualizarSenha from "./pages/AtualizarSenha";
-import Precos from "./pages/Precos";
-import AssinarContrato from "./pages/AssinarContrato";
-import DashboardHome from "./pages/dashboard/DashboardHome";
-import Colaboradores from "./pages/dashboard/Colaboradores";
-import ColaboradorEditar from "./pages/dashboard/ColaboradorEditar";
-import ColaboradorDetalhes from "./pages/dashboard/ColaboradorDetalhes";
-import Contratos from "./pages/dashboard/Contratos";
-import ContratoDetalhes from "./pages/dashboard/ContratoDetalhes";
-import ContratoDocumento from "./pages/dashboard/ContratoDocumento";
-import ContratosFaturaveis from "./pages/dashboard/ContratosFaturaveis";
-import TemplatesContrato from "./pages/dashboard/TemplatesContrato";
-import Pagamentos from "./pages/dashboard/Pagamentos";
-import Convites from "./pages/dashboard/Convites";
-import Empresa from "./pages/dashboard/Empresa";
-import Empresas from "./pages/dashboard/Empresas";
-import Configuracoes from "./pages/dashboard/Configuracoes";
-import Faturamento from "./pages/dashboard/Faturamento";
-import EmpresaDetalhes from "./pages/dashboard/EmpresaDetalhes";
-import Notificacoes from "./pages/dashboard/Notificacoes";
-import Perfil from "./pages/dashboard/Perfil";
-import NotFound from "./pages/NotFound";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { PageLoader } from "@/components/PageLoader";
+import { ScrollToTop } from "@/components/ScrollToTop";
 
-const queryClient = new QueryClient();
+// Lazy-loaded pages — each becomes its own chunk
+const Index = lazy(() => import("./pages/Index"));
+const Login = lazy(() => import("./pages/Login"));
+const Registro = lazy(() => import("./pages/Registro"));
+const RegistroMaster = lazy(() => import("./pages/RegistroMaster"));
+const RecuperarSenha = lazy(() => import("./pages/RecuperarSenha"));
+const AtualizarSenha = lazy(() => import("./pages/AtualizarSenha"));
+const Precos = lazy(() => import("./pages/Precos"));
+const AssinarContrato = lazy(() => import("./pages/AssinarContrato"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Dashboard pages
+const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
+const Colaboradores = lazy(() => import("./pages/dashboard/Colaboradores"));
+const ColaboradorEditar = lazy(() => import("./pages/dashboard/ColaboradorEditar"));
+const ColaboradorDetalhes = lazy(() => import("./pages/dashboard/ColaboradorDetalhes"));
+const Contratos = lazy(() => import("./pages/dashboard/Contratos"));
+const ContratoDetalhes = lazy(() => import("./pages/dashboard/ContratoDetalhes"));
+const ContratoDocumento = lazy(() => import("./pages/dashboard/ContratoDocumento"));
+const ContratosFaturaveis = lazy(() => import("./pages/dashboard/ContratosFaturaveis"));
+const TemplatesContrato = lazy(() => import("./pages/dashboard/TemplatesContrato"));
+const Pagamentos = lazy(() => import("./pages/dashboard/Pagamentos"));
+const Convites = lazy(() => import("./pages/dashboard/Convites"));
+const Empresa = lazy(() => import("./pages/dashboard/Empresa"));
+const Empresas = lazy(() => import("./pages/dashboard/Empresas"));
+const Configuracoes = lazy(() => import("./pages/dashboard/Configuracoes"));
+const Faturamento = lazy(() => import("./pages/dashboard/Faturamento"));
+const EmpresaDetalhes = lazy(() => import("./pages/dashboard/EmpresaDetalhes"));
+const Notificacoes = lazy(() => import("./pages/dashboard/Notificacoes"));
+const Perfil = lazy(() => import("./pages/dashboard/Perfil"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,      // 5 min — data stays fresh
+      gcTime: 10 * 60 * 1000,         // 10 min — unused cache lives
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -47,6 +65,8 @@ function DashboardRoutes() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
+        <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Rotas acessíveis a todos os usuários autenticados */}
           <Route index element={<DashboardHome />} />
@@ -144,6 +164,8 @@ function DashboardRoutes() {
             </ProtectedRoute>
           } />
         </Routes>
+        </Suspense>
+        </ErrorBoundary>
       </DashboardLayout>
     </ProtectedRoute>
   );
@@ -151,6 +173,7 @@ function DashboardRoutes() {
 
 function AppRoutes() {
   return (
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/" element={<Index />} />
       <Route path="/precos" element={<Precos />} />
@@ -163,21 +186,27 @@ function AppRoutes() {
       <Route path="/dashboard/*" element={<DashboardRoutes />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </Suspense>
   );
 }
 
 const App = () => (
+  <ThemeProvider>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <AuthProvider>
-          <AppRoutes />
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

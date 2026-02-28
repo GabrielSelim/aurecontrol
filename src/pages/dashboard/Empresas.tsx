@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState, useMemo } from "react";
+import { useAllCompaniesWithCounts, type CompanyWithCounts } from "@/hooks/queries/useCompanyQueries";
+import { usePricingTiers } from "@/hooks/queries/useSettingsQueries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+// xlsx is dynamically imported in exportToExcel to reduce initial bundle size
 import {
   Select,
   SelectContent,
@@ -32,21 +33,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useDebounce } from "@/hooks/useDebounce";
 
-interface Company {
-  id: string;
-  name: string;
-  cnpj: string;
-  email: string | null;
-  phone: string | null;
-  is_active: boolean;
-  created_at: string;
-  _count?: {
-    users: number;
-    pjContracts: number;
-    otherContracts: number;
-  };
-}
+type Company = CompanyWithCounts;
 
 interface PricingTier {
   min_contracts: number;
@@ -57,79 +47,23 @@ interface PricingTier {
 const ITEMS_PER_PAGE = 10;
 
 const Empresas = () => {
+  useDocumentTitle("Empresas");
   const navigate = useNavigate();
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // --- TanStack Query hooks ------------------------------------------------
+  const companiesQuery = useAllCompaniesWithCounts();
+  const pricingTiersQuery = usePricingTiers();
+
+  // Derived server state
+  const companies = companiesQuery.data ?? [];
+  const pricingTiers = (pricingTiersQuery.data ?? []) as PricingTier[];
+  const isLoading = companiesQuery.isLoading;
+
+  // --- Local UI state -------------------------------------------------------
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [currentPage, setCurrentPage] = useState(1);
-
-  useEffect(() => {
-    const fetchPricingTiers = async () => {
-      const { data } = await supabase
-        .from("pricing_tiers")
-        .select("min_contracts, max_contracts, price_per_contract")
-        .eq("is_active", true)
-        .order("min_contracts", { ascending: true });
-      
-      if (data) setPricingTiers(data);
-    };
-    fetchPricingTiers();
-  }, []);
-
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const { data: companiesData, error } = await supabase
-          .from("companies")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-
-        if (companiesData) {
-          // Get counts for each company
-          const companiesWithCounts = await Promise.all(
-            companiesData.map(async (company) => {
-              const [usersResult, pjContractsResult, otherContractsResult] = await Promise.all([
-                supabase
-                  .from("profiles")
-                  .select("*", { count: "exact", head: true })
-                  .eq("company_id", company.id),
-                supabase
-                  .from("contracts")
-                  .select("*", { count: "exact", head: true })
-                  .eq("company_id", company.id)
-                  .eq("contract_type", "PJ"),
-                supabase
-                  .from("contracts")
-                  .select("*", { count: "exact", head: true })
-                  .eq("company_id", company.id)
-                  .neq("contract_type", "PJ"),
-              ]);
-
-              return {
-                ...company,
-                _count: {
-                  users: usersResult.count || 0,
-                  pjContracts: pjContractsResult.count || 0,
-                  otherContracts: otherContractsResult.count || 0,
-                },
-              };
-            })
-          );
-          setCompanies(companiesWithCounts);
-        }
-      } catch (error) {
-        console.error("Error fetching companies:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCompanies();
-  }, []);
 
   const formatCNPJ = (cnpj: string) => {
     const cleaned = cnpj.replace(/\D/g, "");
@@ -205,8 +139,9 @@ const Empresas = () => {
     toast.success("Arquivo CSV exportado com sucesso!");
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     const data = getExportData();
+    const XLSX = await import("xlsx");
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Empresas");
@@ -221,11 +156,11 @@ const Empresas = () => {
     toast.success("Arquivo Excel exportado com sucesso!");
   };
 
-  const filteredCompanies = companies.filter((company) => {
+  const filteredCompanies = useMemo(() => companies.filter((company) => {
     const matchesSearch =
-      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.cnpj.includes(searchTerm) ||
-      company.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      company.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      company.cnpj.includes(debouncedSearchTerm) ||
+      company.email?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
 
     const matchesStatus =
       statusFilter === "all" ||
@@ -233,7 +168,7 @@ const Empresas = () => {
       (statusFilter === "inactive" && !company.is_active);
 
     return matchesSearch && matchesStatus;
-  });
+  }), [companies, debouncedSearchTerm, statusFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredCompanies.length / ITEMS_PER_PAGE);
@@ -425,7 +360,7 @@ const Empresas = () => {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" aria-label="Mais opções">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>

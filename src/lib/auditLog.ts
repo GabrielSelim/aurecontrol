@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import { auditLogsTable, contractVersionsTable } from "@/integrations/supabase/extraTypes";
+import { logger } from "@/lib/logger";
 
 export type AuditAction =
   | "contract_created"
@@ -83,7 +85,7 @@ export async function logAuditAction(params: {
       ipAddress = data.ip || "";
     } catch { /* ignore */ }
 
-    await (supabase as any).from("contract_audit_logs").insert({
+    await auditLogsTable().insert({
       contract_id: params.contractId,
       document_id: params.documentId || null,
       action: params.action,
@@ -96,7 +98,7 @@ export async function logAuditAction(params: {
       user_agent: navigator.userAgent,
     });
   } catch (error) {
-    console.error("Failed to log audit action:", error);
+    logger.error("Failed to log audit action:", error);
   }
 }
 
@@ -108,8 +110,7 @@ export async function createContractVersion(params: {
 }) {
   try {
     // Get next version number
-    const { data: existing } = await (supabase as any)
-      .from("contract_versions")
+    const { data: existing } = await contractVersionsTable()
       .select("version_number")
       .eq("contract_id", params.contractId)
       .order("version_number", { ascending: false })
@@ -122,7 +123,7 @@ export async function createContractVersion(params: {
 
     const userId = (await supabase.auth.getUser()).data.user?.id || null;
 
-    await (supabase as any).from("contract_versions").insert({
+    await contractVersionsTable().insert({
       contract_id: params.contractId,
       document_id: params.documentId,
       version_number: nextVersion,
@@ -134,7 +135,7 @@ export async function createContractVersion(params: {
 
     return nextVersion;
   } catch (error) {
-    console.error("Failed to create version:", error);
+    logger.error("Failed to create version:", error);
     return null;
   }
 }

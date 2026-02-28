@@ -7,13 +7,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Check, FileText, Users, Percent, Gift, Clock, HelpCircle, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchActivePricingTiers } from "@/services/settingsService";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { logger } from "@/lib/logger";
 
 interface PricingTier {
   id: string;
@@ -83,6 +85,7 @@ const faqs = [
 ];
 
 export default function Precos() {
+  useDocumentTitle("Preços");
   const navigate = useNavigate();
   const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,16 +93,10 @@ export default function Precos() {
   useEffect(() => {
     const fetchPricingTiers = async () => {
       try {
-        const { data, error } = await supabase
-          .from("pricing_tiers")
-          .select("*")
-          .eq("is_active", true)
-          .order("min_contracts", { ascending: true });
-
-        if (error) throw error;
-        setPricingTiers(data || []);
+        const data = await fetchActivePricingTiers();
+        setPricingTiers(data as PricingTier[]);
       } catch (error) {
-        console.error("Error fetching pricing tiers:", error);
+        logger.error("Error fetching pricing tiers:", error);
       } finally {
         setIsLoading(false);
       }

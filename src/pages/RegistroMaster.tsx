@@ -1,100 +1,45 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { Eye, EyeOff, ArrowLeft, Loader2, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
-import { formatCPF, formatPhone, validateCPF, validatePhone } from "@/lib/masks";
-
-const formSchema = z.object({
-  fullName: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
-  email: z.string().email("E-mail inválido"),
-  cpf: z.string().min(11, "CPF inválido"),
-  phone: z.string().min(10, "Telefone inválido"),
-  password: z
-    .string()
-    .min(8, "A senha deve ter no mínimo 8 caracteres")
-    .regex(/[A-Z]/, "A senha deve conter pelo menos uma letra maiúscula")
-    .regex(/[a-z]/, "A senha deve conter pelo menos uma letra minúscula")
-    .regex(/[0-9]/, "A senha deve conter pelo menos um número")
-    .regex(/[^A-Za-z0-9]/, "A senha deve conter pelo menos um caractere especial"),
-});
+import { formatCPF, formatPhone } from "@/lib/masks";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { registroMasterSchema, type RegistroMasterFormData } from "@/schemas/auth";
 
 const RegistroMaster = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
-  
-  // Form data
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [cpf, setCpf] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-
-  const [errors, setErrors] = useState({
-    cpf: "",
-    phone: "",
-  });
-
+  useDocumentTitle("Registro Master");
   const { signUpAsMasterAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const handleCPFChange = (value: string) => {
-    const formatted = formatCPF(value);
-    setCpf(formatted);
-    if (formatted.length === 14) {
-      setErrors(prev => ({ ...prev, cpf: validateCPF(formatted) ? "" : "CPF inválido" }));
-    } else {
-      setErrors(prev => ({ ...prev, cpf: "" }));
-    }
-  };
+  const form = useForm<RegistroMasterFormData>({
+    resolver: zodResolver(registroMasterSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      cpf: "",
+      phone: "",
+      password: "",
+      acceptedTerms: false as unknown as true,
+      acceptedPrivacy: false as unknown as true,
+    },
+  });
 
-  const handlePhoneChange = (value: string) => {
-    const formatted = formatPhone(value);
-    setPhone(formatted);
-    if (formatted.length >= 14) {
-      setErrors(prev => ({ ...prev, phone: validatePhone(formatted) ? "" : "Telefone inválido" }));
-    } else {
-      setErrors(prev => ({ ...prev, phone: "" }));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const validation = formSchema.safeParse({
-      fullName,
-      email,
-      cpf: cpf.replace(/\D/g, ""),
-      phone: phone.replace(/\D/g, ""),
-      password,
-    });
-
-    if (!validation.success) {
-      toast.error(validation.error.errors[0].message);
-      return;
-    }
-
-    if (!acceptedTerms || !acceptedPrivacy) {
-      toast.error("Você precisa aceitar os termos para continuar");
-      return;
-    }
-
-    setIsLoading(true);
-
+  const onSubmit = async (data: RegistroMasterFormData) => {
     const { error } = await signUpAsMasterAdmin({
-      email,
-      password,
-      fullName,
-      cpf: cpf.replace(/\D/g, ""),
-      phone: phone.replace(/\D/g, ""),
+      email: data.email,
+      password: data.password,
+      fullName: data.fullName,
+      cpf: data.cpf.replace(/\D/g, ""),
+      phone: data.phone.replace(/\D/g, ""),
     });
 
     if (error) {
@@ -107,8 +52,6 @@ const RegistroMaster = () => {
       toast.success("Conta Master Admin criada com sucesso!");
       navigate("/dashboard");
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -171,134 +114,180 @@ const RegistroMaster = () => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome completo</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Seu nome completo"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                className="h-12"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome completo</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="Seu nome completo"
+                        className="h-12"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="h-12"
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>E-mail</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="seu@email.com"
+                        className="h-12"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cpf">CPF</Label>
-              <Input
-                id="cpf"
-                type="text"
-                placeholder="000.000.000-00"
-                value={cpf}
-                onChange={(e) => handleCPFChange(e.target.value)}
-                required
-                maxLength={14}
-                className={`h-12 ${errors.cpf ? "border-destructive" : ""}`}
+              <FormField
+                control={form.control}
+                name="cpf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                        className="h-12"
+                        {...field}
+                        onChange={(e) => field.onChange(formatCPF(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.cpf && <p className="text-sm text-destructive">{errors.cpf}</p>}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">Telefone</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="(00) 00000-0000"
-                value={phone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                required
-                maxLength={15}
-                className={`h-12 ${errors.phone ? "border-destructive" : ""}`}
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        placeholder="(00) 00000-0000"
+                        maxLength={15}
+                        className="h-12"
+                        {...field}
+                        onChange={(e) => field.onChange(formatPhone(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Mínimo 8 caracteres"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-12 pr-12"
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Senha</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Mínimo 8 caracteres"
+                          className="h-12 pr-12"
+                          {...field}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      Mín. 8 caracteres com maiúscula, minúscula, número e especial
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Terms */}
+              <div className="space-y-4 pt-4">
+                <FormField
+                  control={form.control}
+                  name="acceptedTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex items-start gap-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm text-muted-foreground leading-tight cursor-pointer font-normal">
+                        Li e aceito os{" "}
+                        <a href="/termos" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          Termos de Uso
+                        </a>
+                      </FormLabel>
+                    </FormItem>
+                  )}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Mín. 8 caracteres com maiúscula, minúscula, número e especial
-              </p>
-            </div>
 
-            {/* Terms */}
-            <div className="space-y-4 pt-4">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="terms"
-                  checked={acceptedTerms}
-                  onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
+                <FormField
+                  control={form.control}
+                  name="acceptedPrivacy"
+                  render={({ field }) => (
+                    <FormItem className="flex items-start gap-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm text-muted-foreground leading-tight cursor-pointer font-normal">
+                        Li e aceito a{" "}
+                        <a href="/privacidade" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                          Política de Privacidade
+                        </a>
+                      </FormLabel>
+                    </FormItem>
+                  )}
                 />
-                <label htmlFor="terms" className="text-sm text-muted-foreground leading-tight cursor-pointer">
-                  Li e aceito os{" "}
-                  <a href="#" className="text-primary hover:underline">
-                    Termos de Uso
-                  </a>
-                </label>
               </div>
 
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="privacy"
-                  checked={acceptedPrivacy}
-                  onCheckedChange={(checked) => setAcceptedPrivacy(checked as boolean)}
-                />
-                <label htmlFor="privacy" className="text-sm text-muted-foreground leading-tight cursor-pointer">
-                  Li e aceito a{" "}
-                  <a href="#" className="text-primary hover:underline">
-                    Política de Privacidade
-                  </a>
-                </label>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-12 text-base font-medium"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Criando conta...
-                </>
-              ) : (
-                "Criar conta Master Admin"
-              )}
-            </Button>
-          </form>
+              <Button
+                type="submit"
+                className="w-full h-12 text-base font-medium"
+                disabled={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Criando conta...
+                  </>
+                ) : (
+                  "Criar conta Master Admin"
+                )}
+              </Button>
+            </form>
+          </Form>
 
           {/* Login Link */}
           <p className="text-center text-muted-foreground mt-8">

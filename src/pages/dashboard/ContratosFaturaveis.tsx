@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchActiveCompanies, fetchCompaniesByIds } from "@/services/companyService";
+import { fetchSystemSetting } from "@/services/settingsService";
+import { fetchCompletedDocuments, fetchContractsByIds } from "@/services/contractService";
+import { fetchProfilesByUserIds } from "@/services/profileService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,12 +30,14 @@ import {
   Eye,
   DollarSign,
   Building2,
-  Calendar,
   Users,
   Filter,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { logger } from "@/lib/logger";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface BillableContract {
   id: string;
@@ -58,11 +63,13 @@ interface Company {
 }
 
 const ContratosFaturaveis = () => {
+  useDocumentTitle("PJ Faturáveis");
   const navigate = useNavigate();
   const [contracts, setContracts] = useState<BillableContract[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm);
   const [selectedCompany, setSelectedCompany] = useState<string>("all");
   const [pricePerContract, setPricePerContract] = useState<number>(0);
 
@@ -73,40 +80,31 @@ const ContratosFaturaveis = () => {
   }, []);
 
   const fetchCompanies = async () => {
-    const { data } = await supabase
-      .from("companies")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("name");
-    
-    if (data) {
+    try {
+      const data = await fetchActiveCompanies();
       setCompanies(data);
+    } catch (error) {
+      logger.error("Error fetching companies:", error);
     }
   };
 
   const fetchPricing = async () => {
-    const { data } = await supabase
-      .from("system_settings")
-      .select("value")
-      .eq("key", "pj_contract_price")
-      .maybeSingle();
-
-    if (data?.value) {
-      setPricePerContract(Number(data.value));
+    try {
+      const value = await fetchSystemSetting("pj_contract_price");
+      if (value) {
+        setPricePerContract(Number(value));
+      }
+    } catch (error) {
+      logger.error("Error fetching pricing:", error);
     }
   };
 
   const fetchBillableContracts = async () => {
     try {
       // Get all PJ contracts with completed signatures
-      const { data: contractDocs, error: docsError } = await supabase
-        .from("contract_documents")
-        .select("contract_id, completed_at")
-        .eq("signature_status", "completed");
+      const contractDocs = await fetchCompletedDocuments();
 
-      if (docsError) throw docsError;
-
-      if (!contractDocs || contractDocs.length === 0) {
+      if (contractDocs.length === 0) {
         setContracts([]);
         setIsLoading(false);
         return;
@@ -115,35 +113,25 @@ const ContratosFaturaveis = () => {
       const contractIds = contractDocs.map(d => d.contract_id);
 
       // Fetch the contracts
-      const { data: contractsData, error: contractsError } = await supabase
-        .from("contracts")
-        .select(`
-          id,
-          job_title,
-          start_date,
-          user_id,
-          company_id
-        `)
-        .in("id", contractIds)
-        .eq("contract_type", "PJ")
-        .eq("status", "active");
-
-      if (contractsError) throw contractsError;
+      const contractsData = await fetchContractsByIds(contractIds, {
+        contract_type: "PJ",
+        status: "active",
+      });
 
       // Fetch profiles and companies for these contracts
-      const userIds = [...new Set(contractsData?.map(c => c.user_id) || [])];
-      const companyIds = [...new Set(contractsData?.map(c => c.company_id) || [])];
+      const userIds = [...new Set(contractsData.map(c => c.user_id))];
+      const companyIds = [...new Set(contractsData.map(c => c.company_id))];
 
-      const [profilesRes, companiesRes] = await Promise.all([
-        supabase.from("profiles").select("user_id, full_name, email").in("user_id", userIds),
-        supabase.from("companies").select("id, name").in("id", companyIds),
+      const [profilesData, companiesData] = await Promise.all([
+        fetchProfilesByUserIds(userIds, "user_id, full_name, email"),
+        fetchCompaniesByIds(companyIds),
       ]);
 
-      const profilesMap = new Map(profilesRes.data?.map(p => [p.user_id, p]));
-      const companiesMap = new Map(companiesRes.data?.map(c => [c.id, c]));
+      const profilesMap = new Map(profilesData.map(p => [p.user_id, p]));
+      const companiesMap = new Map(companiesData.map(c => [c.id, c]));
       const docsMap = new Map(contractDocs.map(d => [d.contract_id, d]));
 
-      const enrichedContracts: BillableContract[] = (contractsData || []).map(contract => ({
+      const enrichedContracts: BillableContract[] = contractsData.map(contract => ({
         ...contract,
         profile: profilesMap.get(contract.user_id) || null,
         company: companiesMap.get(contract.company_id) || null,
@@ -152,14 +140,14 @@ const ContratosFaturaveis = () => {
 
       setContracts(enrichedContracts);
     } catch (error) {
-      console.error("Error fetching billable contracts:", error);
+      logger.error("Error fetching billable contracts:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredContracts = contracts.filter(contract => {
-    const searchLower = searchTerm.toLowerCase();
+  const filteredContracts = useMemo(() => contracts.filter(contract => {
+    const searchLower = debouncedSearchTerm.toLowerCase();
     const matchesSearch = (
       contract.profile?.full_name?.toLowerCase().includes(searchLower) ||
       contract.company?.name?.toLowerCase().includes(searchLower) ||
@@ -167,7 +155,7 @@ const ContratosFaturaveis = () => {
     );
     const matchesCompany = selectedCompany === "all" || contract.company_id === selectedCompany;
     return matchesSearch && matchesCompany;
-  });
+  }), [contracts, debouncedSearchTerm, selectedCompany]);
 
   const totalEstimatedRevenue = filteredContracts.length * pricePerContract;
 

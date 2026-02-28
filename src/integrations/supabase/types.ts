@@ -46,39 +46,90 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          bank_account: string | null
+          bank_account_type: string | null
+          bank_agency: string | null
+          bank_name: string | null
           cnpj: string
           created_at: string | null
+          default_adjustment_policy: string | null
+          default_template_id: string | null
+          default_witness_count: number | null
           email: string | null
           id: string
           is_active: boolean | null
+          legal_rep_cpf: string | null
+          legal_rep_name: string | null
+          legal_rep_nationality: string | null
+          legal_rep_profession: string | null
+          legal_rep_rg: string | null
+          legal_rep_rg_issuer: string | null
           logo_url: string | null
+          max_collaborators: number | null
           name: string
           phone: string | null
+          plan_expires_at: string | null
+          plan_name: string | null
           updated_at: string | null
+          welcome_email_template: string | null
         }
         Insert: {
           address?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
           cnpj: string
           created_at?: string | null
+          default_adjustment_policy?: string | null
+          default_template_id?: string | null
+          default_witness_count?: number | null
           email?: string | null
           id?: string
           is_active?: boolean | null
+          legal_rep_cpf?: string | null
+          legal_rep_name?: string | null
+          legal_rep_nationality?: string | null
+          legal_rep_profession?: string | null
+          legal_rep_rg?: string | null
+          legal_rep_rg_issuer?: string | null
           logo_url?: string | null
+          max_collaborators?: number | null
           name: string
           phone?: string | null
+          plan_expires_at?: string | null
+          plan_name?: string | null
           updated_at?: string | null
+          welcome_email_template?: string | null
         }
         Update: {
           address?: string | null
+          bank_account?: string | null
+          bank_account_type?: string | null
+          bank_agency?: string | null
+          bank_name?: string | null
           cnpj?: string
           created_at?: string | null
+          default_adjustment_policy?: string | null
+          default_template_id?: string | null
+          default_witness_count?: number | null
           email?: string | null
           id?: string
           is_active?: boolean | null
+          legal_rep_cpf?: string | null
+          legal_rep_name?: string | null
+          legal_rep_nationality?: string | null
+          legal_rep_profession?: string | null
+          legal_rep_rg?: string | null
+          legal_rep_rg_issuer?: string | null
           logo_url?: string | null
+          max_collaborators?: number | null
           name?: string
           phone?: string | null
+          plan_expires_at?: string | null
+          plan_name?: string | null
           updated_at?: string | null
+          welcome_email_template?: string | null
         }
         Relationships: []
       }
@@ -329,6 +380,7 @@ export type Database = {
       }
       contract_templates: {
         Row: {
+          category: string | null
           company_id: string | null
           content: string
           created_at: string | null
@@ -342,6 +394,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          category?: string | null
           company_id?: string | null
           content: string
           created_at?: string | null
@@ -355,6 +408,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          category?: string | null
           company_id?: string | null
           content?: string
           created_at?: string | null
@@ -384,8 +438,95 @@ export type Database = {
           },
         ]
       }
+      contract_template_versions: {
+        Row: {
+          id: string
+          template_id: string
+          version_number: number
+          name: string
+          description: string | null
+          content: string
+          saved_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          template_id: string
+          version_number: number
+          name: string
+          description?: string | null
+          content: string
+          saved_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          template_id?: string
+          version_number?: number
+          name?: string
+          description?: string | null
+          content?: string
+          saved_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "contract_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_splits: {
+        Row: {
+          id: string
+          contract_id: string
+          beneficiary_name: string
+          beneficiary_document: string | null
+          beneficiary_bank: string | null
+          beneficiary_agency: string | null
+          beneficiary_account: string | null
+          percentage: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contract_id: string
+          beneficiary_name: string
+          beneficiary_document?: string | null
+          beneficiary_bank?: string | null
+          beneficiary_agency?: string | null
+          beneficiary_account?: string | null
+          percentage: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          contract_id?: string
+          beneficiary_name?: string
+          beneficiary_document?: string | null
+          beneficiary_bank?: string | null
+          beneficiary_agency?: string | null
+          beneficiary_account?: string | null
+          percentage?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_splits_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contracts: {
         Row: {
+          adjustment_date: string | null
+          adjustment_index: string | null
           company_id: string
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at: string | null
@@ -401,13 +542,17 @@ export type Database = {
           id: string
           job_title: string
           notes: string | null
+          payment_frequency: string | null
           salary: number | null
+          scope_description: string | null
           start_date: string
           status: Database["public"]["Enums"]["contract_status"] | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          adjustment_date?: string | null
+          adjustment_index?: string | null
           company_id: string
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at?: string | null
@@ -423,13 +568,17 @@ export type Database = {
           id?: string
           job_title: string
           notes?: string | null
+          payment_frequency?: string | null
           salary?: number | null
+          scope_description?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["contract_status"] | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          adjustment_date?: string | null
+          adjustment_index?: string | null
           company_id?: string
           contract_type?: Database["public"]["Enums"]["contract_type"]
           created_at?: string | null
@@ -445,7 +594,9 @@ export type Database = {
           id?: string
           job_title?: string
           notes?: string | null
+          payment_frequency?: string | null
           salary?: number | null
+          scope_description?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["contract_status"] | null
           updated_at?: string | null

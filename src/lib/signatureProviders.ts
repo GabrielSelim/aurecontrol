@@ -143,7 +143,7 @@ export const SIGNATURE_PROVIDERS: Record<SignatureProviderName, {
  */
 export function createSignatureProvider(
   providerName: SignatureProviderName,
-  config: SignatureProviderConfig
+  _config: SignatureProviderConfig
 ): ISignatureProvider | null {
   // For now, return null as we haven't implemented specific providers yet
   // When implementing, this will return the appropriate provider instance

@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchProfile, fetchUserRoles, deleteUserRoles, insertUserRole } from "@/services/profileService";
+import { fetchContractsByUser } from "@/services/contractService";
+import { fetchPaymentsByUser } from "@/services/paymentService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,11 +34,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Pencil, Mail, Phone, FileText, CreditCard, Loader2, UserCog } from "lucide-react";
+import { ArrowLeft, Pencil, Mail, Phone, FileText, CreditCard, UserCog } from "lucide-react";
 import { formatCPF, formatPhone } from "@/lib/masks";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface ColaboradorData {
   id: string;
@@ -72,6 +77,7 @@ interface Payment {
 }
 
 const ColaboradorDetalhes = () => {
+  useDocumentTitle("Detalhes do Colaborador");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile, hasRole } = useAuth();
@@ -93,25 +99,17 @@ const ColaboradorDetalhes = () => {
 
       try {
         // Fetch collaborator profile
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", id)
-          .eq("company_id", profile.company_id)
-          .maybeSingle();
-
-        if (profileError) throw profileError;
-
-        if (!profileData) {
+        let profileData;
+        try {
+          profileData = await fetchProfile(id, profile.company_id);
+        } catch {
+          // fetchProfile uses .single() — treat any error (including PGRST116) as not found
           navigate("/dashboard/colaboradores");
           return;
         }
 
         // Fetch roles
-        const { data: rolesData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", profileData.user_id);
+        const rolesData = await fetchUserRoles(profileData.user_id);
 
         setColaborador({
           ...profileData,
@@ -119,28 +117,14 @@ const ColaboradorDetalhes = () => {
         });
 
         // Fetch contracts
-        const { data: contractsData, error: contractsError } = await supabase
-          .from("contracts")
-          .select("*")
-          .eq("user_id", profileData.user_id)
-          .eq("company_id", profile.company_id)
-          .order("start_date", { ascending: false });
-
-        if (contractsError) throw contractsError;
+        const contractsData = await fetchContractsByUser(profileData.user_id);
         setContracts(contractsData || []);
 
         // Fetch payments
-        const { data: paymentsData, error: paymentsError } = await supabase
-          .from("payments")
-          .select("*")
-          .eq("user_id", profileData.user_id)
-          .eq("company_id", profile.company_id)
-          .order("reference_month", { ascending: false });
-
-        if (paymentsError) throw paymentsError;
+        const paymentsData = await fetchPaymentsByUser(profileData.user_id);
         setPayments(paymentsData || []);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        logger.error("Error fetching data:", error);
       } finally {
         setIsLoading(false);
       }
@@ -183,23 +167,10 @@ const ColaboradorDetalhes = () => {
     setIsUpdatingRole(true);
     try {
       // Remover papéis antigos (exceto master_admin que não pode ser alterado)
-      const { error: deleteError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", colaborador.user_id)
-        .neq("role", "master_admin");
-
-      if (deleteError) throw deleteError;
+      await deleteUserRoles(colaborador.user_id);
 
       // Inserir novo papel
-      const { error: insertError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: colaborador.user_id,
-          role: selectedRole as "admin" | "financeiro" | "juridico" | "gestor" | "colaborador",
-        });
-
-      if (insertError) throw insertError;
+      await insertUserRole(colaborador.user_id, selectedRole);
 
       // Atualizar estado local
       setColaborador({
@@ -210,7 +181,7 @@ const ColaboradorDetalhes = () => {
       toast.success("Papel do colaborador atualizado com sucesso");
       setIsRoleDialogOpen(false);
     } catch (error) {
-      console.error("Error updating role:", error);
+      logger.error("Error updating role:", error);
       toast.error("Erro ao atualizar papel do colaborador");
     } finally {
       setIsUpdatingRole(false);
@@ -264,8 +235,19 @@ const ColaboradorDetalhes = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48 lg:col-span-2" />
+        </div>
+        <Skeleton className="h-64" />
       </div>
     );
   }

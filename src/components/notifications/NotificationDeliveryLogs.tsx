@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchDetailedNotificationLogs, fetchDeliveryLogs } from "@/services/notificationService";
+import { queryKeys } from "@/hooks/queries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,28 +47,18 @@ export function NotificationDeliveryLogs() {
   const [selectedNotification, setSelectedNotification] = useState<string | null>(null);
 
   const { data: notifications, isLoading, refetch } = useQuery({
-    queryKey: ["notification-logs-detailed"],
+    queryKey: queryKeys.notifications.logs("detailed"),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("notification_logs")
-        .select("*, companies:company_id(name)")
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (error) throw error;
+      const data = await fetchDetailedNotificationLogs();
       return data as NotificationWithDelivery[];
     },
   });
 
   const { data: deliveryLogs } = useQuery({
-    queryKey: ["delivery-logs", selectedNotification],
+    queryKey: queryKeys.notifications.deliveryLogs(selectedNotification!),
     queryFn: async () => {
       if (!selectedNotification) return [];
-      const { data, error } = await supabase
-        .from("notification_delivery_logs")
-        .select("*")
-        .eq("notification_log_id", selectedNotification)
-        .order("attempt_number", { ascending: true });
-      if (error) throw error;
+      const data = await fetchDeliveryLogs(selectedNotification);
       return data as DeliveryLog[];
     },
     enabled: !!selectedNotification,
@@ -214,6 +205,7 @@ export function NotificationDeliveryLogs() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setSelectedNotification(n.id)}
+                          aria-label="Ver detalhes da notificação"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>

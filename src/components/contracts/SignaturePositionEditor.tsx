@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Move, Save, RotateCcw, Eye, EyeOff, ChevronLeft, ChevronRight, FileText } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { updateSignaturePositions } from "@/services/contractService";
+import { logger } from "@/lib/logger";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 export interface SignaturePosition {
   id: string;
@@ -59,7 +61,7 @@ const estimatePageCount = (html: string): number => {
 export function SignaturePositionEditor({
   documentHtml,
   signatures,
-  documentId,
+  documentId: _documentId,
   onPositionsUpdated,
   readOnly = false,
   totalPages: propTotalPages,
@@ -222,25 +224,12 @@ export function SignaturePositionEditor({
     setIsSaving(true);
     try {
       // Update each signature position
-      for (const pos of positions) {
-        const { error } = await supabase
-          .from("contract_signatures")
-          .update({
-            position_x: pos.position_x,
-            position_y: pos.position_y,
-            position_page: pos.position_page,
-            position_width: pos.position_width,
-            position_height: pos.position_height,
-          })
-          .eq("id", pos.id);
-
-        if (error) throw error;
-      }
+      await updateSignaturePositions(positions);
 
       toast.success("Posições das assinaturas salvas com sucesso!");
       onPositionsUpdated();
     } catch (error) {
-      console.error("Error saving positions:", error);
+      logger.error("Error saving positions:", error);
       toast.error("Erro ao salvar posições das assinaturas");
     } finally {
       setIsSaving(false);
@@ -315,6 +304,7 @@ export function SignaturePositionEditor({
                 size="sm"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
+                aria-label="Página anterior"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -323,6 +313,7 @@ export function SignaturePositionEditor({
                 size="sm"
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
+                aria-label="Próxima página"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -400,7 +391,7 @@ export function SignaturePositionEditor({
           {/* Document preview */}
           <div
             className="prose prose-sm max-w-none bg-white text-black p-8"
-            dangerouslySetInnerHTML={{ __html: documentHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(documentHtml) }}
           />
 
           {/* Signature position overlays - only show signatures on current page */}
