@@ -7,6 +7,7 @@ import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { PJLayout } from "@/components/pj/PJLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { PageLoader } from "@/components/PageLoader";
@@ -44,6 +45,13 @@ const EmpresaDetalhes = lazy(() => import("./pages/dashboard/EmpresaDetalhes"));
 const Notificacoes = lazy(() => import("./pages/dashboard/Notificacoes"));
 const Perfil = lazy(() => import("./pages/dashboard/Perfil"));
 
+// PJ portal pages
+const BemVindo = lazy(() => import("./pages/BemVindo"));
+const PJDashboard = lazy(() => import("./pages/pj/PJDashboard"));
+const PJContratos = lazy(() => import("./pages/pj/PJContratos"));
+const PJPagamentos = lazy(() => import("./pages/pj/PJPagamentos"));
+const PJPerfil = lazy(() => import("./pages/pj/PJPerfil"));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -56,9 +64,15 @@ const queryClient = new QueryClient({
 });
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isPJ, profile } = useAuth();
   if (isLoading) return null;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    if (isPJ) {
+      const onboardingDone = (profile as any)?.pj_onboarding_done;
+      return <Navigate to={onboardingDone ? "/pj/dashboard" : "/bem-vindo"} replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -191,6 +205,26 @@ function AppRoutes() {
       <Route path="/atualizar-senha" element={<AtualizarSenha />} />
       <Route path="/assinar-contrato" element={<AssinarContrato />} />
       <Route path="/dashboard/*" element={<DashboardRoutes />} />
+      <Route path="/bem-vindo" element={
+        <ProtectedRoute requiredRoles={["pj"]}>
+          <BemVindo />
+        </ProtectedRoute>
+      } />
+      <Route path="/pj/*" element={
+        <ProtectedRoute requiredRoles={["pj"]}>
+          <PJLayout>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="dashboard" element={<PJDashboard />} />
+                <Route path="contratos" element={<PJContratos />} />
+                <Route path="pagamentos" element={<PJPagamentos />} />
+                <Route path="perfil" element={<PJPerfil />} />
+                <Route index element={<Navigate to="dashboard" replace />} />
+              </Routes>
+            </Suspense>
+          </PJLayout>
+        </ProtectedRoute>
+      } />
       <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>
