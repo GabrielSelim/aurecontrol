@@ -33,7 +33,7 @@ interface Profile {
 }
 
 interface UserRole {
-  role: "master_admin" | "admin" | "financeiro" | "juridico" | "gestor" | "colaborador";
+  role: "master_admin" | "admin" | "financeiro" | "juridico" | "gestor" | "colaborador" | "pj";
 }
 
 interface AuthContextType {
@@ -51,6 +51,7 @@ interface AuthContextType {
   updatePassword: (password: string) => Promise<{ error: Error | null }>;
   hasRole: (role: UserRole["role"]) => boolean;
   isAdmin: () => boolean;
+  isPJ: boolean;
 }
 
 interface SignUpData {
@@ -291,6 +292,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return hasRole("admin") || hasRole("master_admin");
   };
 
+  const isPJ = hasRole("pj");
+
   return (
     <AuthContext.Provider
       value={{
@@ -308,6 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updatePassword,
         hasRole,
         isAdmin,
+        isPJ,
       }}
     >
       {children}

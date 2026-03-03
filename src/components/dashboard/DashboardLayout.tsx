@@ -21,6 +21,7 @@ import {
   ChevronRight,
   FileSignature,
   Search,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -57,6 +58,11 @@ const navigationItems = {
   faturamento: { name: "Faturamento", href: "/dashboard/faturamento", icon: CreditCard },
   notificacoes: { name: "Notificações", href: "/dashboard/notificacoes", icon: Bell },
   configuracoes: { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
+  // PJ
+  pjDashboard: { name: "Meu Painel", href: "/pj/dashboard", icon: LayoutDashboard },
+  pjContratos: { name: "Meus Contratos", href: "/pj/contratos", icon: FileText },
+  pjPagamentos: { name: "Meus Pagamentos", href: "/pj/pagamentos", icon: CreditCard },
+  pjPerfil: { name: "Meu Perfil", href: "/pj/perfil", icon: Briefcase },
 };
 
 const masterAdminNavigation = [
@@ -74,7 +80,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [commandOpen, setCommandOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, roles, signOut, hasRole } = useAuth();
+  const { profile, roles, signOut, hasRole, isPJ } = useAuth();
   useKeyboardShortcuts();
   useSessionTimeout();
 
@@ -100,6 +106,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       juridico: "Jurídico",
       gestor: "Gestor",
       colaborador: "Colaborador",
+      pj: "Prestador PJ",
     };
     return labels[role] || role;
   };
@@ -120,6 +127,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // Build navigation based on user role
   const getNavigationForRole = () => {
+    // PJ sees only their own portal
+    if (isPJ) {
+      return [
+        navigationItems.pjDashboard,
+        navigationItems.pjContratos,
+        navigationItems.pjPagamentos,
+        navigationItems.pjPerfil,
+      ];
+    }
+
     if (isMasterAdmin) {
       return masterAdminNavigation;
     }
@@ -154,8 +171,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     if (hasRole("financeiro")) {
       nav.push(navigationItems.pagamentos);
     }
-    
-    // Colaborador: only visão geral (already added)
     
     return nav;
   };
