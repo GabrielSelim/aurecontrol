@@ -191,7 +191,7 @@ export function NotificationPreferences() {
             <Mail className="h-3.5 w-3.5" /> Email
           </span>
           <span className="text-center flex items-center justify-center gap-1">
-            <Monitor className="h-3.5 w-3.5" /> In-App
+            <Monitor className="h-3.5 w-3.5" /> No App
           </span>
         </div>
 

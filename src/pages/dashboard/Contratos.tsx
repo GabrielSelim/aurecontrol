@@ -99,6 +99,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useDebounce } from "@/hooks/useDebounce";
 import { logger } from "@/lib/logger";
 import { handleApiError } from "@/lib/handleApiError";
+import { logAuditAction } from "@/lib/auditLog";
 import { sanitizeHtml } from "@/lib/sanitize";
 
 interface Contract {
@@ -213,7 +214,7 @@ const Contratos = () => {
   // PJ financial fields
   const [paymentFrequency, setPaymentFrequency] = useState("monthly");
   const [scopeDescription, setScopeDescription] = useState("");
-  const [adjustmentIndex, setAdjustmentIndex] = useState("");
+  const [adjustmentIndex, setAdjustmentIndex] = useState("none");
   const [adjustmentDate, setAdjustmentDate] = useState("");
   // PJ split/beneficiaries
   const [splits, setSplits] = useState<{name: string; document: string; percentage: string}[]>([]);
@@ -495,6 +496,19 @@ const Contratos = () => {
       html = html.replace(new RegExp(key, "g"), value);
     });
 
+    // Process Handlebars-style {{#if variable}}...{{else}}...{{/if}} conditionals
+    html = html.replace(
+      /\{\{#if\s+(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/gi,
+      (_match, varName: string, ifBlock: string, elseBlock: string = "") => {
+        // Look up the variable value — check if it was already replaced (truthy and not a placeholder)
+        const key = `{{${varName}}}`;
+        const val = variables[key];
+        // Variable is "truthy" if it exists, is non-empty, and isn't a placeholder like "Indeterminado"
+        const isTruthy = val !== undefined && val !== "" && val !== "Indeterminado";
+        return isTruthy ? ifBlock : elseBlock;
+      }
+    );
+
     // Remove Handlebars-style witness sections if no witnesses
     if (witnessCountNum === 0) {
       // Remove {{#each witnesses}}...{{/each}} blocks
@@ -523,6 +537,9 @@ const Contratos = () => {
   };
 
   const handleCreateContract = async () => {
+    // Prevent double-submission
+    if (isSubmitting) return;
+
     // Validate required fields
     const errors: Record<string, boolean> = {};
     if (!selectedUserId) errors.colaborador = true;
@@ -574,7 +591,8 @@ const Contratos = () => {
       // Calculate end_date for time-based contracts
       let endDate = null;
       if (contractType === "PJ" && durationType === "time_based" && durationValue) {
-        const start = new Date(startDate);
+        const [y, m, d] = startDate.split('-').map(Number);
+        const start = new Date(y, m - 1, d);
         const value = parseInt(durationValue);
         if (durationUnit === "days") {
           start.setDate(start.getDate() + value);
@@ -585,7 +603,7 @@ const Contratos = () => {
         } else if (durationUnit === "years") {
           start.setFullYear(start.getFullYear() + value);
         }
-        endDate = start.toISOString().split('T')[0];
+        endDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
       }
 
       const insertData = {
@@ -605,7 +623,7 @@ const Contratos = () => {
         deliverable_description: contractType === "PJ" && durationType === "delivery_based" ? deliverableDescription : null,
         payment_frequency: contractType === "PJ" ? paymentFrequency : null,
         scope_description: contractType === "PJ" && scopeDescription ? scopeDescription : null,
-        adjustment_index: contractType === "PJ" && adjustmentIndex ? adjustmentIndex : null,
+        adjustment_index: contractType === "PJ" && adjustmentIndex && adjustmentIndex !== "none" ? adjustmentIndex : null,
         adjustment_date: contractType === "PJ" && adjustmentDate ? adjustmentDate : null,
       };
 
@@ -706,6 +724,22 @@ const Contratos = () => {
         }
       }
 
+      // Log audit: contract created
+      if (contractData) {
+        logAuditAction({
+          contractId: contractData.id,
+          action: "contract_created",
+          actorName: profile?.full_name || "",
+          actorEmail: profile?.email || "",
+          details: {
+            contractType,
+            jobTitle,
+            startDate,
+            collaborator: selectedUserId,
+          },
+        });
+      }
+
       toast.success("Contrato criado com sucesso!");
 
       // Send email notification to PJ for signature (async, non-blocking)
@@ -765,7 +799,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setStartDate("");
     setPaymentFrequency("monthly");
     setScopeDescription("");
-    setAdjustmentIndex("");
+    setAdjustmentIndex("none");
     setAdjustmentDate("");
     setSplits([]);
     setDurationType("indefinite");
@@ -801,18 +835,26 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       setValidationErrors(prev => ({ ...prev, ...errors }));
       return false;
     }
+    // Clear errors for current step fields on success
+    if (currentStep === 1) {
+      setValidationErrors(prev => { const { colaborador, tipoContrato, dataInicio, ...rest } = prev; return rest; });
+    } else if (currentStep === 2) {
+      setValidationErrors(prev => { const { cargo, ...rest } = prev; return rest; });
+    } else if (currentStep === 4) {
+      setValidationErrors(prev => { const { template, representante, ...rest } = prev; return rest; });
+    }
     return true;
   };
 
-  const handleNextStep = useCallback(() => {
+  const handleNextStep = () => {
     if (validateStep(step)) {
       setStep(prev => Math.min(prev + 1, totalSteps));
     }
-  }, [step, totalSteps]);
+  };
 
-  const handlePrevStep = useCallback(() => {
+  const handlePrevStep = () => {
     setStep(prev => Math.max(prev - 1, 1));
-  }, []);
+  };
 
   const handleTerminateContract = async () => {
     if (!contractToTerminate) return;
@@ -820,6 +862,18 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setIsSubmitting(true);
     try {
       await updateContractStatus(contractToTerminate.id, "terminated");
+
+      // Log audit: contract terminated
+      logAuditAction({
+        contractId: contractToTerminate.id,
+        action: "contract_status_changed",
+        actorName: profile?.full_name || "",
+        actorEmail: profile?.email || "",
+        details: {
+          previousStatus: contractToTerminate.status,
+          newStatus: "terminated",
+        },
+      });
 
       toast.success("Contrato encerrado com sucesso!");
       setIsTerminateDialogOpen(false);
@@ -887,6 +941,8 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
   };
 
   const handleRenewContract = (contrato: Contract) => {
+    // Reset all form state before pre-filling
+    resetForm();
     // Pre-fill the contract creation form with data from existing contract
     setSelectedUserId(contrato.user_id);
     setContractType(contrato.contract_type);
@@ -928,6 +984,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       draft: "bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-400 border-gray-200",
       sent: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800",
       signed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800",
+      pending_signature: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800",
     };
     return classNames[status] || "";
   };
@@ -942,12 +999,13 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       terminated: "Encerrado",
       expired: "Expirado",
       inactive: "Inativo",
+      pending_signature: "Aguardando Assinatura",
     };
     return labels[status] || status;
   };
 
   const formatCurrency = (value: number | null) => {
-    if (!value) return "-";
+    if (value === null || value === undefined) return "-";
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
@@ -1061,7 +1119,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
           </p>
         </div>
         {isAdmin() && (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsDialogOpen(open); }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -1266,7 +1324,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                           <SelectValue placeholder="Nenhum reajuste" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Nenhum</SelectItem>
+                          <SelectItem value="none">Nenhum</SelectItem>
                           <SelectItem value="IGPM">IGP-M</SelectItem>
                           <SelectItem value="IPCA">IPCA</SelectItem>
                           <SelectItem value="INPC">INPC</SelectItem>
@@ -1275,7 +1333,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                       </Select>
                     </div>
 
-                    {adjustmentIndex && (
+                    {adjustmentIndex && adjustmentIndex !== "none" && (
                       <div className="space-y-2">
                         <Label className="text-sm">Data-base do Reajuste</Label>
                         <Input
@@ -1603,13 +1661,14 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                   // Build insertData mock for preview
                   let endDate: string | null = null;
                   if (durationType === "time_based" && durationValue) {
-                    const start = new Date(startDate);
+                    const [y, m, d] = startDate.split('-').map(Number);
+                    const start = new Date(y, m - 1, d);
                     const value = parseInt(durationValue);
                     if (durationUnit === "days") start.setDate(start.getDate() + value);
                     else if (durationUnit === "weeks") start.setDate(start.getDate() + (value * 7));
                     else if (durationUnit === "months") start.setMonth(start.getMonth() + value);
                     else if (durationUnit === "years") start.setFullYear(start.getFullYear() + value);
-                    endDate = start.toISOString().split('T')[0];
+                    endDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
                   }
 
                   const mockData = {

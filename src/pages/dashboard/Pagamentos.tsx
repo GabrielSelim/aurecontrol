@@ -483,6 +483,25 @@ const Pagamentos = () => {
     }
   };
 
+  const filteredPagamentos = useMemo(() => {
+    return pagamentos.filter((p) => {
+      const matchesSearch =
+        p.profile?.full_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        p.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === "all" || p.status === statusFilter;
+      
+      const matchesContract = contractFilter === "all" || p.contract_id === contractFilter;
+      
+      let matchesPeriod = true;
+      if (periodFilter !== "all") {
+        matchesPeriod = p.reference_month.startsWith(periodFilter);
+      }
+
+      return matchesSearch && matchesStatus && matchesContract && matchesPeriod;
+    });
+  }, [pagamentos, debouncedSearchTerm, statusFilter, periodFilter, contractFilter]);
+
   const toggleSelectAll = useCallback(() => {
     const pendingIds = filteredPagamentos
       .filter((p) => p.status === "pending")
@@ -587,25 +606,6 @@ const Pagamentos = () => {
   const formatReferenceMonth = (date: string) => {
     return format(new Date(date), "MMMM/yyyy", { locale: ptBR });
   };
-
-  const filteredPagamentos = useMemo(() => {
-    return pagamentos.filter((p) => {
-      const matchesSearch =
-        p.profile?.full_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        p.description?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === "all" || p.status === statusFilter;
-      
-      const matchesContract = contractFilter === "all" || p.contract_id === contractFilter;
-      
-      let matchesPeriod = true;
-      if (periodFilter !== "all") {
-        matchesPeriod = p.reference_month.startsWith(periodFilter);
-      }
-
-      return matchesSearch && matchesStatus && matchesContract && matchesPeriod;
-    });
-  }, [pagamentos, debouncedSearchTerm, statusFilter, periodFilter, contractFilter]);
 
   // Map contract_id -> contract for quick lookup in table
   const contractsMap = useMemo(() => {

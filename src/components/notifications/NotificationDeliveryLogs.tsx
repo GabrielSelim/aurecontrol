@@ -112,9 +112,11 @@ export function NotificationDeliveryLogs() {
       payment_approved: "Pagamento Aprovado",
       payment_rejected: "Pagamento Rejeitado",
       contract_expiration: "Contrato Expirando",
+      contract_expiration_alert: "Alerta Vencimento Contrato",
       contract_completed: "Contrato Concluído",
       invite: "Convite",
       system_announcement: "Aviso do Sistema",
+      urgent_announcement: "Aviso Urgente",
     };
     return labels[type] || type;
   };

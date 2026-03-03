@@ -64,6 +64,8 @@ export default function Notificacoes() {
       case "billing_generated": return "default";
       case "billing_due_reminder": return "secondary";
       case "contract_completed": return "default";
+      case "contract_expiration_alert": return "destructive";
+      case "urgent_announcement": return "destructive";
       case "invite": return "outline";
       default: return "secondary";
     }
@@ -79,6 +81,9 @@ export default function Notificacoes() {
       payment_approved: "Pagamento Aprovado",
       payment_rejected: "Pagamento Rejeitado",
       invite: "Convite",
+      contract_expiration_alert: "Alerta Vencimento Contrato",
+      urgent_announcement: "Aviso Urgente",
+      system_announcement: "Aviso do Sistema",
     };
     return labels[type] || type;
   };
@@ -178,6 +183,8 @@ export default function Notificacoes() {
                     <SelectItem value="billing_generated">Fatura Gerada</SelectItem>
                     <SelectItem value="billing_due_reminder">Lembrete Vencimento</SelectItem>
                     <SelectItem value="contract_completed">Contrato Concluído</SelectItem>
+                    <SelectItem value="contract_expiration_alert">Alerta Vencimento Contrato</SelectItem>
+                    <SelectItem value="urgent_announcement">Aviso Urgente</SelectItem>
                     <SelectItem value="invite">Convite</SelectItem>
                   </SelectContent>
                 </Select>
@@ -210,7 +217,7 @@ export default function Notificacoes() {
                         <TableHead>Tipo</TableHead>
                         <TableHead>Assunto</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Retries</TableHead>
+                        <TableHead>Tentativas</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

@@ -322,23 +322,6 @@ const Colaboradores = () => {
     setSelectedIds(new Set());
   };
 
-  const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === paginatedColaboradores.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(paginatedColaboradores.map(c => c.id)));
-    }
-  }, [selectedIds.size, paginatedColaboradores]);
-
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
   const filteredColaboradores = useMemo(() => colaboradores.filter((c) => {
     const matchesSearch =
       c.full_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
@@ -366,9 +349,6 @@ const Colaboradores = () => {
     return matchesSearch && matchesStatus && matchesRole && matchesDepartment && matchesContractType;
   }), [colaboradores, debouncedSearchTerm, statusFilter, roleFilter, departmentFilter, contractTypeFilter]);
 
-  // Get unique departments for filter
-  const departments = useMemo(() => [...new Set(colaboradores.map(c => c.department).filter(Boolean))] as string[], [colaboradores]);
-
   // Sort collaborators
   const sortedColaboradores = useMemo(() => [...filteredColaboradores].sort((a, b) => {
     let comparison = 0;
@@ -393,6 +373,31 @@ const Colaboradores = () => {
     }
     return sortOrder === "asc" ? comparison : -comparison;
   }), [filteredColaboradores, sortBy, sortOrder]);
+
+  // Pagination
+  const totalPages = Math.ceil(sortedColaboradores.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedColaboradores = sortedColaboradores.slice(startIndex, startIndex + itemsPerPage);
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === paginatedColaboradores.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedColaboradores.map(c => c.id)));
+    }
+  }, [selectedIds.size, paginatedColaboradores]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Get unique departments for filter
+  const departments = useMemo(() => [...new Set(colaboradores.map(c => c.department).filter(Boolean))] as string[], [colaboradores]);
 
   // Reset page when filters change
   useEffect(() => {
@@ -428,11 +433,6 @@ const Colaboradores = () => {
     setSortBy("name");
     setSortOrder("asc");
   };
-
-  // Pagination
-  const totalPages = Math.ceil(sortedColaboradores.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedColaboradores = sortedColaboradores.slice(startIndex, startIndex + itemsPerPage);
 
   const activeCount = colaboradores.filter(c => c.is_active).length;
   const inactiveCount = colaboradores.filter(c => !c.is_active).length;

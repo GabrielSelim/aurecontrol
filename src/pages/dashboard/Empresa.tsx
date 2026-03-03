@@ -106,9 +106,9 @@ const Empresa = () => {
   const [bankAccountType, setBankAccountType] = useState("corrente");
 
   // Contract config state
-  const [defaultTemplateId, setDefaultTemplateId] = useState("");
+  const [defaultTemplateId, setDefaultTemplateId] = useState("none");
   const [defaultWitnessCount, setDefaultWitnessCount] = useState("2");
-  const [defaultAdjustmentPolicy, setDefaultAdjustmentPolicy] = useState("");
+  const [defaultAdjustmentPolicy, setDefaultAdjustmentPolicy] = useState("none");
   const [availableTemplates, setAvailableTemplates] = useState<{id: string; name: string}[]>([]);
 
   // Welcome email state
@@ -166,9 +166,9 @@ const Empresa = () => {
         setBankAgency(data.bank_agency || "");
         setBankAccount(data.bank_account || "");
         setBankAccountType(data.bank_account_type || "corrente");
-        setDefaultTemplateId(data.default_template_id || "");
+        setDefaultTemplateId(data.default_template_id || "none");
         setDefaultWitnessCount(String(data.default_witness_count ?? 2));
-        setDefaultAdjustmentPolicy(data.default_adjustment_policy || "");
+        setDefaultAdjustmentPolicy(data.default_adjustment_policy || "none");
         setWelcomeEmailTemplate(data.welcome_email_template || "");
         setPlanName(data.plan_name || "starter");
         setMaxCollaborators(data.max_collaborators ?? 10);
@@ -251,9 +251,9 @@ const Empresa = () => {
           bank_agency: bankAgency || null,
           bank_account: bankAccount || null,
           bank_account_type: bankAccountType || null,
-          default_template_id: defaultTemplateId || null,
+          default_template_id: defaultTemplateId === "none" ? null : defaultTemplateId || null,
           default_witness_count: parseInt(defaultWitnessCount) || 2,
-          default_adjustment_policy: defaultAdjustmentPolicy || null,
+          default_adjustment_policy: defaultAdjustmentPolicy === "none" ? null : defaultAdjustmentPolicy || null,
           welcome_email_template: welcomeEmailTemplate || null,
         });
 
@@ -687,7 +687,7 @@ const Empresa = () => {
                   <SelectValue placeholder="Nenhum template padrão" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {availableTemplates.map((tpl) => (
                     <SelectItem key={tpl.id} value={tpl.id}>{tpl.name}</SelectItem>
                   ))}
@@ -717,7 +717,7 @@ const Empresa = () => {
                 <SelectValue placeholder="Nenhuma política padrão" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhuma</SelectItem>
+                <SelectItem value="none">Nenhuma</SelectItem>
                 <SelectItem value="IGPM">IGP-M (anual)</SelectItem>
                 <SelectItem value="IPCA">IPCA (anual)</SelectItem>
                 <SelectItem value="INPC">INPC (anual)</SelectItem>

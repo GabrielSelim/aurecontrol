@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { logger } from "@/lib/logger";
+import { logAuditAction } from "@/lib/auditLog";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface SignatureData {
@@ -47,6 +48,7 @@ const AssinarContrato = () => {
   
   const [signature, setSignature] = useState<SignatureData | null>(null);
   const [contractInfo, setContractInfo] = useState<ContractInfo | null>(null);
+  const [contractId, setContractId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSigning, setIsSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +89,7 @@ const AssinarContrato = () => {
       const docData = await fetchContractDocumentById(sigData.document_id);
 
       if (docData) {
+        setContractId(docData.contract_id);
         const contractData = await fetchContract(docData.contract_id);
 
         if (contractData) {
@@ -160,6 +163,24 @@ const AssinarContrato = () => {
       } else {
         // Update to partial
         await updateDocumentStatus(signature.document_id, "partial");
+      }
+
+      // Log audit action for the signature
+      if (contractId) {
+        logAuditAction({
+          contractId,
+          documentId: signature.document_id,
+          action: allSigned ? "contract_completed" : "signature_completed",
+          actorName: signature.signer_name,
+          actorEmail: signature.signer_email,
+          details: {
+            signerName: signature.signer_name,
+            signerEmail: signature.signer_email,
+            signedVia: "external_link",
+            allSigned,
+            ipAddress,
+          },
+        });
       }
 
       setSuccess(true);

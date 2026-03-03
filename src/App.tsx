@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -37,6 +37,7 @@ const Pagamentos = lazy(() => import("./pages/dashboard/Pagamentos"));
 const Convites = lazy(() => import("./pages/dashboard/Convites"));
 const Empresa = lazy(() => import("./pages/dashboard/Empresa"));
 const Empresas = lazy(() => import("./pages/dashboard/Empresas"));
+const NovaEmpresa = lazy(() => import("./pages/dashboard/NovaEmpresa"));
 const Configuracoes = lazy(() => import("./pages/dashboard/Configuracoes"));
 const Faturamento = lazy(() => import("./pages/dashboard/Faturamento"));
 const EmpresaDetalhes = lazy(() => import("./pages/dashboard/EmpresaDetalhes"));
@@ -62,10 +63,11 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function DashboardRoutes() {
+  const location = useLocation();
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <ErrorBoundary>
+        <ErrorBoundary key={location.pathname}>
         <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Rotas acessíveis a todos os usuários autenticados */}
@@ -146,6 +148,11 @@ function DashboardRoutes() {
           <Route path="empresas" element={
             <ProtectedRoute requiredRoles={["master_admin"]}>
               <Empresas />
+            </ProtectedRoute>
+          } />
+          <Route path="empresas/nova" element={
+            <ProtectedRoute requiredRoles={["master_admin"]}>
+              <NovaEmpresa />
             </ProtectedRoute>
           } />
           <Route path="empresas/:id" element={

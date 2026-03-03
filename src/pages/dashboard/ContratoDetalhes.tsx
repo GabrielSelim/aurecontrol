@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchContract as fetchContractService,
   fetchContractDocument as fetchContractDocumentService,
@@ -39,6 +40,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { logger } from "@/lib/logger";
 import { buildWitnessNotificationEmail } from "@/lib/emailTemplates";
+import { logAuditAction } from "@/lib/auditLog";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 interface Contract {
@@ -91,6 +93,7 @@ const ContratoDetalhes = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { profile: authProfile } = useAuth();
   const [contract, setContract] = useState<Contract | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [document, setDocument] = useState<ContractDocument | null>(null);
@@ -220,6 +223,25 @@ const ContratoDetalhes = () => {
 
       // Send email notification to the witness with signing link
       await sendWitnessNotificationEmail(witnessName.trim(), witnessEmail.trim(), signingToken);
+
+      // Log audit: witness updated
+      if (contract) {
+        logAuditAction({
+          contractId: contract.id,
+          documentId: document?.id,
+          action: "contract_updated",
+          actorName: authProfile?.full_name || "Administrador",
+          actorEmail: authProfile?.email || "",
+          details: {
+            field: "witness",
+            witnessId: editingWitness.id,
+            previousName: editingWitness.signer_name,
+            previousEmail: editingWitness.signer_email,
+            newName: witnessName.trim(),
+            newEmail: witnessEmail.trim(),
+          },
+        });
+      }
 
       toast({
         title: "Sucesso",

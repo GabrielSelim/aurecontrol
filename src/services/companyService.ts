@@ -58,6 +58,27 @@ export async function fetchCompaniesByIds(ids: string[]) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Company Create                                                    */
+/* ------------------------------------------------------------------ */
+
+export async function createCompany(fields: {
+  name: string;
+  cnpj: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+}) {
+  const { data, error } = await supabase
+    .from("companies")
+    .insert(fields)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Company Update                                                    */
 /* ------------------------------------------------------------------ */
 
