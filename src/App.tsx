@@ -44,6 +44,7 @@ const Faturamento = lazy(() => import("./pages/dashboard/Faturamento"));
 const EmpresaDetalhes = lazy(() => import("./pages/dashboard/EmpresaDetalhes"));
 const Notificacoes = lazy(() => import("./pages/dashboard/Notificacoes"));
 const Perfil = lazy(() => import("./pages/dashboard/Perfil"));
+const Auditoria = lazy(() => import("./pages/dashboard/Auditoria"));
 
 // PJ portal pages
 const BemVindo = lazy(() => import("./pages/BemVindo"));
@@ -182,6 +183,11 @@ function DashboardRoutes() {
           <Route path="configuracoes" element={
             <ProtectedRoute requiredRoles={["master_admin"]}>
               <Configuracoes />
+            </ProtectedRoute>
+          } />
+          <Route path="auditoria" element={
+            <ProtectedRoute requiredRoles={["master_admin"]}>
+              <Auditoria />
             </ProtectedRoute>
           } />
         </Routes>

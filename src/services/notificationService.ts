@@ -76,3 +76,62 @@ export async function fetchDeliveryLogs(notificationLogId: string) {
   if (error) throw error;
   return data;
 }
+
+/* ------------------------------------------------------------------ */
+/*  In-App User Notifications                                         */
+/* ------------------------------------------------------------------ */
+
+export interface InAppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: string;
+  event_type: string | null;
+  contract_id: string | null;
+  read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+export async function fetchUserNotifications(userId: string, limit = 30): Promise<InAppNotification[]> {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []) as InAppNotification[];
+}
+
+export async function countUnreadNotifications(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("read", false);
+
+  if (error) return 0;
+  return count ?? 0;
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read: true, read_at: new Date().toISOString() })
+    .eq("id", notificationId);
+
+  if (error) throw error;
+}
+
+export async function markAllNotificationsRead(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read: true, read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .eq("read", false);
+
+  if (error) throw error;
+}

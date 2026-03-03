@@ -22,6 +22,7 @@ import {
   FileSignature,
   Search,
   Briefcase,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -58,6 +59,7 @@ const navigationItems = {
   faturamento: { name: "Faturamento", href: "/dashboard/faturamento", icon: CreditCard },
   notificacoes: { name: "Notificações", href: "/dashboard/notificacoes", icon: Bell },
   configuracoes: { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
+  auditoria: { name: "Auditoria", href: "/dashboard/auditoria", icon: ShieldCheck },
   // PJ
   pjDashboard: { name: "Meu Painel", href: "/pj/dashboard", icon: LayoutDashboard },
   pjContratos: { name: "Meus Contratos", href: "/pj/contratos", icon: FileText },
@@ -72,6 +74,7 @@ const masterAdminNavigation = [
   navigationItems.faturamento,
   navigationItems.notificacoes,
   navigationItems.configuracoes,
+  navigationItems.auditoria,
 ];
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {

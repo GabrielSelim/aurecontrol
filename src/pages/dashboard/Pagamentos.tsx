@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchPaymentsByCompany, createPayments, approvePayment, batchApprovePayments, rejectPayment, fetchContractSplits } from "@/services/paymentService";
 import { fetchProfileByUserId, fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { fetchActiveContractsByCompany } from "@/services/contractService";
-import { sendEmail } from "@/services/edgeFunctionService";
+import { sendEmail, gerarObrigacoesPJ } from "@/services/edgeFunctionService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   X,
   Users,
+  Zap,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -113,6 +114,7 @@ const Pagamentos = () => {
   const debouncedSearchTerm = useDebounce(searchTerm);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -706,6 +708,25 @@ const Pagamentos = () => {
     toast.success("Pagamentos exportados com sucesso!");
   };
 
+  const handleGerarObrigacoes = async () => {
+    setIsGenerating(true);
+    try {
+      const result = await gerarObrigacoesPJ();
+      if (result.generated > 0) {
+        toast.success(`${result.generated} obrigação(ões) gerada(s) para ${result.month}`);
+        fetchPagamentos();
+      } else if (result.skipped > 0) {
+        toast.info(`Nenhuma nova obrigação gerada para ${result.month} — ${result.skipped} já existia(m)`);
+      } else {
+        toast.info("Nenhum contrato PJ ativo encontrado");
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao gerar obrigações: ${err?.message ?? "Erro desconhecido"}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -717,6 +738,11 @@ const Pagamentos = () => {
           </p>
         </div>
         {canManagePayments && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleGerarObrigacoes} disabled={isGenerating}>
+              <Zap className="mr-2 h-4 w-4" />
+              {isGenerating ? "Gerando..." : "Gerar Obrigações PJ"}
+            </Button>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -838,6 +864,7 @@ const Pagamentos = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         )}
       </div>
 

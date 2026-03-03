@@ -41,3 +41,26 @@ export async function sendUrgentAnnouncement(announcementId: string) {
 
   if (error) throw error;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Gerar Obrigações PJ via Edge Function                            */
+/* ------------------------------------------------------------------ */
+
+export async function gerarObrigacoesPJ(year?: number, month?: number) {
+  const now = new Date();
+  const { data, error } = await supabase.functions.invoke("gerar-obrigacoes-pj", {
+    body: {
+      year: year ?? now.getFullYear(),
+      month: month ?? (now.getMonth() + 1),
+    },
+  });
+
+  if (error) throw error;
+  return data as {
+    generated: number;
+    skipped: number;
+    errors: number;
+    month: string;
+    details: string[];
+  };
+}

@@ -65,6 +65,7 @@ interface Contract {
   salary: number | null;
   hourly_rate: number | null;
   department: string | null;
+  document_url: string | null;
 }
 
 interface Payment {
@@ -335,6 +336,46 @@ const ColaboradorDetalhes = () => {
         </CardContent>
       </Card>
 
+      {/* KPI Cards */}
+      {(() => {
+        const ativos = contracts.filter(c => c.status === "active" || c.status === "assinado");
+        const currentSalary = ativos[0]?.salary ?? ativos[0]?.hourly_rate ?? null;
+        const currentYear = new Date().getFullYear();
+        const totalPaidYear = payments
+          .filter(p => (p.status === "approved" || p.status === "paid") && new Date(p.reference_month).getFullYear() === currentYear)
+          .reduce((sum, p) => sum + p.amount, 0);
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Contratos Ativos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{ativos.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Valor Mensal Atual</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">
+                  {currentSalary ? formatCurrency(currentSalary) : "—"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total Pago em {currentYear}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{formatCurrency(totalPaidYear)}</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
       {/* Tabs */}
       <Tabs defaultValue="contracts" className="space-y-4">
         <TabsList>
@@ -345,6 +386,10 @@ const ColaboradorDetalhes = () => {
           <TabsTrigger value="payments" className="gap-2">
             <CreditCard className="h-4 w-4" />
             Pagamentos ({payments.length})
+          </TabsTrigger>
+          <TabsTrigger value="documents" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Documentos
           </TabsTrigger>
         </TabsList>
 
@@ -453,6 +498,48 @@ const ColaboradorDetalhes = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="documents">
+          <Card>
+            <CardHeader>
+              <CardTitle>Documentos Contratuais</CardTitle>
+              <CardDescription>Contratos e documentos do colaborador</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {contracts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum documento encontrado
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {contracts.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div>
+                        <p className="font-medium text-sm">{c.job_title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {c.status === "assinado" ? "Assinado" :
+                           c.status === "enviado" ? "Aguardando assinaturas" :
+                           c.status === "active" ? "Vigente" :
+                           c.status === "terminated" ? "Encerrado" : c.status}
+                          {" · "}Iniciado em {new Date(c.start_date).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/dashboard/contratos/${c.id}/documento`)}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        Ver documento
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
       </Tabs>
       {/* Dialog para alterar papel */}
       <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>

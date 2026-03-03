@@ -121,6 +121,8 @@ interface Contract {
   deliverable_description: string | null;
   scope_description: string | null;
   payment_frequency: string | null;
+  payment_day: number | null;
+  monthly_value: number | null;
   adjustment_index: string | null;
   adjustment_date: string | null;
   profile?: {
@@ -213,6 +215,7 @@ const Contratos = () => {
   const [startDate, setStartDate] = useState("");
   // PJ financial fields
   const [paymentFrequency, setPaymentFrequency] = useState("monthly");
+  const [paymentDay, setPaymentDay] = useState<string>("5");
   const [scopeDescription, setScopeDescription] = useState("");
   const [adjustmentIndex, setAdjustmentIndex] = useState("none");
   const [adjustmentDate, setAdjustmentDate] = useState("");
@@ -622,6 +625,8 @@ const Contratos = () => {
         duration_unit: contractType === "PJ" && durationType === "time_based" ? durationUnit : null,
         deliverable_description: contractType === "PJ" && durationType === "delivery_based" ? deliverableDescription : null,
         payment_frequency: contractType === "PJ" ? paymentFrequency : null,
+        payment_day: contractType === "PJ" && paymentDay ? parseInt(paymentDay) : null,
+        monthly_value: contractType === "PJ" && salary ? parseCurrency(salary) : null,
         scope_description: contractType === "PJ" && scopeDescription ? scopeDescription : null,
         adjustment_index: contractType === "PJ" && adjustmentIndex && adjustmentIndex !== "none" ? adjustmentIndex : null,
         adjustment_date: contractType === "PJ" && adjustmentDate ? adjustmentDate : null,
@@ -798,6 +803,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setSalary("");
     setStartDate("");
     setPaymentFrequency("monthly");
+    setPaymentDay("5");
     setScopeDescription("");
     setAdjustmentIndex("none");
     setAdjustmentDate("");
@@ -1301,20 +1307,34 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                 {/* Step 3: Financeiro (PJ only) */}
                 {step === 3 && contractType === "PJ" && (
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm">Periodicidade de Pagamento</Label>
-                      <Select value={paymentFrequency} onValueChange={setPaymentFrequency}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a periodicidade" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="monthly">Mensal</SelectItem>
-                          <SelectItem value="biweekly">Quinzenal</SelectItem>
-                          <SelectItem value="weekly">Semanal</SelectItem>
-                          <SelectItem value="per_delivery">Por Entrega</SelectItem>
-                          <SelectItem value="single">Pagamento Único</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm">Periodicidade de Pagamento</Label>
+                        <Select value={paymentFrequency} onValueChange={setPaymentFrequency}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a periodicidade" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="monthly">Mensal</SelectItem>
+                            <SelectItem value="biweekly">Quinzenal</SelectItem>
+                            <SelectItem value="weekly">Semanal</SelectItem>
+                            <SelectItem value="per_delivery">Por Entrega</SelectItem>
+                            <SelectItem value="single">Pagamento Único</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Dia de Vencimento</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={28}
+                          placeholder="Ex: 5"
+                          value={paymentDay}
+                          onChange={(e) => setPaymentDay(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">Dia do mês (1–28)</p>
+                      </div>
                     </div>
 
                     <div className="space-y-2">

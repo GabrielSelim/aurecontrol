@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -10,6 +10,23 @@ import {
 } from "@/services/contractService";
 import { fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { sendEmail } from "@/services/edgeFunctionService";
+import {
+  fetchContratoAnexos,
+  uploadContratoAnexo,
+  deleteContratoAnexo,
+  getAnexoSignedUrl,
+  type ContratoAnexo,
+} from "@/services/contratoAnexosService";
+import {
+  fetchNfseByContract,
+  createNfse,
+  cancelNfse,
+  fetchSplitsByContract,
+  createContractSplit,
+  deleteContractSplit,
+  type NfseRecord,
+  type ContractSplit,
+} from "@/services/nfseService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +52,13 @@ import {
   Users,
   Pencil,
   Mail,
+  Upload,
+  Trash2,
+  Paperclip,
+  Download,
+  Receipt,
+  Percent,
+  PlusCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -62,6 +86,12 @@ interface Contract {
   duration_value: number | null;
   duration_unit: string | null;
   deliverable_description: string | null;
+  payment_frequency: string | null;
+  payment_day: number | null;
+  monthly_value: number | null;
+  scope_description: string | null;
+  adjustment_index: string | null;
+  adjustment_date: string | null;
 }
 
 interface Profile {
@@ -104,6 +134,16 @@ const ContratoDetalhes = () => {
   const [witnessEmail, setWitnessEmail] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<ContratoAnexo[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [nfseList, setNfseList] = useState<NfseRecord[]>([]);
+  const [splits, setSplits] = useState<ContractSplit[]>([]);
+  const [isSplitDialogOpen, setIsSplitDialogOpen] = useState(false);
+  const [splitName, setSplitName] = useState("");
+  const [splitDocument, setSplitDocument] = useState("");
+  const [splitPercentage, setSplitPercentage] = useState("");
+  const [isSavingSplit, setIsSavingSplit] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -121,8 +161,11 @@ const ContratoDetalhes = () => {
       }
 
       setContract(contractData);
-
-      // Fetch profile
+      loadAttachments(contractData.id);
+      if (contractData.contract_type === "PJ") {
+        loadNfse(contractData.id);
+        loadSplits(contractData.id);
+      }
       const profileData = await fetchProfileByUserIdMaybe(
         contractData.user_id,
         "full_name, email, phone, avatar_url"
@@ -152,6 +195,159 @@ const ContratoDetalhes = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadAttachments = async (contractId: string) => {
+    try {
+      const data = await fetchContratoAnexos(contractId);
+      setAttachments(data);
+    } catch (err) {
+      logger.error("loadAttachments error:", err);
+    }
+  };
+
+  const handleUploadAttachment = async (file: File) => {
+    if (!contract || !authProfile) return;
+    setIsUploadingAttachment(true);
+    try {
+      const anexo = await uploadContratoAnexo({
+        contractId: contract.id,
+        companyId: contract.company_id,
+        uploadedBy: authProfile.user_id,
+        file,
+      });
+      setAttachments((prev) => [anexo, ...prev]);
+      toast({ title: "Anexo enviado com sucesso!" });
+    } catch (err) {
+      logger.error("handleUploadAttachment error:", err);
+      toast({ title: "Erro ao enviar anexo", variant: "destructive" });
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (anexo: ContratoAnexo) => {
+    try {
+      await deleteContratoAnexo(anexo.id, anexo.file_path);
+      setAttachments((prev) => prev.filter((a) => a.id !== anexo.id));
+      toast({ title: "Anexo removido." });
+    } catch (err) {
+      logger.error("handleDeleteAttachment error:", err);
+      toast({ title: "Erro ao remover anexo", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadAttachment = async (anexo: ContratoAnexo) => {
+    try {
+      const url = await getAnexoSignedUrl(anexo.file_path, 60);
+      window.open(url, "_blank");
+    } catch (err) {
+      logger.error("handleDownloadAttachment error:", err);
+      toast({ title: "Erro ao baixar anexo", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadAttachment = async (anexo: ContratoAnexo) => {
+    try {
+      const url = await getAnexoSignedUrl(anexo.file_path, 60);
+      window.open(url, "_blank");
+    } catch (err) {
+      logger.error("handleDownloadAttachment error:", err);
+      toast({ title: "Erro ao baixar anexo", variant: "destructive" });
+    }
+  };
+
+  const loadNfse = async (contractId: string) => {
+    try {
+      const data = await fetchNfseByContract(contractId);
+      setNfseList(data);
+    } catch (err) {
+      logger.error("loadNfse error:", err);
+    }
+  };
+
+  const loadSplits = async (contractId: string) => {
+    try {
+      const data = await fetchSplitsByContract(contractId);
+      setSplits(data);
+    } catch (err) {
+      logger.error("loadSplits error:", err);
+    }
+  };
+
+  const handleEmitirNfse = async () => {
+    if (!contract) return;
+    try {
+      const now = new Date();
+      const competencia = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      const nfse = await createNfse({
+        contractId: contract.id,
+        companyId: contract.company_id,
+        valor: contract.monthly_value ?? contract.salary ?? 0,
+        competencia,
+      });
+      setNfseList((prev) => [nfse, ...prev]);
+      toast({ title: "NFS-e registrada com sucesso!" });
+    } catch (err) {
+      logger.error("handleEmitirNfse error:", err);
+      toast({ title: "Erro ao registrar NFS-e", variant: "destructive" });
+    }
+  };
+
+  const handleCancelNfse = async (nfseId: string) => {
+    try {
+      await cancelNfse(nfseId);
+      setNfseList((prev) => prev.map((n) => n.id === nfseId ? { ...n, status: "cancelada" as const } : n));
+      toast({ title: "NFS-e cancelada." });
+    } catch (err) {
+      logger.error("handleCancelNfse error:", err);
+      toast({ title: "Erro ao cancelar NFS-e", variant: "destructive" });
+    }
+  };
+
+  const handleSaveSplit = async () => {
+    if (!contract || !splitName.trim() || !splitPercentage) return;
+    const pct = parseFloat(splitPercentage);
+    if (isNaN(pct) || pct <= 0 || pct > 100) {
+      toast({ title: "Percentual inválido", variant: "destructive" });
+      return;
+    }
+    const totalCurrent = splits.reduce((acc, s) => acc + s.percentage, 0);
+    if (totalCurrent + pct > 100) {
+      toast({ title: `Percentual total excederia 100% (atual: ${totalCurrent}%)`, variant: "destructive" });
+      return;
+    }
+    setIsSavingSplit(true);
+    try {
+      const split = await createContractSplit({
+        contractId: contract.id,
+        beneficiaryName: splitName.trim(),
+        beneficiaryDocument: splitDocument.trim() || undefined,
+        percentage: pct,
+      });
+      setSplits((prev) => [...prev, split]);
+      setSplitName("");
+      setSplitDocument("");
+      setSplitPercentage("");
+      setIsSplitDialogOpen(false);
+      toast({ title: "Split adicionado com sucesso!" });
+    } catch (err) {
+      logger.error("handleSaveSplit error:", err);
+      toast({ title: "Erro ao salvar split", variant: "destructive" });
+    } finally {
+      setIsSavingSplit(false);
+    }
+  };
+
+  const handleDeleteSplit = async (splitId: string) => {
+    try {
+      await deleteContractSplit(splitId);
+      setSplits((prev) => prev.filter((s) => s.id !== splitId));
+      toast({ title: "Split removido." });
+    } catch (err) {
+      logger.error("handleDeleteSplit error:", err);
+      toast({ title: "Erro ao remover split", variant: "destructive" });
     }
   };
 
@@ -510,6 +706,58 @@ const ContratoDetalhes = () => {
                 </div>
               )}
             </div>
+            {contract.contract_type === "PJ" && (contract.payment_frequency || contract.payment_day) && (
+              <>
+                <Separator />
+                <div className="grid grid-cols-2 gap-4">
+                  {contract.payment_frequency && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Periodicidade</p>
+                      <p className="font-medium capitalize">
+                        {contract.payment_frequency === "monthly" ? "Mensal" :
+                         contract.payment_frequency === "biweekly" ? "Quinzenal" :
+                         contract.payment_frequency === "weekly" ? "Semanal" :
+                         contract.payment_frequency === "per_delivery" ? "Por Entrega" :
+                         contract.payment_frequency === "single" ? "Único" :
+                         contract.payment_frequency}
+                      </p>
+                    </div>
+                  )}
+                  {contract.payment_day && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Vencimento</p>
+                      <p className="font-medium">Todo dia <strong>{contract.payment_day}</strong></p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+            {contract.scope_description && (
+              <>
+                <Separator />
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Escopo do Serviço</p>
+                  <p className="text-sm whitespace-pre-line">{contract.scope_description}</p>
+                </div>
+              </>
+            )}
+            {contract.adjustment_index && contract.adjustment_index !== "none" && (
+              <>
+                <Separator />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Índice de Reajuste</p>
+                    <p className="font-medium">{contract.adjustment_index}</p>
+                  </div>
+                  {contract.adjustment_date && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Data-base do Reajuste</p>
+                      <p className="font-medium">{formatDate(contract.adjustment_date)}</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -699,6 +947,213 @@ const ContratoDetalhes = () => {
         </Card>
       </div>
 
+      {/* Alerta de reajuste */}
+      {contract?.adjustment_index && contract?.adjustment_date && (() => {
+        const adjustmentDate = new Date(contract.adjustment_date);
+        const today = new Date();
+        const daysUntil = Math.ceil((adjustmentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil > 60) return null;
+        return (
+          <div className={`flex items-start gap-3 rounded-lg border p-4 ${daysUntil <= 0 ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-yellow-500/50 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"}`}>
+            <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold text-sm">
+                {daysUntil <= 0
+                  ? "Reajuste em atraso"
+                  : `Revisão de reajuste em ${daysUntil} dia${daysUntil !== 1 ? "s" : ""}`}
+              </p>
+              <p className="text-xs mt-0.5">
+                Índice: <strong>{contract.adjustment_index}</strong> — Previsto para{" "}
+                {adjustmentDate.toLocaleDateString("pt-BR")}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Anexos */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            Anexos ({attachments.length})
+          </CardTitle>
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleUploadAttachment(file);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isUploadingAttachment}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {isUploadingAttachment ? "Enviando..." : "Adicionar Arquivo"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {attachments.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhum anexo adicionado ainda.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {attachments.map((anexo) => (
+                <div
+                  key={anexo.id}
+                  className="flex items-center justify-between rounded-md border p-3"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{anexo.name}</p>
+                      {anexo.description && (
+                        <p className="text-xs text-muted-foreground truncate">{anexo.description}</p>
+                      )}
+                      {anexo.file_size && (
+                        <p className="text-xs text-muted-foreground">
+                          {(anexo.file_size / 1024).toFixed(1)} KB
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => handleDownloadAttachment(anexo)}
+                      title="Baixar"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteAttachment(anexo)}
+                      title="Remover"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* NFS-e section (PJ only) */}
+      {contract?.contract_type === "PJ" && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              NFS-e — Notas Fiscais de Serviço ({nfseList.length})
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={handleEmitirNfse}>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Registrar NFS-e
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {nfseList.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma NFS-e registrada para este contrato.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {nfseList.map((nfse) => (
+                  <div key={nfse.id} className="flex items-center justify-between rounded-md border p-3">
+                    <div>
+                      <p className="text-sm font-medium">
+                        Competência: {new Date(nfse.competencia).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                        {nfse.numero && ` · Nº ${nfse.numero}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Valor: {formatCurrency(nfse.valor)} ·{" "}
+                        <span className={nfse.status === "emitida" ? "text-green-600" : nfse.status === "cancelada" ? "text-red-500" : nfse.status === "erro" ? "text-red-600" : "text-yellow-600"}>
+                          {nfse.status.charAt(0).toUpperCase() + nfse.status.slice(1)}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      {nfse.pdf_url && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open(nfse.pdf_url!, "_blank")}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {nfse.status === "emitida" && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleCancelNfse(nfse.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Split section (PJ only) */}
+      {contract?.contract_type === "PJ" && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Percent className="h-4 w-4" />
+                Configuração de Split
+              </CardTitle>
+              {splits.length > 0 && (
+                <CardDescription className="mt-1">
+                  Total alocado: {splits.reduce((acc, s) => acc + s.percentage, 0).toFixed(1)}%
+                </CardDescription>
+              )}
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setIsSplitDialogOpen(true)}>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Adicionar Beneficiário
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {splits.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma configuração de split. O pagamento integral vai ao contratado.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {splits.map((split) => (
+                  <div key={split.id} className="flex items-center justify-between rounded-md border p-3">
+                    <div>
+                      <p className="text-sm font-medium">{split.beneficiary_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {split.beneficiary_document && `${split.beneficiary_document} · `}
+                        {split.percentage}%
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteSplit(split.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Dialog para editar testemunha */}
       <Dialog open={!!editingWitness} onOpenChange={(open) => !open && setEditingWitness(null)}>
         <DialogContent>
@@ -739,6 +1194,64 @@ const ContratoDetalhes = () => {
             </Button>
             <Button onClick={handleSaveWitness} disabled={isSaving}>
               {isSaving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para adicionar split */}
+      <Dialog open={isSplitDialogOpen} onOpenChange={(open) => { setIsSplitDialogOpen(open); if (!open) { setSplitName(""); setSplitDocument(""); setSplitPercentage(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Beneficiário de Split</DialogTitle>
+            <DialogDescription>
+              Configure um beneficiário para receber parte do pagamento deste contrato.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="split-name">Nome do Beneficiário *</Label>
+              <Input
+                id="split-name"
+                value={splitName}
+                onChange={(e) => setSplitName(e.target.value)}
+                placeholder="Ex: Sócio João Silva"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="split-doc">CPF / CNPJ</Label>
+              <Input
+                id="split-doc"
+                value={splitDocument}
+                onChange={(e) => setSplitDocument(e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="split-pct">Percentual (%) *</Label>
+              <Input
+                id="split-pct"
+                type="number"
+                min="0.01"
+                max="100"
+                step="0.01"
+                value={splitPercentage}
+                onChange={(e) => setSplitPercentage(e.target.value)}
+                placeholder="Ex: 30"
+              />
+              {splits.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Disponível: {(100 - splits.reduce((acc, s) => acc + s.percentage, 0)).toFixed(1)}%
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSplitDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveSplit} disabled={isSavingSplit || !splitName.trim() || !splitPercentage}>
+              {isSavingSplit ? "Salvando..." : "Adicionar"}
             </Button>
           </DialogFooter>
         </DialogContent>
