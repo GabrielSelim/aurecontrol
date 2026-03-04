@@ -248,16 +248,6 @@ const ContratoDetalhes = () => {
     }
   };
 
-  const handleDownloadAttachment = async (anexo: ContratoAnexo) => {
-    try {
-      const url = await getAnexoSignedUrl(anexo.file_path, 60);
-      window.open(url, "_blank");
-    } catch (err) {
-      logger.error("handleDownloadAttachment error:", err);
-      toast({ title: "Erro ao baixar anexo", variant: "destructive" });
-    }
-  };
-
   const loadNfse = async (contractId: string) => {
     try {
       const data = await fetchNfseByContract(contractId);
