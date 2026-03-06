@@ -77,7 +77,10 @@ export default function NovaEmpresa() {
       }
     } catch (error) {
       logger.error("Error validating CNPJ:", error);
-      setCnpjError("Erro ao validar CNPJ. Tente novamente.");
+      // A validação local já passou — permite prosseguir mesmo sem acesso à API
+      setCnpjValidated(true);
+      setCnpjError("");
+      toast.warning("Não foi possível verificar o CNPJ na Receita Federal.");
     } finally {
       setIsValidatingCNPJ(false);
     }

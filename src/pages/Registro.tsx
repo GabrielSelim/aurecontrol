@@ -163,7 +163,10 @@ const Registro = () => {
       }
     } catch (error) {
       logger.error("Error validating CNPJ:", error);
-      setErrors(prev => ({ ...prev, cnpj: "Erro ao validar CNPJ. Tente novamente." }));
+      // A validação local já passou — permite prosseguir mesmo sem acesso à API
+      setCnpjValidated(true);
+      setErrors(prev => ({ ...prev, cnpj: "" }));
+      toast.warning("Não foi possível verificar o CNPJ na Receita Federal. Prossiga com atenção.");
     } finally {
       setIsValidatingCNPJ(false);
     }

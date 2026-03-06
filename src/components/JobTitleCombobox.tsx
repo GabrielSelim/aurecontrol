@@ -148,14 +148,31 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
               setInputValue(val);
               onChange(val);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && inputValue.trim()) {
+                onChange(inputValue.trim());
+                setOpen(false);
+              }
+              if (e.key === "Escape") {
+                setOpen(false);
+              }
+            }}
           />
           <div className="max-h-[200px] overflow-y-auto">
             {filteredTitles.length === 0 ? (
-              <div className="py-6 text-center text-sm">
-                <p className="text-muted-foreground">Nenhum cargo encontrado.</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Pressione Enter para usar "{inputValue}"
-                </p>
+              <div className="py-4 text-center text-sm">
+                <p className="text-muted-foreground">Nenhum cargo encontrado na lista.</p>
+                {inputValue.trim() && (
+                  <button
+                    className="mt-2 text-primary font-medium text-xs underline underline-offset-2 hover:opacity-80"
+                    onClick={() => {
+                      onChange(inputValue.trim());
+                      setOpen(false);
+                    }}
+                  >
+                    Usar "{inputValue.trim()}" como cargo personalizado
+                  </button>
+                )}
               </div>
             ) : (
               Object.entries(groupedTitles).map(([category, titles]) => (

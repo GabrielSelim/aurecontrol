@@ -267,7 +267,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'global' });
+    // Limpa tokens residuais do localStorage para evitar re-login automático
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("sb-")) localStorage.removeItem(key);
+    });
+    setUser(null);
+    setSession(null);
     setProfile(null);
     setRoles([]);
   };
