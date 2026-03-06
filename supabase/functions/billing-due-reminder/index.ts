@@ -6,6 +6,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendEmailViaResend(to: string, subject: string, html: string, fromName = "Aure System"): Promise<void> {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) throw new Error("RESEND_API_KEY not configured");
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${fromName} <noreply@gabrielsanztech.com.br>`,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error (${res.status}): ${err}`);
+  }
+}
+
 async function logNotification(
   supabase: any,
   companyId: string,
@@ -83,27 +105,6 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const gmailUser = Deno.env.get("GMAIL_USER");
-    const gmailPassword = Deno.env.get("GMAIL_APP_PASSWORD");
-
-    if (!gmailUser || !gmailPassword) {
-      throw new Error("Gmail credentials not configured");
-    }
-
-    const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-
-    const client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: {
-          username: gmailUser,
-          password: gmailPassword,
-        },
-      },
-    });
 
     let remindersSent = 0;
 
@@ -236,13 +237,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       for (const email of recipientEmails) {
         try {
-          await client.send({
-            from: `Aure System <${gmailUser}>`,
-            to: email,
-            subject: subject,
-            content: "auto",
-            html: htmlContent,
-          });
+          await sendEmailViaResend(email, subject, htmlContent);
           console.log(`Reminder sent to ${email} for billing ${billing.id}`);
           
           await logNotification(supabaseClient, company.id, email, "billing_due_reminder", subject, "sent", {
@@ -262,8 +257,6 @@ const handler = async (req: Request): Promise<Response> => {
         }
       }
     }
-
-    await client.close();
 
     console.log(`Total reminders sent: ${remindersSent}`);
 

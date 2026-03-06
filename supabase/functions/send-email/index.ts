@@ -6,6 +6,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendEmailViaResend(to: string, subject: string, html: string, fromName = "Aure System"): Promise<void> {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) throw new Error("RESEND_API_KEY not configured");
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${fromName} <noreply@gabrielsanztech.com.br>`,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error (${res.status}): ${err}`);
+  }
+}
+
 interface EmailRequest {
   to: string;
   subject: string;
@@ -42,70 +64,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields: to, subject, html");
     }
 
-    const gmailUser = Deno.env.get("GMAIL_USER");
-    const gmailPassword = Deno.env.get("GMAIL_APP_PASSWORD");
-
-    if (!gmailUser || !gmailPassword) {
-      throw new Error("Gmail credentials not configured");
-    }
-
-    // Using Gmail SMTP via fetch to Google's API
-    // For production, we'll use a simple SMTP approach via base64 encoding
     const senderName = from_name || "Aure System";
-    
-    // Create email content in RFC 2822 format
-    const emailContent = [
-      `From: ${senderName} <${gmailUser}>`,
-      `To: ${to}`,
-      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
-      `MIME-Version: 1.0`,
-      `Content-Type: text/html; charset=UTF-8`,
-      ``,
-      html
-    ].join("\r\n");
-
-    // Encode credentials for Basic Auth
-    const credentials = btoa(`${gmailUser}:${gmailPassword}`);
-
-    // Send via Gmail SMTP using the Gmail API
-    const response = await fetch("https://smtp.gmail.com:587", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${credentials}`,
-      },
-    }).catch(() => null);
-
-    // Since direct SMTP isn't available in Deno Deploy, we'll use an alternative approach
-    // Using Gmail's API endpoint for sending emails
-    const gmailApiUrl = "https://www.googleapis.com/gmail/v1/users/me/messages/send";
-    
-    // For Gmail API, we need OAuth. Since we have App Password, let's use nodemailer
-    // Actually, let's use a simpler approach with smtp.ts library
-
-    // Using Deno's built-in SMTP support isn't available, so we'll use the denodrivers/smtp
-    const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-
-    const client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: {
-          username: gmailUser,
-          password: gmailPassword,
-        },
-      },
-    });
-
-    await client.send({
-      from: `${senderName} <${gmailUser}>`,
-      to: to,
-      subject: subject,
-      content: "auto",
-      html: html,
-    });
-
-    await client.close();
+    await sendEmailViaResend(to, subject, html, senderName);
 
     console.log(`Email sent successfully to ${to}`);
 

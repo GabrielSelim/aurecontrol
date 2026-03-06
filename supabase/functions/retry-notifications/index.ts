@@ -6,6 +6,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendEmailViaResend(to: string, subject: string, html: string, fromName = "Aure System"): Promise<void> {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) throw new Error("RESEND_API_KEY not configured");
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${fromName} <noreply@gabrielsanztech.com.br>`,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error (${res.status}): ${err}`);
+  }
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,26 +59,6 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const gmailUser = Deno.env.get("GMAIL_USER");
-    const gmailPassword = Deno.env.get("GMAIL_APP_PASSWORD");
-
-    if (!gmailUser || !gmailPassword) {
-      throw new Error("Gmail credentials not configured");
-    }
-
-    const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-    const client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: {
-          username: gmailUser,
-          password: gmailPassword,
-        },
-      },
-    });
 
     let retriedCount = 0;
     let successCount = 0;
@@ -93,13 +95,7 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
         `;
 
-        await client.send({
-          from: `Aure System <${gmailUser}>`,
-          to: recipientEmail,
-          subject: `[Retry] ${subject}`,
-          content: "auto",
-          html: html,
-        });
+        await sendEmailViaResend(recipientEmail, `[Retry] ${subject}`, html);
 
         // Log successful delivery
         await supabaseClient.from("notification_delivery_logs").insert({
@@ -149,8 +145,6 @@ const handler = async (req: Request): Promise<Response> => {
 
       retriedCount++;
     }
-
-    await client.close();
 
     return new Response(
       JSON.stringify({

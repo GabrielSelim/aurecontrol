@@ -1,11 +1,32 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+async function sendEmailViaResend(to: string, subject: string, html: string, fromName = "Aure System"): Promise<void> {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) throw new Error("RESEND_API_KEY not configured");
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${fromName} <noreply@gabrielsanztech.com.br>`,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error (${res.status}): ${err}`);
+  }
+}
 
 interface Company {
   id: string;
@@ -43,9 +64,7 @@ async function logNotification(
 }
 
 async function sendBillingNotification(
-  client: SMTPClient,
   supabase: any,
-  gmailUser: string,
   to: string,
   companyId: string,
   companyName: string,
@@ -127,13 +146,7 @@ async function sendBillingNotification(
       </html>
     `;
 
-    await client.send({
-      from: `Aure System <${gmailUser}>`,
-      to: to,
-      subject: subject,
-      content: "auto",
-      html: html,
-    });
+    await sendEmailViaResend(to, subject, html);
 
     console.log(`Notification email sent to ${to}`);
     await logNotification(supabase, companyId, to, "billing_generated", subject, "sent", {
@@ -159,28 +172,7 @@ serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const gmailUser = Deno.env.get("GMAIL_USER");
-    const gmailPassword = Deno.env.get("GMAIL_APP_PASSWORD");
-    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Initialize SMTP client if credentials are available
-    let smtpClient: SMTPClient | null = null;
-    if (gmailUser && gmailPassword) {
-      smtpClient = new SMTPClient({
-        connection: {
-          hostname: "smtp.gmail.com",
-          port: 465,
-          tls: true,
-          auth: {
-            username: gmailUser,
-            password: gmailPassword,
-          },
-        },
-      });
-    } else {
-      console.log("Gmail credentials not configured, email notifications will be skipped");
-    }
 
     // Get current month reference (previous month for billing)
     const now = new Date();
@@ -203,7 +195,6 @@ serve(async (req: Request) => {
 
     if (!companies || companies.length === 0) {
       console.log("No active companies found");
-      if (smtpClient) await smtpClient.close();
       return new Response(
         JSON.stringify({ message: "No active companies to bill", generated: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -311,7 +302,7 @@ serve(async (req: Request) => {
         generated++;
 
         // Send email notifications
-        if (smtpClient && gmailUser) {
+        {
           // Get company admins
           const { data: admins } = await supabase
             .from("profiles")
@@ -345,9 +336,7 @@ serve(async (req: Request) => {
           // Send notifications
           for (const email of adminEmails) {
             const sent = await sendBillingNotification(
-              smtpClient,
               supabase,
-              gmailUser,
               email,
               company.id,
               company.name,
@@ -364,11 +353,6 @@ serve(async (req: Request) => {
         console.error(`Error processing ${company.name}:`, companyError);
         errors.push(`${company.name}: ${String(companyError)}`);
       }
-    }
-
-    // Close SMTP connection
-    if (smtpClient) {
-      await smtpClient.close();
     }
 
     const result = {

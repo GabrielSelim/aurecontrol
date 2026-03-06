@@ -6,6 +6,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendEmailViaResend(to: string, subject: string, html: string, fromName = "Aure System"): Promise<void> {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) throw new Error("RESEND_API_KEY not configured");
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${fromName} <noreply@gabrielsanztech.com.br>`,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error (${res.status}): ${err}`);
+  }
+}
+
 interface Contract {
   id: string;
   user_id: string;
@@ -95,13 +117,6 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     let alertsSent = 0;
-    const gmailUser = Deno.env.get("GMAIL_USER");
-    const gmailPassword = Deno.env.get("GMAIL_APP_PASSWORD");
-
-    if (!gmailUser || !gmailPassword) {
-      console.error("Gmail credentials not configured");
-      throw new Error("Gmail credentials not configured");
-    }
 
     // Process each company
     for (const [companyId, contracts] of contractsByCompany) {
@@ -227,31 +242,9 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       // Send email to each admin
-      const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-
       for (const admin of admins) {
         try {
-          const client = new SMTPClient({
-            connection: {
-              hostname: "smtp.gmail.com",
-              port: 465,
-              tls: true,
-              auth: {
-                username: gmailUser,
-                password: gmailPassword,
-              },
-            },
-          });
-
-          await client.send({
-            from: `Aure System <${gmailUser}>`,
-            to: admin.email,
-            subject: `⚠️ ${contracts.length} contrato(s) próximo(s) do vencimento - ${companyData.name}`,
-            content: "auto",
-            html: emailHtml,
-          });
-
-          await client.close();
+          await sendEmailViaResend(admin.email, `⚠️ ${contracts.length} contrato(s) próximo(s) do vencimento - ${companyData.name}`, emailHtml);
 
           // Log notification
           await supabaseClient.from("notification_logs").insert({

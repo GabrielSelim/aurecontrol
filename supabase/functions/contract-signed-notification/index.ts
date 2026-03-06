@@ -6,6 +6,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendEmailViaResend(to: string, subject: string, html: string, fromName = "Aure System"): Promise<void> {
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendApiKey) throw new Error("RESEND_API_KEY not configured");
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${fromName} <noreply@gabrielsanztech.com.br>`,
+      to: [to],
+      subject,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend error (${res.status}): ${err}`);
+  }
+}
+
 interface WebhookPayload {
   type: "UPDATE";
   table: "contract_documents";
@@ -75,27 +97,6 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Error fetching signatures:", sigsError);
     }
 
-    const gmailUser = Deno.env.get("GMAIL_USER");
-    const gmailPassword = Deno.env.get("GMAIL_APP_PASSWORD");
-
-    if (!gmailUser || !gmailPassword) {
-      console.error("Gmail credentials not configured");
-      throw new Error("Email configuration missing");
-    }
-
-    const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-    const client = new SMTPClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: {
-          username: gmailUser,
-          password: gmailPassword,
-        },
-      },
-    });
-
     const collaboratorName = (contract.profiles as any)?.full_name || "Colaborador";
     const collaboratorEmail = (contract.profiles as any)?.email;
     const companyName = (contract.companies as any)?.name || "Empresa";
@@ -115,13 +116,7 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       try {
-        await client.send({
-          from: `Aure System <${gmailUser}>`,
-          to: collaboratorEmail,
-          subject: `✅ Contrato Assinado - ${companyName}`,
-          content: "auto",
-          html: collaboratorHtml,
-        });
+        await sendEmailViaResend(collaboratorEmail, `✅ Contrato Assinado - ${companyName}`, collaboratorHtml);
         console.log(`Notification sent to collaborator: ${collaboratorEmail}`);
 
         // Log notification
@@ -160,13 +155,7 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       try {
-        await client.send({
-          from: `Aure System <${gmailUser}>`,
-          to: companyEmail,
-          subject: `✅ Contrato Assinado - ${collaboratorName}`,
-          content: "auto",
-          html: companyHtml,
-        });
+        await sendEmailViaResend(companyEmail, `✅ Contrato Assinado - ${collaboratorName}`, companyHtml);
         console.log(`Notification sent to company: ${companyEmail}`);
 
         await supabaseClient.from("notification_logs").insert({
@@ -189,8 +178,6 @@ const handler = async (req: Request): Promise<Response> => {
         });
       }
     }
-
-    await client.close();
 
     return new Response(
       JSON.stringify({ success: true, message: "Notifications sent" }),

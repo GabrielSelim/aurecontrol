@@ -173,6 +173,32 @@ services:
     networks:
       - aurecontrol
 
+  # ─── Edge Runtime (Supabase Functions) ─────────────────
+  functions:
+    image: supabase/edge-runtime:v1.67.4
+    container_name: aurecontrol-functions
+    restart: unless-stopped
+    depends_on:
+      - db
+    volumes:
+      - ./supabase/functions:/home/deno/functions:Z
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
+      - --port
+      - "9000"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
+      RESEND_API_KEY: ${RESEND_API_KEY}
+    networks:
+      - aurecontrol
+
   # ─── Kong (API Gateway) ─────────────────────────────────
   kong:
     image: kong:2.8.1
