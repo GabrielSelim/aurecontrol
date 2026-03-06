@@ -953,7 +953,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setSelectedUserId(contrato.user_id);
     setContractType(contrato.contract_type);
     setJobTitle(contrato.job_title);
-    setSalary(contrato.salary ? formatCurrencyMask(contrato.salary) : "");
+    setSalary(contrato.salary ? formatCurrencyMask(String(contrato.salary)) : "");
     setDeliverableDescription(contrato.deliverable_description || "");
 
     // Set start date to the day after the existing contract ends, or today

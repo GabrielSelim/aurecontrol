@@ -89,11 +89,11 @@ export async function savePricingTier(tier: Record<string, unknown>) {
     const { id, ...fields } = tier;
     const { error } = await supabase
       .from("pricing_tiers")
-      .update(fields)
+      .update(fields as never)
       .eq("id", id as string);
     if (error) throw error;
   } else {
-    const { error } = await supabase.from("pricing_tiers").insert(tier);
+    const { error } = await supabase.from("pricing_tiers").insert(tier as never);
     if (error) throw error;
   }
 }
@@ -116,11 +116,11 @@ export async function saveCoupon(coupon: Record<string, unknown>) {
     const { id, ...fields } = coupon;
     const { error } = await supabase
       .from("discount_coupons")
-      .update(fields)
+      .update(fields as never)
       .eq("id", id as string);
     if (error) throw error;
   } else {
-    const { error } = await supabase.from("discount_coupons").insert(coupon);
+    const { error } = await supabase.from("discount_coupons").insert(coupon as never);
     if (error) throw error;
   }
 }
@@ -143,11 +143,11 @@ export async function savePromotion(promo: Record<string, unknown>) {
     const { id, ...fields } = promo;
     const { error } = await supabase
       .from("promotions")
-      .update(fields)
+      .update(fields as never)
       .eq("id", id as string);
     if (error) throw error;
   } else {
-    const { error } = await supabase.from("promotions").insert(promo);
+    const { error } = await supabase.from("promotions").insert(promo as never);
     if (error) throw error;
   }
 }
@@ -182,7 +182,7 @@ export async function saveAnnouncement(
     const { id, ...fields } = announcement;
     const { data, error } = await supabase
       .from("system_announcements")
-      .update(fields)
+      .update(fields as never)
       .eq("id", id as string)
       .select()
       .single();
@@ -191,7 +191,7 @@ export async function saveAnnouncement(
   } else {
     const { data, error } = await supabase
       .from("system_announcements")
-      .insert(announcement)
+      .insert(announcement as never)
       .select()
       .single();
     if (error) throw error;

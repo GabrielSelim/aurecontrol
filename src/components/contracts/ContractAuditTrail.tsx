@@ -77,20 +77,22 @@ export const ContractAuditTrail = ({ contractId, documentId: _documentId }: Cont
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const _cvTable = contractVersionsTable() as any;
       const [logsRes, versionsRes] = await Promise.all([
         auditLogsTable()
           .select("*")
           .eq("contract_id", contractId)
           .order("created_at", { ascending: false })
           .limit(100),
-        contractVersionsTable()
+        _cvTable
           .select("*")
           .eq("contract_id", contractId)
           .order("version_number", { ascending: false }),
       ]);
 
-      setLogs((logsRes.data as AuditLog[]) || []);
-      setVersions((versionsRes.data as ContractVersion[]) || []);
+      setLogs((logsRes.data as unknown as AuditLog[]) || []);
+      setVersions((versionsRes.data as unknown as ContractVersion[]) || []);
     } catch (error) {
       logger.error("Error fetching audit data:", error);
     } finally {

@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { auditLogsTable, contractVersionsTable } from "@/integrations/supabase/extraTypes";
 import { logger } from "@/lib/logger";
+import type { Json } from "@/integrations/supabase/types";
 
 export type AuditAction =
   | "contract_created"
@@ -93,7 +94,7 @@ export async function logAuditAction(params: {
       actor_id: (await supabase.auth.getUser()).data.user?.id || null,
       actor_name: params.actorName,
       actor_email: params.actorEmail,
-      details: params.details || {},
+      details: (params.details || null) as Json | null,
       ip_address: ipAddress,
       user_agent: navigator.userAgent,
     });
@@ -110,20 +111,23 @@ export async function createContractVersion(params: {
 }) {
   try {
     // Get next version number
-    const { data: existing } = await contractVersionsTable()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const _cvTable = contractVersionsTable() as any;
+    const { data: existing } = await _cvTable
       .select("version_number")
       .eq("contract_id", params.contractId)
       .order("version_number", { ascending: false })
       .limit(1);
 
-    const nextVersion = (existing?.[0]?.version_number || 0) + 1;
+    const existingVersions = existing as Array<{ version_number: number }> | null;
+    const nextVersion = (existingVersions?.[0]?.version_number || 0) + 1;
 
     // Generate hash client-side using simple approach
     const hash = await generateClientHash(params.documentHtml);
 
     const userId = (await supabase.auth.getUser()).data.user?.id || null;
 
-    await contractVersionsTable().insert({
+    await _cvTable.insert({
       contract_id: params.contractId,
       document_id: params.documentId,
       version_number: nextVersion,

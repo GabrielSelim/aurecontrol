@@ -180,7 +180,7 @@ export function useDashboardAdmin(companyId: string | undefined) {
       const allContracts = await fetchContractUserIds(cid, "active");
       const usersWithContract = new Set(allContracts.map((c) => c.user_id));
       const usersWithoutContract = allProfiles.filter(
-        (p: Record<string, unknown>) => !usersWithContract.has(p.user_id as string)
+        (p) => !usersWithContract.has(p.user_id as string)
       );
 
       const overduePaymentsCount = await countOverduePayments({
@@ -284,8 +284,8 @@ export function useDashboardAdmin(companyId: string | undefined) {
           .limit(5);
 
         if (auditLogs && auditLogs.length > 0) {
-          recentActivities = auditLogs.map(
-            (log: Record<string, unknown>) => ({
+          recentActivities = (auditLogs as unknown as Record<string, unknown>[]).map(
+            (log) => ({
               id: log.id as string,
               action: log.action as string,
               actorName: log.actor_name as string,

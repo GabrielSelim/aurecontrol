@@ -7,13 +7,23 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
-  }
   public: {
     Tables: {
+      _migrations_applied: {
+        Row: {
+          applied_at: string | null
+          filename: string
+        }
+        Insert: {
+          applied_at?: string | null
+          filename: string
+        }
+        Update: {
+          applied_at?: string | null
+          filename?: string
+        }
+        Relationships: []
+      }
       announcement_reads: {
         Row: {
           announcement_id: string
@@ -46,6 +56,13 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          address_cep: string | null
+          address_city: string | null
+          address_complement: string | null
+          address_neighborhood: string | null
+          address_number: string | null
+          address_state: string | null
+          address_street: string | null
           bank_account: string | null
           bank_account_type: string | null
           bank_agency: string | null
@@ -75,6 +92,13 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_cep?: string | null
+          address_city?: string | null
+          address_complement?: string | null
+          address_neighborhood?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
           bank_account?: string | null
           bank_account_type?: string | null
           bank_agency?: string | null
@@ -104,6 +128,13 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_cep?: string | null
+          address_city?: string | null
+          address_complement?: string | null
+          address_neighborhood?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
           bank_account?: string | null
           bank_account_type?: string | null
           bank_agency?: string | null
@@ -131,7 +162,15 @@ export type Database = {
           updated_at?: string | null
           welcome_email_template?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_default_template_id_fkey"
+            columns: ["default_template_id"]
+            isOneToOne: false
+            referencedRelation: "contract_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       company_billings: {
         Row: {
@@ -228,6 +267,80 @@ export type Database = {
           },
         ]
       }
+      contract_audit_logs: {
+        Row: {
+          action: string
+          action_category: string
+          actor_email: string
+          actor_id: string | null
+          actor_name: string
+          contract_id: string
+          created_at: string | null
+          details: Json | null
+          document_id: string | null
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          action_category?: string
+          actor_email: string
+          actor_id?: string | null
+          actor_name: string
+          contract_id: string
+          created_at?: string | null
+          details?: Json | null
+          document_id?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          action_category?: string
+          actor_email?: string
+          actor_id?: string | null
+          actor_name?: string
+          contract_id?: string
+          created_at?: string | null
+          details?: Json | null
+          document_id?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_audit_logs_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_audit_logs_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_audit_logs_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "pj_payment_queue"
+            referencedColumns: ["contract_id"]
+          },
+          {
+            foreignKeyName: "contract_audit_logs_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "contract_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_documents: {
         Row: {
           company_representative_id: string | null
@@ -285,6 +398,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "contracts_secure"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_documents_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: true
+            referencedRelation: "pj_payment_queue"
+            referencedColumns: ["contract_id"]
           },
           {
             foreignKeyName: "contract_documents_template_id_fkey"
@@ -378,6 +498,105 @@ export type Database = {
           },
         ]
       }
+      contract_splits: {
+        Row: {
+          beneficiary_account: string | null
+          beneficiary_agency: string | null
+          beneficiary_bank: string | null
+          beneficiary_document: string | null
+          beneficiary_name: string
+          contract_id: string
+          created_at: string
+          id: string
+          percentage: number
+        }
+        Insert: {
+          beneficiary_account?: string | null
+          beneficiary_agency?: string | null
+          beneficiary_bank?: string | null
+          beneficiary_document?: string | null
+          beneficiary_name: string
+          contract_id: string
+          created_at?: string
+          id?: string
+          percentage: number
+        }
+        Update: {
+          beneficiary_account?: string | null
+          beneficiary_agency?: string | null
+          beneficiary_bank?: string | null
+          beneficiary_document?: string | null
+          beneficiary_name?: string
+          contract_id?: string
+          created_at?: string
+          id?: string
+          percentage?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_splits_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_splits_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_splits_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "pj_payment_queue"
+            referencedColumns: ["contract_id"]
+          },
+        ]
+      }
+      contract_template_versions: {
+        Row: {
+          content: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          saved_by: string | null
+          template_id: string
+          version_number: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          saved_by?: string | null
+          template_id: string
+          version_number?: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          saved_by?: string | null
+          template_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "contract_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_templates: {
         Row: {
           category: string | null
@@ -438,91 +657,6 @@ export type Database = {
           },
         ]
       }
-      contract_template_versions: {
-        Row: {
-          id: string
-          template_id: string
-          version_number: number
-          name: string
-          description: string | null
-          content: string
-          saved_by: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          template_id: string
-          version_number: number
-          name: string
-          description?: string | null
-          content: string
-          saved_by?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          template_id?: string
-          version_number?: number
-          name?: string
-          description?: string | null
-          content?: string
-          saved_by?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "contract_template_versions_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "contract_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      contract_splits: {
-        Row: {
-          id: string
-          contract_id: string
-          beneficiary_name: string
-          beneficiary_document: string | null
-          beneficiary_bank: string | null
-          beneficiary_agency: string | null
-          beneficiary_account: string | null
-          percentage: number
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          contract_id: string
-          beneficiary_name: string
-          beneficiary_document?: string | null
-          beneficiary_bank?: string | null
-          beneficiary_agency?: string | null
-          beneficiary_account?: string | null
-          percentage: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          contract_id?: string
-          beneficiary_name?: string
-          beneficiary_document?: string | null
-          beneficiary_bank?: string | null
-          beneficiary_agency?: string | null
-          beneficiary_account?: string | null
-          percentage?: number
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "contract_splits_contract_id_fkey"
-            columns: ["contract_id"]
-            isOneToOne: false
-            referencedRelation: "contracts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       contracts: {
         Row: {
           adjustment_date: string | null
@@ -541,7 +675,9 @@ export type Database = {
           hourly_rate: number | null
           id: string
           job_title: string
+          monthly_value: number | null
           notes: string | null
+          payment_day: number | null
           payment_frequency: string | null
           salary: number | null
           scope_description: string | null
@@ -567,7 +703,9 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           job_title: string
+          monthly_value?: number | null
           notes?: string | null
+          payment_day?: number | null
           payment_frequency?: string | null
           salary?: number | null
           scope_description?: string | null
@@ -593,7 +731,9 @@ export type Database = {
           hourly_rate?: number | null
           id?: string
           job_title?: string
+          monthly_value?: number | null
           notes?: string | null
+          payment_day?: number | null
           payment_frequency?: string | null
           salary?: number | null
           scope_description?: string | null
@@ -616,6 +756,81 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies_secure"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      contrato_anexos: {
+        Row: {
+          company_id: string
+          contract_id: string
+          created_at: string | null
+          description: string | null
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          name: string
+          uploaded_by: string
+        }
+        Insert: {
+          company_id: string
+          contract_id: string
+          created_at?: string | null
+          description?: string | null
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          name: string
+          uploaded_by: string
+        }
+        Update: {
+          company_id?: string
+          contract_id?: string
+          created_at?: string | null
+          description?: string | null
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          name?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contrato_anexos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_anexos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_anexos_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_anexos_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contrato_anexos_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "pj_payment_queue"
+            referencedColumns: ["contract_id"]
           },
         ]
       }
@@ -715,6 +930,90 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies_secure"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      nfse: {
+        Row: {
+          company_id: string
+          competencia: string
+          contract_id: string
+          created_at: string
+          emitida_em: string | null
+          error_message: string | null
+          id: string
+          numero: string | null
+          pdf_url: string | null
+          status: string
+          updated_at: string
+          valor: number
+          xml: string | null
+        }
+        Insert: {
+          company_id: string
+          competencia: string
+          contract_id: string
+          created_at?: string
+          emitida_em?: string | null
+          error_message?: string | null
+          id?: string
+          numero?: string | null
+          pdf_url?: string | null
+          status?: string
+          updated_at?: string
+          valor: number
+          xml?: string | null
+        }
+        Update: {
+          company_id?: string
+          competencia?: string
+          contract_id?: string
+          created_at?: string
+          emitida_em?: string | null
+          error_message?: string | null
+          id?: string
+          numero?: string | null
+          pdf_url?: string | null
+          status?: string
+          updated_at?: string
+          valor?: number
+          xml?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nfse_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nfse_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "pj_payment_queue"
+            referencedColumns: ["contract_id"]
           },
         ]
       }
@@ -876,6 +1175,67 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          contract_id: string | null
+          created_at: string | null
+          event_type: string | null
+          id: string
+          message: string
+          read: boolean
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          contract_id?: string | null
+          created_at?: string | null
+          event_type?: string | null
+          id?: string
+          message: string
+          read?: boolean
+          read_at?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          contract_id?: string | null
+          created_at?: string | null
+          event_type?: string | null
+          id?: string
+          message?: string
+          read?: boolean
+          read_at?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "pj_payment_queue"
+            referencedColumns: ["contract_id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -885,6 +1245,7 @@ export type Database = {
           contract_id: string
           created_at: string | null
           description: string | null
+          due_date: string | null
           id: string
           notes: string | null
           payment_date: string | null
@@ -902,6 +1263,7 @@ export type Database = {
           contract_id: string
           created_at?: string | null
           description?: string | null
+          due_date?: string | null
           id?: string
           notes?: string | null
           payment_date?: string | null
@@ -919,6 +1281,7 @@ export type Database = {
           contract_id?: string
           created_at?: string | null
           description?: string | null
+          due_date?: string | null
           id?: string
           notes?: string | null
           payment_date?: string | null
@@ -956,6 +1319,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "contracts_secure"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "pj_payment_queue"
+            referencedColumns: ["contract_id"]
           },
         ]
       }
@@ -1016,9 +1386,17 @@ export type Database = {
           marital_status: string | null
           nationality: string | null
           phone: string | null
+          pj_bank_account: string | null
+          pj_bank_account_type: string | null
+          pj_bank_agency: string | null
+          pj_bank_name: string | null
           pj_cnpj: string | null
           pj_nome_fantasia: string | null
+          pj_onboarding_done: boolean | null
+          pj_pix_key: string | null
+          pj_pix_key_type: string | null
           pj_razao_social: string | null
+          pj_regime_tributario: string | null
           profession: string | null
           updated_at: string | null
           user_id: string
@@ -1046,9 +1424,17 @@ export type Database = {
           marital_status?: string | null
           nationality?: string | null
           phone?: string | null
+          pj_bank_account?: string | null
+          pj_bank_account_type?: string | null
+          pj_bank_agency?: string | null
+          pj_bank_name?: string | null
           pj_cnpj?: string | null
           pj_nome_fantasia?: string | null
+          pj_onboarding_done?: boolean | null
+          pj_pix_key?: string | null
+          pj_pix_key_type?: string | null
           pj_razao_social?: string | null
+          pj_regime_tributario?: string | null
           profession?: string | null
           updated_at?: string | null
           user_id: string
@@ -1076,9 +1462,17 @@ export type Database = {
           marital_status?: string | null
           nationality?: string | null
           phone?: string | null
+          pj_bank_account?: string | null
+          pj_bank_account_type?: string | null
+          pj_bank_agency?: string | null
+          pj_bank_name?: string | null
           pj_cnpj?: string | null
           pj_nome_fantasia?: string | null
+          pj_onboarding_done?: boolean | null
+          pj_pix_key?: string | null
+          pj_pix_key_type?: string | null
           pj_razao_social?: string | null
+          pj_regime_tributario?: string | null
           profession?: string | null
           updated_at?: string | null
           user_id?: string
@@ -1238,6 +1632,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "system_announcements_created_by_profile_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "system_announcements_created_by_profile_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "system_announcements_target_company_id_fkey"
             columns: ["target_company_id"]
             isOneToOne: false
@@ -1303,6 +1711,71 @@ export type Database = {
       }
     }
     Views: {
+      audit_log_full: {
+        Row: {
+          action: string | null
+          action_category: string | null
+          actor_email: string | null
+          actor_full_name: string | null
+          actor_id: string | null
+          actor_name: string | null
+          company_id: string | null
+          contract_id: string | null
+          contract_job_title: string | null
+          contract_status: Database["public"]["Enums"]["contract_status"] | null
+          contract_type: Database["public"]["Enums"]["contract_type"] | null
+          created_at: string | null
+          details: Json | null
+          document_id: string | null
+          id: string | null
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_audit_logs_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_audit_logs_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "contracts_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_audit_logs_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "pj_payment_queue"
+            referencedColumns: ["contract_id"]
+          },
+          {
+            foreignKeyName: "contract_audit_logs_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "contract_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies_secure: {
         Row: {
           address: string | null
@@ -1396,6 +1869,76 @@ export type Database = {
           status?: Database["public"]["Enums"]["contract_status"] | null
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financeiro_dashboard: {
+        Row: {
+          approved_count: number | null
+          company_id: string | null
+          month: string | null
+          paid_count: number | null
+          pending_count: number | null
+          rejected_count: number | null
+          total_approved: number | null
+          total_paid: number | null
+          total_pending: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_alerts: {
+        Row: {
+          alert_date: string | null
+          alert_type: string | null
+          company_id: string | null
+          message: string | null
+          reference_id: string | null
+        }
+        Relationships: []
+      }
+      pj_payment_queue: {
+        Row: {
+          company_id: string | null
+          contract_id: string | null
+          email: string | null
+          end_date: string | null
+          full_name: string | null
+          job_title: string | null
+          monthly_value: number | null
+          payment_day: number | null
+          payment_frequency: string | null
+          start_date: string | null
+          user_id: string | null
         }
         Relationships: [
           {
@@ -1545,6 +2088,7 @@ export type Database = {
         | "gestor"
         | "colaborador"
         | "juridico"
+        | "pj"
       contract_status:
         | "active"
         | "inactive"
@@ -1690,6 +2234,7 @@ export const Constants = {
         "gestor",
         "colaborador",
         "juridico",
+        "pj",
       ],
       contract_status: [
         "active",

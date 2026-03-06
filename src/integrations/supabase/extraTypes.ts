@@ -75,17 +75,19 @@ export interface ContractVersionInsert {
 /**
  * Access the `contract_audit_logs` table with typed Row/Insert support.
  *
- * Uses an `as unknown as` cast internally so callers don't have to.
- * This can be removed once the generated types include the table.
+ * Now that `contract_audit_logs` is in the generated Database types,
+ * this helper simply returns the typed query builder directly.
  */
  
 export function auditLogsTable() {
-  return (supabase as unknown as { from: (table: string) => ReturnType<typeof supabase.from> })
-    .from("contract_audit_logs");
+  return supabase.from("contract_audit_logs");
 }
 
 /**
  * Access the `contract_versions` table with typed Row/Insert support.
+ *
+ * `contract_versions` is not yet in the generated types (no migration exists).
+ * Uses an `as unknown as` cast internally so callers don't have to.
  */
  
 export function contractVersionsTable() {

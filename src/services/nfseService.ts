@@ -36,7 +36,7 @@ export async function fetchNfseByContract(contractId: string): Promise<NfseRecor
     .order("competencia", { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as NfseRecord[];
 }
 
 export async function createNfse(nfse: {
@@ -58,7 +58,7 @@ export async function createNfse(nfse: {
     .single();
 
   if (error) throw error;
-  return data;
+  return data as NfseRecord;
 }
 
 export async function cancelNfse(nfseId: string): Promise<void> {

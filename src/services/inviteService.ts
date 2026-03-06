@@ -40,7 +40,7 @@ export async function createInvite(invite: {
 }) {
   const { data, error } = await supabase
     .from("invites")
-    .insert(invite)
+    .insert(invite as never)
     .select()
     .single();
 
@@ -55,7 +55,7 @@ export async function updateInviteStatus(
 ) {
   const { error } = await supabase
     .from("invites")
-    .update({ status, ...extraFields })
+    .update({ status, ...(extraFields || {}) } as never)
     .eq("id", inviteId);
 
   if (error) throw error;

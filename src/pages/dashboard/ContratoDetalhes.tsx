@@ -171,7 +171,7 @@ const ContratoDetalhes = () => {
         "full_name, email, phone, avatar_url"
       );
 
-      setProfile(profileData);
+      setProfile(profileData as unknown as Profile);
 
       // Fetch document if PJ contract
       if (contractData.contract_type === "PJ") {

@@ -156,8 +156,8 @@ export async function fetchContractsByCompany(
     .select("*")
     .eq("company_id", companyId);
 
-  if (filters?.status) query = query.eq("status", filters.status);
-  if (filters?.contract_type) query = query.eq("contract_type", filters.contract_type);
+  if (filters?.status) query = query.eq("status", filters.status as never);
+  if (filters?.contract_type) query = query.eq("contract_type", filters.contract_type as never);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -181,7 +181,7 @@ export async function updateContractStatus(
 ) {
   const { error } = await supabase
     .from("contracts")
-    .update({ status })
+    .update({ status: status as never })
     .eq("id", contractId);
 
   if (error) throw error;
@@ -196,7 +196,7 @@ export async function countContractsByCompany(
     .select("*", { count: "exact", head: true })
     .eq("company_id", companyId);
 
-  if (contractType) query = query.eq("contract_type", contractType);
+  if (contractType) query = query.eq("contract_type", contractType as never);
 
   const { count, error } = await query;
   if (error) throw error;
@@ -240,7 +240,7 @@ export async function fetchContractsByUser(userId: string) {
 export async function createContract(contractData: Record<string, unknown>) {
   const { data, error } = await supabase
     .from("contracts")
-    .insert(contractData)
+    .insert(contractData as never)
     .select()
     .single();
 
@@ -251,7 +251,7 @@ export async function createContract(contractData: Record<string, unknown>) {
 export async function createDocument(docData: Record<string, unknown>) {
   const { data, error } = await supabase
     .from("contract_documents")
-    .insert(docData)
+    .insert(docData as never)
     .select()
     .single();
 
@@ -264,7 +264,7 @@ export async function createSignatures(
 ) {
   const { error } = await supabase
     .from("contract_signatures")
-    .insert(entries);
+    .insert(entries as never);
 
   if (error) throw error;
 }
@@ -274,7 +274,7 @@ export async function createContractSplits(
 ) {
   const { error } = await supabase
     .from("contract_splits")
-    .insert(splits);
+    .insert(splits as never);
 
   if (error) throw error;
 }
@@ -299,8 +299,8 @@ export async function fetchContractsByIds(
     .select("*")
     .in("id", ids);
 
-  if (filters?.contract_type) query = query.eq("contract_type", filters.contract_type);
-  if (filters?.status) query = query.eq("status", filters.status);
+  if (filters?.contract_type) query = query.eq("contract_type", filters.contract_type as never);
+  if (filters?.status) query = query.eq("status", filters.status as never);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -342,7 +342,7 @@ export async function fetchContractUserIds(
     .from("contracts")
     .select("user_id")
     .eq("company_id", companyId)
-    .eq("status", status);
+    .eq("status", status as never);
 
   if (error) throw error;
   return data ?? [];
@@ -356,7 +356,7 @@ export async function fetchContractSalaries(
     .from("contracts")
     .select("salary")
     .eq("company_id", companyId)
-    .eq("status", status);
+    .eq("status", status as never);
 
   if (error) throw error;
   return data ?? [];
@@ -365,16 +365,16 @@ export async function fetchContractSalaries(
 export async function fetchActiveTemplatesByCompany(
   companyId: string,
   select = "id, name"
-) {
+): Promise<{ id: string; name: string }[]> {
   const { data, error } = await supabase
     .from("contract_templates")
-    .select(select)
+    .select(select as "*")
     .eq("company_id", companyId)
     .eq("is_active", true)
     .order("name");
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as unknown as { id: string; name: string }[];
 }
 
 export async function fetchPendingSignaturesByEmail(email: string) {

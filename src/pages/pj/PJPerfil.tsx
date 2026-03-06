@@ -128,22 +128,22 @@ const PJPerfil = () => {
           <div>
             <Label>CNPJ</Label>
             <Input
-              value={form.cnpj ?? ""}
-              onChange={(e) => set("cnpj", formatCNPJ(e.target.value))}
+              value={form.pj_cnpj ?? ""}
+              onChange={(e) => set("pj_cnpj", formatCNPJ(e.target.value))}
               maxLength={18}
             />
           </div>
           <div>
             <Label>Razão Social</Label>
-            <Input value={form.razao_social ?? ""} onChange={(e) => set("razao_social", e.target.value)} />
+            <Input value={form.pj_razao_social ?? ""} onChange={(e) => set("pj_razao_social", e.target.value)} />
           </div>
           <div>
             <Label>Nome Fantasia</Label>
-            <Input value={form.nome_fantasia ?? ""} onChange={(e) => set("nome_fantasia", e.target.value)} />
+            <Input value={form.pj_nome_fantasia ?? ""} onChange={(e) => set("pj_nome_fantasia", e.target.value)} />
           </div>
           <div>
             <Label>Regime Tributário</Label>
-            <Select value={form.regime_tributario ?? ""} onValueChange={(v) => set("regime_tributario", v)}>
+            <Select value={form.pj_regime_tributario ?? ""} onValueChange={(v) => set("pj_regime_tributario", v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
@@ -169,34 +169,34 @@ const PJPerfil = () => {
           <div>
             <Label>CEP</Label>
             <Input
-              value={form.cep ?? ""}
-              onChange={(e) => set("cep", formatCEP(e.target.value))}
+              value={form.address_cep ?? ""}
+              onChange={(e) => set("address_cep", formatCEP(e.target.value))}
               maxLength={9}
             />
           </div>
           <div className="sm:col-span-2">
             <Label>Logradouro</Label>
-            <Input value={form.street ?? ""} onChange={(e) => set("street", e.target.value)} />
+            <Input value={form.address_street ?? ""} onChange={(e) => set("address_street", e.target.value)} />
           </div>
           <div>
             <Label>Número</Label>
-            <Input value={form.number ?? ""} onChange={(e) => set("number", e.target.value)} />
+            <Input value={form.address_number ?? ""} onChange={(e) => set("address_number", e.target.value)} />
           </div>
           <div>
             <Label>Complemento</Label>
-            <Input value={form.complement ?? ""} onChange={(e) => set("complement", e.target.value)} />
+            <Input value={form.address_complement ?? ""} onChange={(e) => set("address_complement", e.target.value)} />
           </div>
           <div>
             <Label>Bairro</Label>
-            <Input value={form.neighborhood ?? ""} onChange={(e) => set("neighborhood", e.target.value)} />
+            <Input value={form.address_neighborhood ?? ""} onChange={(e) => set("address_neighborhood", e.target.value)} />
           </div>
           <div>
             <Label>Cidade</Label>
-            <Input value={form.city ?? ""} onChange={(e) => set("city", e.target.value)} />
+            <Input value={form.address_city ?? ""} onChange={(e) => set("address_city", e.target.value)} />
           </div>
           <div>
             <Label>Estado (UF)</Label>
-            <Input value={form.state ?? ""} onChange={(e) => set("state", e.target.value)} maxLength={2} />
+            <Input value={form.address_state ?? ""} onChange={(e) => set("address_state", e.target.value)} maxLength={2} />
           </div>
         </CardContent>
       </Card>
@@ -212,11 +212,11 @@ const PJPerfil = () => {
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>Banco</Label>
-            <Input value={form.bank_name ?? ""} onChange={(e) => set("bank_name", e.target.value)} />
+            <Input value={form.pj_bank_name ?? ""} onChange={(e) => set("pj_bank_name", e.target.value)} />
           </div>
           <div>
             <Label>Tipo de Conta</Label>
-            <Select value={form.bank_account_type ?? ""} onValueChange={(v) => set("bank_account_type", v)}>
+            <Select value={form.pj_bank_account_type ?? ""} onValueChange={(v) => set("pj_bank_account_type", v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
@@ -228,22 +228,22 @@ const PJPerfil = () => {
           </div>
           <div>
             <Label>Agência</Label>
-            <Input value={form.bank_agency ?? ""} onChange={(e) => set("bank_agency", e.target.value)} />
+            <Input value={form.pj_bank_agency ?? ""} onChange={(e) => set("pj_bank_agency", e.target.value)} />
           </div>
           <div>
             <Label>Conta</Label>
-            <Input value={form.bank_account ?? ""} onChange={(e) => set("bank_account", e.target.value)} />
+            <Input value={form.pj_bank_account ?? ""} onChange={(e) => set("pj_bank_account", e.target.value)} />
           </div>
 
           <Separator className="sm:col-span-2" />
 
           <div>
             <Label>Chave Pix</Label>
-            <Input value={form.pix_key ?? ""} onChange={(e) => set("pix_key", e.target.value)} />
+            <Input value={form.pj_pix_key ?? ""} onChange={(e) => set("pj_pix_key", e.target.value)} />
           </div>
           <div>
             <Label>Tipo de Chave Pix</Label>
-            <Select value={form.pix_key_type ?? ""} onValueChange={(v) => set("pix_key_type", v)}>
+            <Select value={form.pj_pix_key_type ?? ""} onValueChange={(v) => set("pj_pix_key_type", v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>

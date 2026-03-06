@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, ChevronsUpDown, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -111,9 +111,20 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
 
+  // Sync when parent resets the value (e.g. form reset)
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
   const filteredTitles = commonJobTitles.filter((title) =>
     title.value.toLowerCase().includes(inputValue.toLowerCase())
   );
+
+  const exactMatch = commonJobTitles.some(
+    (t) => t.value.toLowerCase() === inputValue.trim().toLowerCase()
+  );
+
+  const showCustomOption = inputValue.trim().length > 0 && !exactMatch;
 
   const groupedTitles = filteredTitles.reduce((acc, title) => {
     if (!acc[title.category]) {
@@ -159,22 +170,29 @@ export function JobTitleCombobox({ value, onChange, placeholder = "Selecione ou 
             }}
           />
           <div className="max-h-[200px] overflow-y-auto">
-            {filteredTitles.length === 0 ? (
-              <div className="py-4 text-center text-sm">
-                <p className="text-muted-foreground">Nenhum cargo encontrado na lista.</p>
-                {inputValue.trim() && (
-                  <button
-                    className="mt-2 text-primary font-medium text-xs underline underline-offset-2 hover:opacity-80"
-                    onClick={() => {
-                      onChange(inputValue.trim());
-                      setOpen(false);
-                    }}
-                  >
-                    Usar "{inputValue.trim()}" como cargo personalizado
-                  </button>
-                )}
+            {showCustomOption && (
+              <div className="p-1 border-b border-border/50">
+                <div
+                  className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground gap-2"
+                  onClick={() => {
+                    onChange(inputValue.trim());
+                    setOpen(false);
+                  }}
+                >
+                  <PenLine className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span>
+                    Usar{" "}
+                    <span className="font-medium">"{inputValue.trim()}"</span>
+                    {" "}como cargo personalizado
+                  </span>
+                </div>
               </div>
-            ) : (
+            )}
+            {filteredTitles.length === 0 && !showCustomOption ? (
+              <div className="py-4 text-center text-sm text-muted-foreground">
+                Nenhum cargo encontrado.
+              </div>
+            ) : filteredTitles.length === 0 && showCustomOption ? null : (
               Object.entries(groupedTitles).map(([category, titles]) => (
                 <div key={category} className="p-1">
                   <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">

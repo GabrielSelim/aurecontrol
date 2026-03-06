@@ -18,7 +18,7 @@ export async function fetchPaymentsByCompany(companyId: string) {
 export async function createPayments(
   payloads: Array<Record<string, unknown>>
 ) {
-  const { error } = await supabase.from("payments").insert(payloads);
+  const { error } = await supabase.from("payments").insert(payloads as never);
   if (error) throw error;
 }
 
@@ -174,7 +174,7 @@ export async function countPaymentsByCompany(
     .select("*", { count: "exact", head: true })
     .eq("company_id", companyId);
 
-  if (filters?.status) query = query.eq("status", filters.status);
+  if (filters?.status) query = query.eq("status", filters.status as never);
   if (filters?.fromDate) query = query.gte("created_at", filters.fromDate);
 
   const { count, error } = await query;
