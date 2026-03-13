@@ -1,0 +1,233 @@
+# AURE — Backlog de Implementação
+> Referência: `nova_implementacao_12_03_2026.md`
+> Atualizado em: 13/03/2026
+> **Como usar:** Ao concluir um item, troque `⬜` por `✅` e adicione a data.
+
+---
+
+## Legenda
+| Símbolo | Significado |
+|---|---|
+| ✅ | Implementado |
+| 🔄 | Implementado parcialmente |
+| ⬜ | Não implementado |
+| 🔴 | Bloqueador crítico (MVP) |
+| 🟡 | Alta prioridade |
+| 🟢 | Média prioridade |
+| 🔵 | Longo prazo (Fases 2–4) |
+
+---
+
+## PARTE I — Diagnóstico: Gaps do PRD
+
+### 🔴 Gaps Críticos — Bloqueadores MVP
+
+| # | Gap | Status | Observação |
+|---|---|---|---|
+| GAP-01 | Portal e Visão do PJ | ✅ | `PJDashboard`, `PJContratos`, `PJPagamentos`, `PJPerfil`, `PJLayout` — portal bilateral completo |
+| GAP-02 | Assinatura Digital Bilateral e Certificado | 🔄 | `SignaturePad.tsx`, `SignatureCertificate.tsx` existem. Falta: registro em blockchain e integração com provedor externo (ClickSign/DocuSign) |
+| GAP-03 | Status Contratual Estruturado com Histórico | 🔄 | Estados existem (`active`, `assinado`, `enviado`, `terminated`, etc). Falta: máquina de 9 estados do PRD completa + timeline visível por contrato |
+| GAP-04 | Vínculo Automático Contrato → Obrigação Financeira | 🔄 | Campo de periodicidade existe no formulário. `gerarObrigacoesPJ` via edge function existe. Falta: vínculo automático real ao ativar contrato + fila de aprovação financeiro |
+
+---
+
+### 🟡 Alta Prioridade — Diferenciais Competitivos
+
+| # | Gap | Status | Observação |
+|---|---|---|---|
+| GAP-05 | Tela de Detalhe do Contrato | ✅ | `ContratoDetalhes.tsx` (1254 linhas) — visualizador, dados, assinaturas, NFS-e, splits, anexos |
+| GAP-06 | Tela de Detalhe do Colaborador | ✅ | `ColaboradorDetalhes.tsx` — perfil completo, contratos, histórico de pagamentos, gestão de roles |
+| GAP-07 | PDF Inteligente do Contrato | 🔄 | `ContratoDocumento.tsx` existe. Falta: QR Code de verificação, seção de assinaturas formatada |
+| GAP-08 | Onboarding Guiado do PJ após Convite | 🔄 | `Registro.tsx` tem fluxo multi-etapas com convite. Falta: coleta de dados bancários e fiscais do PJ no onboarding |
+| GAP-09 | Motor de Notificações Estruturado | 🔄 | `notificationService.ts`, `NotificationBell.tsx`, `NotificationPreferences.tsx`, `NotificationDeliveryLogs.tsx` existem. Falta: centro in-app com badge funcional, filtros e histórico 90 dias |
+| GAP-10 | Controle de Permissões por Perfil (RBAC) | ✅ | `hasRole()` em `AuthContext`, sidebar dinâmica por perfil, roles no backend |
+
+---
+
+### 🟢 Média Prioridade — Completude e Qualidade
+
+| # | Gap | Status | Observação |
+|---|---|---|---|
+| GAP-11 | Timeline de Auditoria por Contrato | ✅ | `ContractAuditTrail.tsx` — histórico de eventos by contrato |
+| GAP-12 | Módulo de Notas Fiscais (NFS-e) | 🔄 | `nfseService.ts`, emissão em `ContratoDetalhes`. Falta: integração real com API da prefeitura (hoje é registro interno apenas) |
+| GAP-13 | Configuração de Split por Contrato | 🔄 | `createContractSplits` no formulário de criação. Split visível em `ContratoDetalhes`. Falta: execução automática via Pix/gateway real |
+| GAP-14 | Campo de Escopo do Serviço no Contrato | ✅ | Campo "Escopo do Serviço" existe no formulário (`Contratos.tsx` linha 1369) |
+| GAP-15 | Alertas Inteligentes e Proativos | ✅ | `DashboardOverview.tsx` — alertas por cor (danger/warning) com contratos vencendo e pagamentos atrasados |
+| GAP-16 | Centro Financeiro Melhorado | 🔄 | `Pagamentos.tsx` tem filtros por período, status e contrato. Falta: exportação CSV/PDF/Excel, card de inadimplência |
+| GAP-17 | Controle de Reajuste Contratual | ✅ | Campo "Índice de Reajuste" e "Data-base do Reajuste" no formulário (linhas 1341–1364) |
+| GAP-18 | Anexos e Documentos por Contrato | ✅ | `contratoAnexosService.ts` — upload, listagem, download em `ContratoDetalhes` |
+
+---
+
+### 🔵 Longo Prazo — Pós-MVP (Fases 2–4)
+
+| # | Gap | Status | Observação |
+|---|---|---|---|
+| GAP-19 | Validação Automática de CNPJ (KYC/KYB) | 🔄 | CNPJ validado via API Receita Federal no `Registro.tsx`. Falta: coleta de documentos KYB, validação de situação cadastral |
+| GAP-20 | Painel Administrativo e Logs de Auditoria Central | 🔄 | `Auditoria.tsx` existe. Falta: hash de integridade por linha, exportação IPFS |
+| GAP-21 | Módulo de Escrow Digital | ⬜ | Não implementado — Fase 3 (6–9 meses) |
+| GAP-22 | Integração Blockchain e IPFS (Produção) | ⬜ | Não implementado — Fase 4 |
+
+---
+
+## PARTE II — Dashboard
+
+### Cards e KPIs
+
+| Item | Status | Observação |
+|---|---|---|
+| ⬜ Cards segmentados PJ vs CLT | ⬜ | Hoje existe um único card "Colaboradores Ativos". Falta: dois cards distintos com seta de tendência |
+| ⬜ Card "Custo Mensal Projetado" | ⬜ | Não existe. Falta: soma automática contratos ativos × valores × periodicidades + barra pago vs pendente |
+
+### Notificações
+
+| Item | Status | Observação |
+|---|---|---|
+| ✅ Painel de alertas proativos | ✅ | Alertas por severity no topo do dashboard (`DashboardOverview.tsx` linha 328) |
+| 🔄 Centro de notificações in-app com badge | 🔄 | `NotificationBell.tsx` existe. Falta: badge com contagem real de não lidas + histórico 90 dias paginado |
+
+---
+
+## PARTE III — Contratos
+
+### Campos e Formulário
+
+| Item | Status | Observação |
+|---|---|---|
+| ⬜ Campo Nível / Senioridade | ⬜ | Não existe no formulário de contrato (Estágio, Júnior, Pleno, Sênior, etc.) |
+| ✅ Campo Escopo do Serviço | ✅ | Implementado (`Contratos.tsx` linha 1369) |
+| ✅ Campo Periodicidade de Pagamento | ✅ | Implementado (`Contratos.tsx` linha 1312) |
+| ✅ Campo Índice de Reajuste | ✅ | Implementado com data-base |
+
+### Remuneração Variável
+
+| Item | Status | Observação |
+|---|---|---|
+| ⬜ Modelo FIXO (já existe) | ✅ | Implementado — valor mensal fixo |
+| ⬜ Modelo VARIÁVEL POR META | ⬜ | Não implementado |
+| ⬜ Modelo VARIÁVEL POR ENTREGÁVEL | ⬜ | Não implementado |
+| ⬜ Modelo HORA/HORA | ⬜ | Não implementado |
+| ⬜ Modelo MISTO (fixo + variável) | ⬜ | Não implementado |
+| ⬜ Painel de Metas e Entregáveis | ⬜ | Não implementado — cadastro de metas, aprovação, liberação de pagamento variável |
+
+### Ciclo de Vida (9 estados do PRD)
+
+| Estado | Status | Observação |
+|---|---|---|
+| 1. Em Criação | ✅ | Mapeado como estado inicial |
+| 2. Enviado para PJ | ✅ | Status `enviado` implementado |
+| 3. Em Revisão | ⬜ | Não existe como estado separado |
+| 4. Assinado | ✅ | Status `assinado` implementado |
+| 5. Vigente | ✅ | Status `active` implementado |
+| 6. Vencendo (< 30 dias) | 🔄 | Lógica de alerta existe, mas não é um estado formal do contrato |
+| 7. Renovado | ⬜ | Não existe como estado — sem fluxo de renovação |
+| 8. Encerrado | ✅ | Status `terminated` implementado |
+| 9. Suspenso | ⬜ | Não implementado como estado |
+
+### Visualização do Contrato Assinado
+
+| Item | Status | Observação |
+|---|---|---|
+| ✅ Tela de detalhe completa | ✅ | `ContratoDetalhes.tsx` |
+| 🔄 PDF inline sem precisar baixar | 🔄 | `ContratoDocumento.tsx` existe mas não é visualizador inline (PDF.js) |
+| ✅ Dados do contrato e assinaturas | ✅ | Implementado |
+| ⬜ Hash SHA-256 exibível | ⬜ | Hash gerado mas não exibido visivelmente ao usuário |
+| ⬜ QR Code no PDF | ⬜ | Não implementado |
+
+---
+
+## PARTE IV — Templates de Contrato
+
+| Item | Status | Observação |
+|---|---|---|
+| 🔄 Editor em tela cheia (fullscreen) | 🔄 | Botão "Tela cheia" existe em `TemplatesContrato.tsx` (linha 637) mas ainda é modal/dialog, não página dedicada com rota própria (`/dashboard/templates/novo`) |
+| ⬜ Auto-save com indicador "Salvo às HH:MM" | ⬜ | Não implementado |
+| ⬜ Histórico de versões com rollback (10 versões) | 🔄 | `fetchTemplateVersions`, `createTemplateVersion` existem no service. Falta: UI de rollback |
+| ⬜ Painel lateral de variáveis dinâmicas | ⬜ | Não existe painel com `{{empresa_nome}}`, `{{pj_nome}}` etc. clicáveis para inserir no cursor |
+| ✅ Categorias de templates | ✅ | Campo categoria implementado com filtro na listagem |
+| ✅ Operações: Duplicar, Arquivar, Editar | ✅ | `duplicateTemplate`, `softDeleteTemplate` implementados |
+| ✅ Contador de uso do template | ✅ | `fetchTemplateUsageCounts` implementado |
+
+---
+
+## PARTE V — Nota Fiscal (NFS-e)
+
+| Item | Status | Observação |
+|---|---|---|
+| 🔄 Emissão de NFS-e pelo PJ | 🔄 | Interface de emissão em `ContratoDetalhes.tsx`. Falta: integração real com API da prefeitura (hoje cria registro interno) |
+| 🔄 Ciclo de vida da nota (Rascunho → Emitida) | 🔄 | Estados mapeados em `nfseService.ts`. Falta: sincronização com retorno real da prefeitura |
+| ⬜ Integração API NFS-e municipal | ⬜ | Não implementado — necessário integrar com API da prefeitura (ex: Campo Grande/MS) |
+| ⬜ Fila de reprocessamento (timeout 10s) | ⬜ | Não implementado |
+| ⬜ Conferência pelo financeiro | ⬜ | Não existe fluxo de aprovação financeiro → liberação após nota emitida |
+
+---
+
+## PARTE VI — Pagamentos
+
+| Item | Status | Observação |
+|---|---|---|
+| 🔄 Filtros avançados | 🔄 | Filtro por período, status e contrato implementados. Falta: exportação CSV/PDF/Excel |
+| ⬜ Exportação CSV/PDF/Excel | ⬜ | Não implementado |
+| 🔄 Geração automática de obrigações | 🔄 | `gerarObrigacoesPJ` (edge function) existe. Falta: acionamento automático na ativação do contrato |
+| ⬜ Fluxo de aprovação financeiro | 🔄 | `approvePayment`, `batchApprovePayments` implementados. Falta: integração com nfse para só aprovar após nota emitida |
+| ⬜ Integração gateway Pix/Split real | ⬜ | Não implementado — pagamentos são aprovados manualmente |
+| ⬜ Card inadimplência no dashboard financeiro | ⬜ | Não existe card dedicado de inadimplência |
+
+---
+
+## PARTE VII — CLT
+
+| Item | Status | Observação |
+|---|---|---|
+| ⬜ Campos contábeis eSocial | ⬜ | Não implementado — campos específicos de eSocial ausentes |
+| ⬜ Holerite digital | ⬜ | Não implementado — sem geração de holerite |
+| 🔄 Contratos CLT | 🔄 | Tipo `CLT` existe no formulário de contratos. Falta: campos específicos CLT (matrícula, CBO, CTPS) |
+
+---
+
+## Resumo Executivo
+
+| Categoria | Total | ✅ Feito | 🔄 Parcial | ⬜ Falta |
+|---|---|---|---|---|
+| Gaps Críticos (🔴) | 4 | 1 | 3 | 0 |
+| Alta Prioridade (🟡) | 6 | 3 | 3 | 0 |
+| Média Prioridade (🟢) | 8 | 5 | 3 | 0 |
+| Longo Prazo (🔵) | 4 | 0 | 2 | 2 |
+| Dashboard | 4 | 2 | 1 | 2 |
+| Contratos — Extras | 13 | 5 | 3 | 6 |
+| Templates | 7 | 3 | 2 | 2 |
+| NFS-e | 5 | 0 | 2 | 3 |
+| Pagamentos | 6 | 0 | 3 | 3 |
+| CLT | 3 | 0 | 1 | 2 |
+| **TOTAL** | **60** | **19** | **23** | **20** |
+
+---
+
+## Próximas Implementações Sugeridas (Por Impacto × Complexidade)
+
+### Sprint 1 — Rápido / Alto impacto
+1. ⬜ Cards PJ vs CLT segmentados no dashboard
+2. ⬜ Card "Custo Mensal Projetado"
+3. ⬜ Campo Nível/Senioridade no contrato
+4. ⬜ Badge de notificações não lidas funcional
+5. ⬜ Estado "Em Revisão" e "Suspenso" no ciclo de vida do contrato
+
+### Sprint 2 — Médio prazo
+6. ⬜ Exportação CSV/PDF no módulo de Pagamentos
+7. ⬜ Editor de templates como página fullscreen com rota própria
+8. ⬜ Painel de variáveis dinâmicas no editor de templates
+9. ⬜ Hash SHA-256 exibível na tela do contrato assinado
+10. ⬜ Fluxo de renovação de contrato (estado "Renovado")
+
+### Sprint 3 — Alta complexidade
+11. ⬜ Remuneração variável (META, ENTREGÁVEL, HORA/HORA, MISTO)
+12. ⬜ Painel de metas e entregáveis vinculados ao pagamento variável
+13. ⬜ Integração real API NFS-e com prefeitura
+14. ⬜ Geração automática de obrigação ao ativar contrato
+15. ⬜ Fluxo completo financeiro: nota emitida → aprovação → pagamento
+
+### Fases 2–4 (Longo prazo)
+16. ⬜ Campos CLT: eSocial, holerite, CTPS, CBO
+17. ⬜ Integração gateway Pix/Split real
+18. ⬜ Módulo de Escrow Digital
+19. ⬜ Blockchain Polygon + IPFS (produção)
