@@ -226,6 +226,18 @@ export async function countAllActivePJContracts() {
   return count ?? 0;
 }
 
+export async function countActiveContractsByType(companyId: string, contractType: string) {
+  const { count, error } = await supabase
+    .from("contracts")
+    .select("*", { count: "exact", head: true })
+    .eq("company_id", companyId)
+    .eq("contract_type", contractType)
+    .in("status", ["active", "assinado"]);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function fetchContractsByUser(userId: string) {
   const { data, error } = await supabase
     .from("contracts")

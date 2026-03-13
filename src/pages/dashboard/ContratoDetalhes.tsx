@@ -7,6 +7,7 @@ import {
   fetchSignaturesByDocument,
   updateSignature,
   fetchSignatureToken,
+  updateContractStatus,
 } from "@/services/contractService";
 import { fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { sendEmail } from "@/services/edgeFunctionService";
@@ -503,6 +504,7 @@ const ContratoDetalhes = () => {
       enviado: "Enviado",
       assinado: "Assinado",
       suspended: "Suspenso",
+      em_revisao: "Em Revisão",
       terminated: "Encerrado",
       expired: "Expirado",
       inactive: "Inativo",
@@ -622,6 +624,47 @@ const ContratoDetalhes = () => {
         <Badge variant={getStatusBadgeVariant(contract.status)} className="text-sm">
           {getStatusLabel(contract.status)}
         </Badge>
+        {/* Status Actions */}
+        <div className="flex gap-2">
+          {(contract.status === "active" || contract.status === "assinado") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await updateContractStatus(contract.id, "em_revisao");
+                window.location.reload();
+              }}
+            >
+              Em Revisão
+            </Button>
+          )}
+          {contract.status === "active" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-slate-600 border-slate-400 hover:bg-slate-50"
+              onClick={async () => {
+                await updateContractStatus(contract.id, "suspended");
+                window.location.reload();
+              }}
+            >
+              Suspender
+            </Button>
+          )}
+          {(contract.status === "suspended" || contract.status === "em_revisao") && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-green-600 border-green-400 hover:bg-green-50"
+              onClick={async () => {
+                await updateContractStatus(contract.id, "active");
+                window.location.reload();
+              }}
+            >
+              Reativar
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">

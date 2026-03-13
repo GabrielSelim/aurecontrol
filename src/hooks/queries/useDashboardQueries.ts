@@ -7,6 +7,7 @@ import {
   fetchContractSalaries,
   fetchContractUserIds,
   fetchExpiringContracts,
+  countActiveContractsByType,
 } from "@/services/contractService";
 import {
   countActiveProfilesByCompany,
@@ -30,10 +31,13 @@ import { queryKeys } from "./queryKeys";
 
 export interface AdminStats {
   totalColaboradores: number;
+  totalColaboradoresPJ: number;
+  totalColaboradoresCLT: number;
   contratosAtivos: number;
   pagamentosPendentes: number;
   pagamentosMes: number;
   custoPrevistoProximoMes: number;
+  custoComprometidoMes: number;
 }
 
 export interface ColaboradorStats {
@@ -117,6 +121,11 @@ export function useDashboardAdmin(companyId: string | undefined) {
       const contratosCount = activeContractSalaries.length;
       const pagamentosPendentesCount = await countPendingPayments(cid);
 
+      const [totalPJ, totalCLT] = await Promise.all([
+        countActiveContractsByType(cid, "PJ"),
+        countActiveContractsByType(cid, "CLT"),
+      ]);
+
       const now = new Date();
       const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -136,12 +145,20 @@ export function useDashboardAdmin(companyId: string | undefined) {
         0
       );
 
+      const custoComprometidoMes = activeContractSalaries.reduce(
+        (sum, c) => sum + Number(c.salary || 0),
+        0
+      );
+
       const adminStats: AdminStats = {
         totalColaboradores: colaboradoresCount,
+        totalColaboradoresPJ: totalPJ,
+        totalColaboradoresCLT: totalCLT,
         contratosAtivos: contratosCount,
         pagamentosPendentes: pagamentosPendentesCount,
         pagamentosMes: totalPagamentosMes,
         custoPrevistoProximoMes,
+        custoComprometidoMes,
       };
 
       // Sparkline: last 3 months

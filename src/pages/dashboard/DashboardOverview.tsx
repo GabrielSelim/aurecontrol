@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Users, FileText, CreditCard, TrendingUp, Clock, CheckCircle, PenTool, AlertCircle, User, Building2, UserPlus, AlertTriangle, CalendarClock, Wallet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useNavigate } from "react-router-dom";
@@ -363,15 +364,40 @@ const DashboardOverview = () => {
 
       {/* Stats Grid */}
       <TooltipProvider>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
         <Tooltip>
           <TooltipTrigger asChild>
             <Card 
               className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
-              onClick={() => navigate("/dashboard/colaboradores")}
+              onClick={() => navigate("/dashboard/colaboradores?tipo=PJ")}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Colaboradores</CardTitle>
+                <CardTitle className="text-sm font-medium">Prestadores PJ</CardTitle>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold">{adminStats?.totalColaboradoresPJ ?? 0}</div>
+                    <p className="text-xs text-muted-foreground">Contratos PJ ativos</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>Contratos do tipo PJ com status ativo ou assinado</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card 
+              className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
+              onClick={() => navigate("/dashboard/colaboradores?tipo=CLT")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Colaboradores CLT</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -379,14 +405,14 @@ const DashboardOverview = () => {
                   <Skeleton className="h-8 w-16" />
                 ) : (
                   <>
-                    <div className="text-2xl font-bold">{adminStats?.totalColaboradores}</div>
-                    <p className="text-xs text-muted-foreground">Ativos na empresa</p>
+                    <div className="text-2xl font-bold">{adminStats?.totalColaboradoresCLT ?? 0}</div>
+                    <p className="text-xs text-muted-foreground">Contratos CLT ativos</p>
                   </>
                 )}
               </CardContent>
             </Card>
           </TooltipTrigger>
-          <TooltipContent>Perfis com status ativo na empresa</TooltipContent>
+          <TooltipContent>Contratos do tipo CLT com status ativo ou assinado</TooltipContent>
         </Tooltip>
 
         <Tooltip>
@@ -482,7 +508,7 @@ const DashboardOverview = () => {
               onClick={() => navigate("/dashboard/contratos")}
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Custo Previsto</CardTitle>
+                <CardTitle className="text-sm font-medium">Custo Comprometido</CardTitle>
                 <Wallet className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -491,15 +517,31 @@ const DashboardOverview = () => {
                 ) : (
                   <>
                     <div className="text-2xl font-bold">
-                      {adminStats?.custoPrevistoProximoMes ? formatCurrency(adminStats.custoPrevistoProximoMes) : "—"}
+                      {adminStats?.custoComprometidoMes ? formatCurrency(adminStats.custoComprometidoMes) : "—"}
                     </div>
-                    <p className="text-xs text-muted-foreground">Próximo mês (salários)</p>
+                    <p className="text-xs text-muted-foreground mb-2">Salários contratos ativos</p>
+                    {adminStats?.custoPrevistoProximoMes && adminStats.custoPrevistoProximoMes > 0 && (
+                      <>
+                        <Progress
+                          value={Math.min(
+                            100,
+                            Math.round(
+                              ((adminStats.custoComprometidoMes ?? 0) / adminStats.custoPrevistoProximoMes) * 100
+                            )
+                          )}
+                          className="h-1.5"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {Math.min(100, Math.round(((adminStats.custoComprometidoMes ?? 0) / adminStats.custoPrevistoProximoMes) * 100))}% do previsto
+                        </p>
+                      </>
+                    )}
                   </>
                 )}
               </CardContent>
             </Card>
           </TooltipTrigger>
-          <TooltipContent>Soma dos salários dos contratos ativos</TooltipContent>
+          <TooltipContent>Soma dos salários dos contratos ativos / previsto próximo mês</TooltipContent>
         </Tooltip>
       </div>
       </TooltipProvider>

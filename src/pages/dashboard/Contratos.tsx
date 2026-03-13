@@ -108,6 +108,7 @@ interface Contract {
   company_id: string;
   contract_type: string;
   job_title: string;
+  seniority: string | null;
   department: string | null;
   salary: number | null;
   hourly_rate: number | null;
@@ -210,6 +211,7 @@ const Contratos = () => {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [contractType, setContractType] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [seniority, setSeniority] = useState("");
   
   const [salary, setSalary] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -614,6 +616,7 @@ const Contratos = () => {
         user_id: selectedUserId,
         contract_type: contractType as "CLT" | "PJ" | "estagio" | "temporario",
         job_title: jobTitle,
+        seniority: seniority || null,
         department: null,
         salary: salary ? parseCurrency(salary) : null,
         start_date: startDate,
@@ -799,6 +802,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setSelectedUserId("");
     setContractType("");
     setJobTitle("");
+    setSeniority("");
     
     setSalary("");
     setStartDate("");
@@ -953,6 +957,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setSelectedUserId(contrato.user_id);
     setContractType(contrato.contract_type);
     setJobTitle(contrato.job_title);
+    setSeniority(contrato.seniority || "");
     setSalary(contrato.salary ? formatCurrencyMask(String(contrato.salary)) : "");
     setDeliverableDescription(contrato.deliverable_description || "");
 
@@ -985,6 +990,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     const classNames: Record<string, string> = {
       active: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
       suspended: "bg-gray-100 text-gray-600 dark:bg-gray-800/30 dark:text-gray-400",
+      em_revisao: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800",
       terminated: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800",
       expired: "bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-500 border-gray-200",
       draft: "bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-400 border-gray-200",
@@ -1002,6 +1008,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       sent: "Enviado",
       signed: "Assinado",
       suspended: "Suspenso",
+      em_revisao: "Em Revisão",
       terminated: "Encerrado",
       expired: "Expirado",
       inactive: "Inativo",
@@ -1284,6 +1291,23 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                       {validationErrors.cargo && (
                         <p className="text-xs text-destructive">Informe o cargo</p>
                       )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nível / Senioridade</Label>
+                      <Select value={seniority} onValueChange={setSeniority}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o nível" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="estagio">Estágio</SelectItem>
+                          <SelectItem value="junior">Júnior</SelectItem>
+                          <SelectItem value="pleno">Pleno</SelectItem>
+                          <SelectItem value="senior">Sênior</SelectItem>
+                          <SelectItem value="especialista">Especialista</SelectItem>
+                          <SelectItem value="gerente">Gerente</SelectItem>
+                          <SelectItem value="diretor">Diretor</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label>Salário</Label>
@@ -1813,6 +1837,8 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="active">Vigente</SelectItem>
                 <SelectItem value="pending_signature">Aguardando assinatura</SelectItem>
+                <SelectItem value="em_revisao">Em Revisão</SelectItem>
+                <SelectItem value="suspended">Suspenso</SelectItem>
                 <SelectItem value="terminated">Encerrado</SelectItem>
                 <SelectItem value="expired">Expirado</SelectItem>
               </SelectContent>
@@ -2062,8 +2088,8 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
               /* Kanban View */
               <div className="p-4">
                 {isLoading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[1, 2, 3, 4].map((i) => (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
                       <div key={i} className="space-y-3">
                         <Skeleton className="h-6 w-32" />
                         <Skeleton className="h-24 w-full" />
@@ -2072,10 +2098,12 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                     {[
                       { key: "pending_signature", label: "Aguardando Assinatura", color: "border-yellow-500", bgHeader: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400" },
                       { key: "active", label: "Vigente", color: "border-blue-500", bgHeader: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
+                      { key: "em_revisao", label: "Em Revisão", color: "border-orange-500", bgHeader: "bg-orange-500/10 text-orange-700 dark:text-orange-400" },
+                      { key: "suspended", label: "Suspenso", color: "border-slate-400", bgHeader: "bg-slate-500/10 text-slate-600 dark:text-slate-400" },
                       { key: "expiring", label: "Vencendo", color: "border-amber-500", bgHeader: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
                       { key: "terminated", label: "Encerrado", color: "border-gray-400", bgHeader: "bg-gray-500/10 text-gray-600 dark:text-gray-400" },
                     ].map((column) => {
