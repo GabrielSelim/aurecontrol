@@ -14,9 +14,7 @@ export function Header() {
         <nav className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">A</span>
-            </div>
+            <img src="/logo_aure.svg" alt="Aure" className="h-9 w-auto" />
             <span className="font-bold text-xl text-foreground">Aure</span>
           </Link>
 

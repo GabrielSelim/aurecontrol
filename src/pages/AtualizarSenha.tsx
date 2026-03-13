@@ -47,9 +47,7 @@ const AtualizarSenha = () => {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="flex items-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-xl">A</span>
-            </div>
+            <img src="/logo_aure.svg" alt="Aure" className="h-10 w-auto" />
             <span className="font-bold text-2xl text-foreground">Aure</span>
           </div>
 

@@ -190,9 +190,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         "flex h-16 items-center gap-2 border-b border-border transition-all duration-300",
         collapsed ? "px-3 justify-center" : "px-6"
       )}>
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">A</span>
-        </div>
+        <img src="/logo_aure.svg" alt="Aure" className="h-8 w-auto flex-shrink-0" />
         {!collapsed && <span className="font-bold text-xl text-foreground">Aure</span>}
       </div>
 
