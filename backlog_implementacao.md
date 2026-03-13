@@ -76,15 +76,15 @@
 
 | Item | Status | Observação |
 |---|---|---|
-| ⬜ Cards segmentados PJ vs CLT | ⬜ | Hoje existe um único card "Colaboradores Ativos". Falta: dois cards distintos com seta de tendência |
-| ⬜ Card "Custo Mensal Projetado" | ⬜ | Não existe. Falta: soma automática contratos ativos × valores × periodicidades + barra pago vs pendente |
+| ✅ Cards segmentados PJ vs CLT | ✅ | Dois cards 'Prestadores PJ' e 'Colaboradores CLT' com contagem por tipo. Grid 6 colunas. |
+| ✅ Card "Custo Mensal Projetado" | ✅ | Card 'Custo Comprometido' com barra de progresso vs previsto |
 
 ### Notificações
 
 | Item | Status | Observação |
 |---|---|---|
 | ✅ Painel de alertas proativos | ✅ | Alertas por severity no topo do dashboard (`DashboardOverview.tsx` linha 328) |
-| 🔄 Centro de notificações in-app com badge | 🔄 | `NotificationBell.tsx` existe. Falta: badge com contagem real de não lidas + histórico 90 dias paginado |
+| ✅ Centro de notificações in-app com badge | ✅ | `NotificationBell.tsx` com badge `totalUnread` funcional |
 
 ---
 
@@ -94,7 +94,7 @@
 
 | Item | Status | Observação |
 |---|---|---|
-| ⬜ Campo Nível / Senioridade | ⬜ | Não existe no formulário de contrato (Estágio, Júnior, Pleno, Sênior, etc.) |
+| ✅ Campo Nível / Senioridade | ✅ | Implementado no Step 2 do formulário (Estágio, Júnior, Pleno, Sênior, Especialista, Gerente, Diretor) |
 | ✅ Campo Escopo do Serviço | ✅ | Implementado (`Contratos.tsx` linha 1369) |
 | ✅ Campo Periodicidade de Pagamento | ✅ | Implementado (`Contratos.tsx` linha 1312) |
 | ✅ Campo Índice de Reajuste | ✅ | Implementado com data-base |
@@ -116,13 +116,13 @@
 |---|---|---|
 | 1. Em Criação | ✅ | Mapeado como estado inicial |
 | 2. Enviado para PJ | ✅ | Status `enviado` implementado |
-| 3. Em Revisão | ⬜ | Não existe como estado separado |
+| 3. Em Revisão | ✅ | Implementado: filtro, Kanban (laranja), badge, botão em ContratoDetalhes |
 | 4. Assinado | ✅ | Status `assinado` implementado |
 | 5. Vigente | ✅ | Status `active` implementado |
 | 6. Vencendo (< 30 dias) | 🔄 | Lógica de alerta existe, mas não é um estado formal do contrato |
 | 7. Renovado | ⬜ | Não existe como estado — sem fluxo de renovação |
 | 8. Encerrado | ✅ | Status `terminated` implementado |
-| 9. Suspenso | ⬜ | Não implementado como estado |
+| 9. Suspenso | ✅ | Implementado: filtro, Kanban (cinza), botão em ContratoDetalhes |
 
 ### Visualização do Contrato Assinado
 
@@ -206,11 +206,11 @@
 ## Próximas Implementações Sugeridas (Por Impacto × Complexidade)
 
 ### Sprint 1 — Rápido / Alto impacto
-1. ⬜ Cards PJ vs CLT segmentados no dashboard
-2. ⬜ Card "Custo Mensal Projetado"
-3. ⬜ Campo Nível/Senioridade no contrato
-4. ⬜ Badge de notificações não lidas funcional
-5. ⬜ Estado "Em Revisão" e "Suspenso" no ciclo de vida do contrato
+1. ✅ Cards PJ vs CLT segmentados no dashboard
+2. ✅ Card "Custo Mensal Projetado"
+3. ✅ Campo Nível/Senioridade no contrato
+4. ✅ Badge de notificações não lidas funcional
+5. ✅ Estado "Em Revisão" e "Suspenso" no ciclo de vida do contrato
 
 ### Sprint 2 — Médio prazo
 6. ⬜ Exportação CSV/PDF no módulo de Pagamentos
