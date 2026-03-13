@@ -25,7 +25,7 @@ export function LogoAure({
   if (variant === "full") {
     return (
       <img
-        src="/logo_aure.svg"
+        src="/logo_aure.svg?v=7db59ff"
         alt="Aure"
         style={{
           height: imgH,
