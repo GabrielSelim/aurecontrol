@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   updateTemplate,
@@ -195,6 +196,7 @@ const STANDARD_CLAUSES = [
 const TemplatesContrato = () => {
   useDocumentTitle("Templates de Contrato");
   const { profile, isAdmin, hasRole } = useAuth();
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateUsageCounts, setTemplateUsageCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -395,16 +397,8 @@ const TemplatesContrato = () => {
   };
 
   const handleEditTemplate = useCallback((template: Template) => {
-    setEditingTemplate(template);
-    setName(template.name);
-    setDescription(template.description || "");
-    setContent(template.content);
-    setWitnessCount(template.default_witness_count.toString());
-    setCategory(template.category || "");
-    lastSavedContentRef.current = template.content;
-    setIsDialogOpen(true);
-    fetchVersions(template.id);
-  }, [fetchVersions]);
+    navigate(`/dashboard/templates-contrato/${template.id}/editar`);
+  }, [navigate]);
 
   const handleDuplicateTemplate = useCallback(async (template: Template) => {
     try {

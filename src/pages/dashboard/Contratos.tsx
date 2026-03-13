@@ -206,6 +206,7 @@ const Contratos = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTerminateDialogOpen, setIsTerminateDialogOpen] = useState(false);
   const [contractToTerminate, setContractToTerminate] = useState<Contract | null>(null);
+  const [renovandoContratoId, setRenovandoContratoId] = useState<string | null>(null);
 
   // Form state
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -750,6 +751,17 @@ const Contratos = () => {
 
       toast.success("Contrato criado com sucesso!");
 
+      // Mark old contract as renewed if this was a renewal
+      if (renovandoContratoId) {
+        try {
+          await updateContractStatus(renovandoContratoId, "renovado");
+          toast.info("Contrato anterior marcado como Renovado.");
+        } catch (e) {
+          console.error("Erro ao marcar contrato como renovado", e);
+        }
+        setRenovandoContratoId(null);
+      }
+
       // Send email notification to PJ for signature (async, non-blocking)
       if (contractType === "PJ" && contractData) {
         const collab = profiles.find(p => p.user_id === selectedUserId);
@@ -799,6 +811,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
   };
 
   const resetForm = useCallback(() => {
+    setRenovandoContratoId(null);
     setSelectedUserId("");
     setContractType("");
     setJobTitle("");
@@ -972,8 +985,9 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     if (contrato.duration_value) setDurationValue(contrato.duration_value.toString());
     if (contrato.duration_unit) setDurationUnit(contrato.duration_unit);
 
+    setRenovandoContratoId(contrato.id);
     setIsDialogOpen(true);
-    toast.info("Formulário pré-preenchido com dados do contrato anterior");
+    toast.info("Formulário pré-preenchido com dados do contrato anterior.");
   };
 
   const getContractTypeLabel = (type: string) => {
@@ -991,6 +1005,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       active: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800",
       suspended: "bg-gray-100 text-gray-600 dark:bg-gray-800/30 dark:text-gray-400",
       em_revisao: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800",
+      renovado: "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-800",
       terminated: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800",
       expired: "bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-500 border-gray-200",
       draft: "bg-gray-100 text-gray-500 dark:bg-gray-800/30 dark:text-gray-400 border-gray-200",
@@ -1009,6 +1024,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       signed: "Assinado",
       suspended: "Suspenso",
       em_revisao: "Em Revisão",
+      renovado: "Renovado",
       terminated: "Encerrado",
       expired: "Expirado",
       inactive: "Inativo",
@@ -1839,6 +1855,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                 <SelectItem value="pending_signature">Aguardando assinatura</SelectItem>
                 <SelectItem value="em_revisao">Em Revisão</SelectItem>
                 <SelectItem value="suspended">Suspenso</SelectItem>
+                <SelectItem value="renovado">Renovado</SelectItem>
                 <SelectItem value="terminated">Encerrado</SelectItem>
                 <SelectItem value="expired">Expirado</SelectItem>
               </SelectContent>
@@ -2106,6 +2123,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                       { key: "suspended", label: "Suspenso", color: "border-slate-400", bgHeader: "bg-slate-500/10 text-slate-600 dark:text-slate-400" },
                       { key: "expiring", label: "Vencendo", color: "border-amber-500", bgHeader: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
                       { key: "terminated", label: "Encerrado", color: "border-gray-400", bgHeader: "bg-gray-500/10 text-gray-600 dark:text-gray-400" },
+                      { key: "renovado", label: "Renovado", color: "border-teal-500", bgHeader: "bg-teal-500/10 text-teal-700 dark:text-teal-400" },
                     ].map((column) => {
                       const columnContratos = filteredContratos.filter((c) => {
                         if (column.key === "expiring") {

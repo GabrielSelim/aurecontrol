@@ -4,6 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 /*  Contract Templates                                                */
 /* ================================================================== */
 
+export async function fetchTemplateById(templateId: string) {
+  const { data, error } = await supabase
+    .from("contract_templates")
+    .select("*")
+    .eq("id", templateId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function fetchActiveTemplates(companyId?: string | null) {
   const query = supabase
     .from("contract_templates")

@@ -708,6 +708,45 @@ const Pagamentos = () => {
     toast.success("Pagamentos exportados com sucesso!");
   };
 
+  const exportToPDF = () => {
+    const rows = filteredPagamentos.map(p => `
+      <tr>
+        <td>${p.profile?.full_name || "-"}</td>
+        <td>${p.profile?.email || "-"}</td>
+        <td style="text-align:right">${formatCurrency(Number(p.amount))}</td>
+        <td>${formatReferenceMonth(p.reference_month)}</td>
+        <td>${p.description || "-"}</td>
+        <td>${getStatusLabel(p.status)}</td>
+        <td>${p.payment_date ? format(new Date(p.payment_date), "dd/MM/yyyy", { locale: ptBR }) : "-"}</td>
+      </tr>`).join("");
+    const totalValue = filteredPagamentos.reduce((s, p) => s + Number(p.amount), 0);
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>Relatório de Pagamentos</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 24px; color: #111; }
+        h2 { margin-bottom: 4px; }
+        p.sub { color: #666; margin-bottom: 16px; font-size: 11px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f0f0f0; padding: 6px 8px; text-align: left; border: 1px solid #ccc; font-size: 11px; }
+        td { padding: 5px 8px; border: 1px solid #ddd; font-size: 11px; }
+        tr:nth-child(even) td { background: #f9f9f9; }
+        tfoot td { font-weight: bold; background: #f0f0f0; }
+        @media print { @page { margin: 1.5cm; } }
+      </style></head><body>
+      <h2>Relatório de Pagamentos</h2>
+      <p class="sub">Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })} · ${filteredPagamentos.length} registro(s)</p>
+      <table>
+        <thead><tr><th>Colaborador</th><th>E-mail</th><th>Valor</th><th>Referência</th><th>Descrição</th><th>Status</th><th>Data Pagamento</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td colspan="2">Total</td><td style="text-align:right">${formatCurrency(totalValue)}</td><td colspan="4"></td></tr></tfoot>
+      </table>
+      <script>window.onload=function(){window.print();}<\/script>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
+    else toast.error("Permita pop-ups para gerar o PDF.");
+  };
+
   const handleGerarObrigacoes = async () => {
     setIsGenerating(true);
     try {
@@ -971,10 +1010,16 @@ const Pagamentos = () => {
             </CardDescription>
           </div>
           {pagamentos.length > 0 && (
-            <Button variant="outline" size="sm" onClick={exportToCSV}>
-              <Download className="mr-2 h-4 w-4" />
-              Exportar CSV
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportToPDF}>
+                <Download className="mr-2 h-4 w-4" />
+                Exportar PDF
+              </Button>
+            </div>
           )}
         </CardHeader>
         <CardContent>

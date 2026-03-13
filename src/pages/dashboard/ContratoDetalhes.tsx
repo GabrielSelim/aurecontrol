@@ -145,6 +145,21 @@ const ContratoDetalhes = () => {
   const [splitDocument, setSplitDocument] = useState("");
   const [splitPercentage, setSplitPercentage] = useState("");
   const [isSavingSplit, setIsSavingSplit] = useState(false);
+  const [documentHash, setDocumentHash] = useState<string | null>(null);
+
+  // Compute SHA-256 of document_html for integrity verification
+  useEffect(() => {
+    if (document?.signature_status === "completed" && document.document_html) {
+      const computeHash = async () => {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(document.document_html);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        setDocumentHash(hashArray.map(b => b.toString(16).padStart(2, "0")).join(""));
+      };
+      computeHash().catch(console.error);
+    }
+  }, [document]);
 
   useEffect(() => {
     if (id) {
@@ -505,6 +520,7 @@ const ContratoDetalhes = () => {
       assinado: "Assinado",
       suspended: "Suspenso",
       em_revisao: "Em Revisão",
+      renovado: "Renovado",
       terminated: "Encerrado",
       expired: "Expirado",
       inactive: "Inativo",
@@ -872,6 +888,16 @@ const ContratoDetalhes = () => {
                 <div>
                   <p className="text-sm text-muted-foreground">Concluído em</p>
                   <p className="font-medium">{formatDate(document.completed_at)}</p>
+                </div>
+              )}
+
+              {documentHash && (
+                <div className="p-3 rounded-lg bg-muted/50 border space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <span>🔒</span> Hash de Integridade (SHA-256)
+                  </p>
+                  <p className="text-xs font-mono break-all text-foreground select-all">{documentHash}</p>
+                  <p className="text-xs text-muted-foreground">Gerado a partir do conteúdo do documento assinado. Use para verificar autenticidade.</p>
                 </div>
               )}
 

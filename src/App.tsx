@@ -34,6 +34,7 @@ const ContratoDetalhes = lazy(() => import("./pages/dashboard/ContratoDetalhes")
 const ContratoDocumento = lazy(() => import("./pages/dashboard/ContratoDocumento"));
 const ContratosFaturaveis = lazy(() => import("./pages/dashboard/ContratosFaturaveis"));
 const TemplatesContrato = lazy(() => import("./pages/dashboard/TemplatesContrato"));
+const TemplateEditorFullscreen = lazy(() => import("./pages/dashboard/TemplateEditorFullscreen"));
 const Pagamentos = lazy(() => import("./pages/dashboard/Pagamentos"));
 const Convites = lazy(() => import("./pages/dashboard/Convites"));
 const Empresa = lazy(() => import("./pages/dashboard/Empresa"));
@@ -210,6 +211,13 @@ function AppRoutes() {
       <Route path="/recuperar-senha" element={<PublicRoute><RecuperarSenha /></PublicRoute>} />
       <Route path="/atualizar-senha" element={<AtualizarSenha />} />
       <Route path="/assinar-contrato" element={<AssinarContrato />} />
+      <Route path="/dashboard/templates-contrato/:id/editar" element={
+        <ProtectedRoute requiredRoles={["master_admin", "admin", "juridico"]}>
+          <Suspense fallback={<PageLoader />}>
+            <TemplateEditorFullscreen />
+          </Suspense>
+        </ProtectedRoute>
+      } />
       <Route path="/dashboard/*" element={<DashboardRoutes />} />
       <Route path="/bem-vindo" element={
         <ProtectedRoute requiredRoles={["pj"]}>
