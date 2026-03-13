@@ -20,6 +20,8 @@ services:
       - max_connections=200
       - -c
       - shared_buffers=256MB
+      - -c
+      - listen_addresses=*
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
@@ -40,19 +42,41 @@ services:
     networks:
       - aurecontrol
 
+  # ─── PgBouncer (Connection Pooler) ─────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: aurecontrol-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./docker/volumes/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./docker/init-pgbouncer.sh:/init-pgbouncer.sh:ro
+    entrypoint: ["/bin/sh", "/init-pgbouncer.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 6432 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - aurecontrol
+
   # ─── PostgREST (API REST) ───────────────────────────────
   rest:
     image: postgrest/postgrest:v12.2.3
     container_name: aurecontrol-rest
     restart: unless-stopped
     depends_on:
-      - db
+      pgbouncer:
+        condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@aurecontrol-pgbouncer:6432/${POSTGRES_DB:-postgres}
       PGRST_DB_SCHEMAS: public,graphql_public
       PGRST_DB_ANON_ROLE: anon
-      PGRST_DB_POOL: "5"
-      PGRST_DB_POOL_ACQUISITION_TIMEOUT: "10"
+      PGRST_DB_POOL: "10"
       PGRST_JWT_SECRET: ${JWT_SECRET}
       PGRST_DB_USE_LEGACY_GUCS: "false"
       PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
@@ -66,14 +90,15 @@ services:
     container_name: aurecontrol-auth
     restart: unless-stopped
     depends_on:
-      - db
+      pgbouncer:
+        condition: service_healthy
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
       API_EXTERNAL_URL: ${API_EXTERNAL_URL}
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
-      GOTRUE_DB_MAX_POOL_SIZE: "5"
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@aurecontrol-pgbouncer:6432/${POSTGRES_DB:-postgres}
+      GOTRUE_DB_MAX_POOL_SIZE: "10"
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-}
       GOTRUE_DISABLE_SIGNUP: "false"
@@ -130,14 +155,16 @@ services:
     container_name: aurecontrol-storage
     restart: unless-stopped
     depends_on:
-      - db
-      - rest
+      pgbouncer:
+        condition: service_healthy
+      rest:
+        condition: service_started
     environment:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       POSTGREST_URL: http://rest:3000
       PGRST_JWT_SECRET: ${JWT_SECRET}
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@aurecontrol-pgbouncer:6432/${POSTGRES_DB:-postgres}
       FILE_SIZE_LIMIT: 52428800
       STORAGE_BACKEND: file
       FILE_STORAGE_BACKEND_PATH: /var/lib/storage
@@ -171,11 +198,12 @@ services:
     container_name: aurecontrol-meta
     restart: unless-stopped
     depends_on:
-      - db
+      pgbouncer:
+        condition: service_healthy
     environment:
       PG_META_PORT: 8080
-      PG_META_DB_HOST: db
-      PG_META_DB_PORT: 5432
+      PG_META_DB_HOST: aurecontrol-pgbouncer
+      PG_META_DB_PORT: 6432
       PG_META_DB_NAME: ${POSTGRES_DB:-postgres}
       PG_META_DB_USER: postgres
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -188,7 +216,8 @@ services:
     container_name: aurecontrol-functions
     restart: unless-stopped
     depends_on:
-      - db
+      pgbouncer:
+        condition: service_healthy
     volumes:
       - ./supabase/functions:/home/deno/functions:Z
     command:
@@ -202,7 +231,7 @@ services:
       SUPABASE_URL: http://kong:8000
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
-      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@aurecontrol-pgbouncer:6432/${POSTGRES_DB:-postgres}
       VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
       RESEND_API_KEY: ${RESEND_API_KEY}
     networks:
