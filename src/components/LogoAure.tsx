@@ -1,17 +1,17 @@
 interface LogoAureProps {
-  /** "full" = icon + wordmark (default), "icon" = icon only */
+  /** "full" = logo completa com AURE (default), "icon" = ícone quadrado só */
   variant?: "full" | "icon";
-  /** Size scale */
+  /** Altura do logo */
   size?: "sm" | "md" | "lg";
-  /** For use on dark backgrounds (white text) */
+  /** Para uso em fundos escuros — inverte as cores para branco */
   dark?: boolean;
   className?: string;
 }
 
 const sizeMap = {
-  sm: { box: 28, radius: 6, fontSize: 16, textSize: "text-lg",   gap: "gap-2" },
-  md: { box: 32, radius: 7, fontSize: 18, textSize: "text-xl",   gap: "gap-2" },
-  lg: { box: 38, radius: 8, fontSize: 22, textSize: "text-2xl",  gap: "gap-2.5" },
+  sm: { imgH: 24, box: 28, radius: 6, fontSize: 16 },
+  md: { imgH: 28, box: 32, radius: 7, fontSize: 18 },
+  lg: { imgH: 36, box: 38, radius: 8, fontSize: 22 },
 };
 
 export function LogoAure({
@@ -20,12 +20,31 @@ export function LogoAure({
   dark = false,
   className = "",
 }: LogoAureProps) {
-  const { box, radius, fontSize } = sizeMap[size];
-  const textClass = `${sizeMap[size].textSize} ${sizeMap[size].gap}`;
+  const { imgH, box, radius, fontSize } = sizeMap[size];
 
+  if (variant === "full") {
+    return (
+      <img
+        src="/logo_aure.svg"
+        alt="Aure"
+        style={{
+          height: imgH,
+          width: "auto",
+          // dark=true: inverte para branco (purple→black→white), transparência preservada
+          filter: dark ? "brightness(0) invert(1)" : undefined,
+          flexShrink: 0,
+        }}
+        className={className}
+      />
+    );
+  }
+
+  // variant="icon" — ícone quadrado com "A"
   return (
-    <span className={`inline-flex items-center ${sizeMap[size].gap} ${className}`} aria-label="Aure">
-      {/* Icon — inline SVG garante render independente de arquivo externo */}
+    <span
+      className={`inline-flex items-center ${className}`}
+      aria-label="Aure"
+    >
       <svg
         width={box}
         height={box}
@@ -35,8 +54,12 @@ export function LogoAure({
         aria-hidden="true"
         style={{ flexShrink: 0 }}
       >
-        <rect width="48" height="48" rx={radius * (48 / box)} fill="#34095e" />
-        {/* Stylized "A" path — traço grosso bold condensado como no original */}
+        <rect
+          width="48"
+          height="48"
+          rx={radius * (48 / box)}
+          fill={dark ? "white" : "#34095e"}
+        />
         <text
           x="24"
           y="36"
@@ -44,26 +67,12 @@ export function LogoAure({
           fontFamily="'Plus Jakarta Sans', 'Arial Black', sans-serif"
           fontWeight="900"
           fontSize={fontSize * (48 / box)}
-          fill="white"
+          fill={dark ? "#34095e" : "white"}
           letterSpacing="-1"
         >
           A
         </text>
       </svg>
-
-      {/* Wordmark */}
-      {variant === "full" && (
-        <span
-          className={`font-black tracking-tight leading-none select-none ${sizeMap[size].textSize}`}
-          style={{
-            color: dark ? "white" : "#34095e",
-            fontWeight: 900,
-            letterSpacing: "-0.02em",
-          }}
-        >
-          Aure
-        </span>
-      )}
     </span>
   );
 }
