@@ -120,7 +120,7 @@
 | 4. Assinado | ✅ | Status `assinado` implementado |
 | 5. Vigente | ✅ | Status `active` implementado |
 | 6. Vencendo (< 30 dias) | 🔄 | Lógica de alerta existe, mas não é um estado formal do contrato |
-| 7. Renovado | ⬜ | Não existe como estado — sem fluxo de renovação |
+| 7. Renovado | ✅ | Implementado: estado teal no Kanban, labels e ao renovar marca o anterior como Renovado |
 | 8. Encerrado | ✅ | Status `terminated` implementado |
 | 9. Suspenso | ✅ | Implementado: filtro, Kanban (cinza), botão em ContratoDetalhes |
 
@@ -131,7 +131,7 @@
 | ✅ Tela de detalhe completa | ✅ | `ContratoDetalhes.tsx` |
 | 🔄 PDF inline sem precisar baixar | 🔄 | `ContratoDocumento.tsx` existe mas não é visualizador inline (PDF.js) |
 | ✅ Dados do contrato e assinaturas | ✅ | Implementado |
-| ⬜ Hash SHA-256 exibível | ⬜ | Hash gerado mas não exibido visivelmente ao usuário |
+| ✅ Hash SHA-256 exibível | ✅ | Computado client-side via Web Crypto API a partir do document_html e exibido em ContratoDetalhes quando assinatura_status=completed |
 | ⬜ QR Code no PDF | ⬜ | Não implementado |
 
 ---
@@ -140,10 +140,10 @@
 
 | Item | Status | Observação |
 |---|---|---|
-| 🔄 Editor em tela cheia (fullscreen) | 🔄 | Botão "Tela cheia" existe em `TemplatesContrato.tsx` (linha 637) mas ainda é modal/dialog, não página dedicada com rota própria (`/dashboard/templates/novo`) |
-| ⬜ Auto-save com indicador "Salvo às HH:MM" | ⬜ | Não implementado |
+| ✅ Editor em tela cheia (fullscreen) | ✅ | Página dedicada `/dashboard/templates-contrato/:id/editar` com layout 2 colunas: editor + sidebar de variáveis |
+| ✅ Auto-save com indicador "Salvo às HH:MM" | ✅ | Implementado no editor fullscreen com indicador visual de status |
 | ⬜ Histórico de versões com rollback (10 versões) | 🔄 | `fetchTemplateVersions`, `createTemplateVersion` existem no service. Falta: UI de rollback |
-| ⬜ Painel lateral de variáveis dinâmicas | ⬜ | Não existe painel com `{{empresa_nome}}`, `{{pj_nome}}` etc. clicáveis para inserir no cursor |
+| ✅ Painel lateral de variáveis dinâmicas | ✅ | Sidebar com grupos colapsoáveis e clique para inserir no cursor via `insertVariable` |
 | ✅ Categorias de templates | ✅ | Campo categoria implementado com filtro na listagem |
 | ✅ Operações: Duplicar, Arquivar, Editar | ✅ | `duplicateTemplate`, `softDeleteTemplate` implementados |
 | ✅ Contador de uso do template | ✅ | `fetchTemplateUsageCounts` implementado |
@@ -167,7 +167,7 @@
 | Item | Status | Observação |
 |---|---|---|
 | 🔄 Filtros avançados | 🔄 | Filtro por período, status e contrato implementados. Falta: exportação CSV/PDF/Excel |
-| ⬜ Exportação CSV/PDF/Excel | ⬜ | Não implementado |
+| ✅ Exportação CSV/PDF/Excel | ✅ | CSV já existia; PDF adicionado via browser print (rel. HTML formatado) |
 | 🔄 Geração automática de obrigações | 🔄 | `gerarObrigacoesPJ` (edge function) existe. Falta: acionamento automático na ativação do contrato |
 | ⬜ Fluxo de aprovação financeiro | 🔄 | `approvePayment`, `batchApprovePayments` implementados. Falta: integração com nfse para só aprovar após nota emitida |
 | ⬜ Integração gateway Pix/Split real | ⬜ | Não implementado — pagamentos são aprovados manualmente |
@@ -213,11 +213,11 @@
 5. ✅ Estado "Em Revisão" e "Suspenso" no ciclo de vida do contrato
 
 ### Sprint 2 — Médio prazo
-6. ⬜ Exportação CSV/PDF no módulo de Pagamentos
-7. ⬜ Editor de templates como página fullscreen com rota própria
-8. ⬜ Painel de variáveis dinâmicas no editor de templates
-9. ⬜ Hash SHA-256 exibível na tela do contrato assinado
-10. ⬜ Fluxo de renovação de contrato (estado "Renovado")
+6. ✅ Exportação CSV/PDF no módulo de Pagamentos
+7. ✅ Editor de templates como página fullscreen com rota própria
+8. ✅ Painel de variáveis dinâmicas no editor de templates
+9. ✅ Hash SHA-256 exibível na tela do contrato assinado
+10. ✅ Fluxo de renovação de contrato (estado "Renovado")
 
 ### Sprint 3 — Alta complexidade
 11. ⬜ Remuneração variável (META, ENTREGÁVEL, HORA/HORA, MISTO)
