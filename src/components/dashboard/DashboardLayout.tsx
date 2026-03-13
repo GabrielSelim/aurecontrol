@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { LogoAure } from "@/components/LogoAure";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -190,8 +191,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         "flex h-16 items-center gap-2 border-b border-border transition-all duration-300",
         collapsed ? "px-3 justify-center" : "px-6"
       )}>
-        <img src="/logo_aure.svg" alt="Aure" className="h-8 w-auto flex-shrink-0" />
-        {!collapsed && <span className="font-bold text-xl text-foreground">Aure</span>}
+        <LogoAure variant={collapsed ? "icon" : "full"} size="sm" />
       </div>
 
       {/* Collapse Button */}
@@ -427,10 +427,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <Menu className="h-6 w-6" />
             </Button>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">A</span>
-              </div>
-              <span className="font-bold text-xl text-foreground">Aure</span>
+              <LogoAure size="sm" />
             </div>
           </div>
           <NotificationBell />

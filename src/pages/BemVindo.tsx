@@ -1,3 +1,4 @@
+import { LogoAure } from "@/components/LogoAure";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -157,10 +158,7 @@ const BemVindo = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">A</span>
-            </div>
-            <span className="font-bold text-2xl">Aure</span>
+            <LogoAure size="lg" />
           </div>
           <h1 className="text-3xl font-bold text-foreground">Bem-vindo ao Aure!</h1>
           <p className="text-muted-foreground mt-1">Complete seu cadastro para acessar a plataforma</p>

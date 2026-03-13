@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { LogoAure } from "@/components/LogoAure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -388,8 +389,7 @@ const Registro = () => {
 
           {/* Logo */}
           <div className="flex items-center gap-2 mb-8">
-            <img src="/logo_aure.svg" alt="Aure" className="h-10 w-auto" />
-            <span className="font-bold text-2xl text-foreground">Aure</span>
+            <LogoAure size="lg" />
           </div>
 
           {/* Header */}

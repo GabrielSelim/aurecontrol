@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { LogoAure } from "@/components/LogoAure";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -47,8 +48,7 @@ const AtualizarSenha = () => {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="flex items-center gap-2 mb-8">
-            <img src="/logo_aure.svg" alt="Aure" className="h-10 w-auto" />
-            <span className="font-bold text-2xl text-foreground">Aure</span>
+            <LogoAure size="lg" />
           </div>
 
           {!passwordUpdated ? (

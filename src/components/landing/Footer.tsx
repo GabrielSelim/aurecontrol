@@ -1,3 +1,4 @@
+import { LogoAure } from "@/components/LogoAure";
 import { Link } from "react-router-dom";
 
 export function Footer() {
@@ -8,8 +9,7 @@ export function Footer() {
           {/* Logo & Description */}
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src="/logo_aure.svg" alt="Aure" className="h-9 w-auto" />
-              <span className="font-bold text-xl text-primary-foreground">Aure</span>
+              <LogoAure size="md" dark />
             </Link>
             <p className="text-muted-foreground text-sm">
               Sistema completo de gestão empresarial para funcionários CLT e PJ.

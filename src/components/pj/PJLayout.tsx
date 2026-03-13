@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { LogoAure } from "@/components/LogoAure";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -48,10 +49,9 @@ export function PJLayout({ children }: { children: React.ReactNode }) {
     <div className="flex h-full flex-col bg-card border-r border-border w-64">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-        <img src="/logo_aure.svg" alt="Aure" className="h-8 w-auto" />
         <div>
-          <span className="font-bold text-lg text-foreground">Aure</span>
-          <span className="block text-xs text-muted-foreground leading-none">Portal PJ</span>
+          <LogoAure size="sm" />
+          <span className="block text-xs text-muted-foreground leading-none mt-0.5">Portal PJ</span>
         </div>
       </div>
 

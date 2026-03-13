@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
+import { LogoAure } from "@/components/LogoAure";
 import { useState } from "react";
 
 export function Header() {
@@ -14,8 +15,7 @@ export function Header() {
         <nav className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo_aure.svg" alt="Aure" className="h-9 w-auto" />
-            <span className="font-bold text-xl text-foreground">Aure</span>
+            <LogoAure size="md" />
           </Link>
 
           {/* Desktop Navigation */}
