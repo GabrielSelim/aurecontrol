@@ -740,7 +740,7 @@ const Pagamentos = () => {
         <tbody>${rows}</tbody>
         <tfoot><tr><td colspan="2">Total</td><td style="text-align:right">${formatCurrency(totalValue)}</td><td colspan="4"></td></tr></tfoot>
       </table>
-      <script>window.onload=function(){window.print();}<\/script>
+      <script>window.onload=function(){window.print();}${"</script>"}
       </body></html>`;
     const w = window.open("", "_blank");
     if (w) { w.document.write(html); w.document.close(); }

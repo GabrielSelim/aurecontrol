@@ -14,6 +14,7 @@ vi.mock("@/services/contractService", () => ({
   fetchContractSalaries: vi.fn(),
   fetchContractUserIds: vi.fn(),
   fetchExpiringContracts: vi.fn(),
+  countActiveContractsByType: vi.fn(),
 }));
 
 vi.mock("@/services/profileService", () => ({
@@ -52,6 +53,7 @@ import {
   fetchContractSalaries,
   fetchContractUserIds,
   fetchExpiringContracts,
+  countActiveContractsByType,
 } from "@/services/contractService";
 import {
   countActiveProfilesByCompany,
@@ -88,6 +90,7 @@ function createWrapper() {
 const m = {
   countActiveProfilesByCompany: countActiveProfilesByCompany as ReturnType<typeof vi.fn>,
   fetchContractSalaries: fetchContractSalaries as ReturnType<typeof vi.fn>,
+  countActiveContractsByType: countActiveContractsByType as ReturnType<typeof vi.fn>,
   countPendingPayments: countPendingPayments as ReturnType<typeof vi.fn>,
   fetchPaidPaymentsInRange: fetchPaidPaymentsInRange as ReturnType<typeof vi.fn>,
   fetchExpiringContracts: fetchExpiringContracts as ReturnType<typeof vi.fn>,
@@ -104,6 +107,8 @@ const m = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // countActiveContractsByType defaults to 0 for PJ and CLT
+  (countActiveContractsByType as ReturnType<typeof vi.fn>).mockResolvedValue(0);
   // Set up audit logs chain → returns empty by default
   auditSelectMock.mockReturnValue({ eq: auditEqMock });
   auditEqMock.mockReturnValue({ order: auditOrderMock });

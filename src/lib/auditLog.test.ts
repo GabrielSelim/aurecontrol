@@ -1,4 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
+vi.mock("@/integrations/supabase/extraTypes", () => ({
+  auditLogsTable: vi.fn(),
+  contractVersionsTable: vi.fn(),
+}));
+vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() } }));
+
 import { getAuditActionLabel, getAuditCategoryLabel } from "./auditLog";
 
 describe("getAuditActionLabel", () => {
