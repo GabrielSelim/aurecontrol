@@ -26,6 +26,7 @@ vi.mock("@/services/paymentService", () => ({
   countPaymentsByUser: vi.fn(),
   countPendingPayments: vi.fn(),
   fetchPaidPaymentsInRange: vi.fn(),
+  fetchOverduePaymentsSummary: vi.fn(),
   countOverduePayments: vi.fn(),
 }));
 
@@ -63,6 +64,7 @@ import {
   countPaymentsByUser,
   countPendingPayments,
   fetchPaidPaymentsInRange,
+  fetchOverduePaymentsSummary,
   countOverduePayments,
 } from "@/services/paymentService";
 import { fetchCompany } from "@/services/companyService";
@@ -97,6 +99,7 @@ const m = {
   fetchProfilesByCompany: fetchProfilesByCompany as ReturnType<typeof vi.fn>,
   fetchContractUserIds: fetchContractUserIds as ReturnType<typeof vi.fn>,
   countOverduePayments: countOverduePayments as ReturnType<typeof vi.fn>,
+  fetchOverduePaymentsSummary: fetchOverduePaymentsSummary as ReturnType<typeof vi.fn>,
   fetchContractsByUser: fetchContractsByUser as ReturnType<typeof vi.fn>,
   fetchPendingSignaturesByEmail: fetchPendingSignaturesByEmail as ReturnType<typeof vi.fn>,
   fetchContractDocumentById: fetchContractDocumentById as ReturnType<typeof vi.fn>,
@@ -109,6 +112,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   // countActiveContractsByType defaults to 0 for PJ and CLT
   (countActiveContractsByType as ReturnType<typeof vi.fn>).mockResolvedValue(0);
+  // fetchOverduePaymentsSummary defaults to no overdue
+  (fetchOverduePaymentsSummary as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 0, total: 0 });
   // Set up audit logs chain → returns empty by default
   auditSelectMock.mockReturnValue({ eq: auditEqMock });
   auditEqMock.mockReturnValue({ order: auditOrderMock });
