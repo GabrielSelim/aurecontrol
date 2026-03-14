@@ -399,13 +399,66 @@ const ContratoDocumento = () => {
             .signature-summary {
               margin-top: 40px;
               padding-top: 20px;
-              border-top: 1px solid #ddd;
+              border-top: 2px solid #374151;
+              page-break-inside: avoid;
             }
-            .signature-item {
-              margin: 15px 0;
-              padding: 10px;
-              border: 1px solid #ddd;
-              border-radius: 4px;
+            .signature-summary h3 {
+              text-align: center;
+              font-size: 14px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              color: #111827;
+              margin-bottom: 24px;
+            }
+            .signatures-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 32px;
+            }
+            .signature-block {
+              text-align: center;
+            }
+            .signature-image-area {
+              height: 72px;
+              display: flex;
+              align-items: flex-end;
+              justify-content: center;
+              margin-bottom: 8px;
+            }
+            .signature-image-area img {
+              max-height: 64px;
+              max-width: 200px;
+              object-fit: contain;
+            }
+            .signature-line {
+              border-top: 1px solid #374151;
+              margin: 0 20px 8px;
+            }
+            .signature-name {
+              font-size: 12px;
+              font-weight: 600;
+              color: #111827;
+              margin-bottom: 2px;
+            }
+            .signature-role {
+              font-size: 10px;
+              color: #6b7280;
+              margin-bottom: 2px;
+            }
+            .signature-email {
+              font-size: 10px;
+              color: #6b7280;
+              margin-bottom: 4px;
+            }
+            .signature-date {
+              font-size: 10px;
+              font-weight: 600;
+              color: #16a34a;
+            }
+            .signature-pending {
+              font-size: 10px;
+              color: #9ca3af;
             }
             img { max-width: 200px; height: auto; }
             @media print {
@@ -432,20 +485,27 @@ const ContratoDocumento = () => {
           `).join('') : ''}
           
           <div class="signature-summary">
-            <h3 style="margin-bottom: 20px;">Resumo das Assinaturas</h3>
-            ${signatures.map(s => `
-              <div class="signature-item">
-                <p style="margin: 0 0 5px 0;"><strong>${getSignerTypeLabel(s.signer_type)}:</strong> ${s.signer_name}</p>
-                <p style="margin: 0; font-size: 12px; color: #666;">Posição: Página ${s.position_page || 1}</p>
-                ${s.signed_at ? `
-                  <p style="margin: 5px 0 0 0; font-size: 12px; color: #22c55e;">
-                    ✓ Assinado em: ${format(new Date(s.signed_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                  </p>
-                ` : `
-                  <p style="margin: 5px 0 0 0; font-size: 12px; color: #999;">⏳ Pendente</p>
-                `}
-              </div>
-            `).join('')}
+            <h3>Assinaturas Digitais</h3>
+            <div class="signatures-grid">
+              ${signatures.map(s => `
+                <div class="signature-block">
+                  <div class="signature-image-area">
+                    ${s.signature_image_url
+                      ? `<img src="${s.signature_image_url}" alt="Assinatura de ${s.signer_name}" />`
+                      : `<span style="font-size:11px;color:#9ca3af;font-style:italic;">Sem assinatura digital</span>`
+                    }
+                  </div>
+                  <div class="signature-line"></div>
+                  <p class="signature-name">${s.signer_name}</p>
+                  <p class="signature-role">${getSignerTypeLabel(s.signer_type)}${s.signer_type === "witness" ? ` ${s.signer_order || ""}` : ""}</p>
+                  <p class="signature-email">${s.signer_email}</p>
+                  ${s.signed_at
+                    ? `<p class="signature-date">✓ ${format(new Date(s.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>`
+                    : `<p class="signature-pending">⏳ Aguardando assinatura</p>`
+                  }
+                </div>
+              `).join('')}
+            </div>
           </div>
 
           <div style="margin-top: 40px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: center; gap: 20px; background: #f9fafb;">

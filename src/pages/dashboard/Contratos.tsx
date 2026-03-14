@@ -129,6 +129,11 @@ interface Contract {
   monthly_value: number | null;
   adjustment_index: string | null;
   adjustment_date: string | null;
+  clt_employee_id: string | null;
+  clt_ctps_number: string | null;
+  clt_ctps_series: string | null;
+  clt_cbo_code: string | null;
+  clt_work_regime: string | null;
   profile?: {
     full_name: string;
     email: string;
@@ -641,6 +646,11 @@ const Contratos = () => {
         adjustment_index: contractType === "PJ" && adjustmentIndex && adjustmentIndex !== "none" ? adjustmentIndex : null,
         adjustment_date: contractType === "PJ" && adjustmentDate ? adjustmentDate : null,
         compensation_type: contractType === "PJ" ? compensationType : "fixed",
+        clt_employee_id: contractType !== "PJ" && cltEmployeeId ? cltEmployeeId : null,
+        clt_ctps_number: contractType !== "PJ" && cltCtpsNumber ? cltCtpsNumber : null,
+        clt_ctps_series: contractType !== "PJ" && cltCtpsSeries ? cltCtpsSeries : null,
+        clt_cbo_code: contractType !== "PJ" && cltCboCode ? cltCboCode : null,
+        clt_work_regime: contractType !== "PJ" ? cltWorkRegime : null,
         hourly_rate: contractType === "PJ" && compensationType === "hourly" && salary ? parseCurrency(salary) : null,
         variable_component: contractType === "PJ" && compensationType === "mixed" && variableComponent ? parseCurrency(variableComponent) : null,
         goal_description: contractType === "PJ" && (compensationType === "variable_goal" || compensationType === "variable_deliverable") && goalDescription ? goalDescription : null,
@@ -850,6 +860,11 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setDurationValue("");
     setDurationUnit("months");
     setDeliverableDescription("");
+    setCltEmployeeId("");
+    setCltCtpsNumber("");
+    setCltCtpsSeries("");
+    setCltCboCode("");
+    setCltWorkRegime("presencial");
     setSelectedTemplateId("");
     setWitnessCount("0");
     setSelectedRepresentativeId("");
@@ -1349,6 +1364,68 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                         </SelectContent>
                       </Select>
                     </div>
+                    {/* CLT-specific fields */}
+                    {contractType !== "PJ" && contractType !== "" && (
+                      <div className="space-y-3 pt-2 border-t">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados Trabalhistas</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label className="text-sm">Matrícula</Label>
+                            <Input
+                              placeholder="Ex: 000123"
+                              value={cltEmployeeId}
+                              onChange={(e) => setCltEmployeeId(e.target.value)}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Código CBO</Label>
+                            <Input
+                              placeholder="Ex: 2124-05"
+                              value={cltCboCode}
+                              onChange={(e) => setCltCboCode(e.target.value)}
+                              className="h-10"
+                            />
+                            <p className="text-xs text-muted-foreground">Classificação Brasileira de Ocupações</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label className="text-sm">Nº CTPS</Label>
+                            <Input
+                              placeholder="Ex: 0001234"
+                              value={cltCtpsNumber}
+                              onChange={(e) => setCltCtpsNumber(e.target.value)}
+                              className="h-10"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Série CTPS</Label>
+                            <Input
+                              placeholder="Ex: 0001"
+                              value={cltCtpsSeries}
+                              onChange={(e) => setCltCtpsSeries(e.target.value)}
+                              className="h-10"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-sm">Regime de Trabalho</Label>
+                          <Select value={cltWorkRegime} onValueChange={setCltWorkRegime}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="presencial">Presencial</SelectItem>
+                              <SelectItem value="teletrabalho">Teletrabalho (Home Office)</SelectItem>
+                              <SelectItem value="hibrido">Híbrido</SelectItem>
+                              <SelectItem value="parcial">Jornada Parcial</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+
                     {contractType === "PJ" && (
                       <div className="space-y-2">
                         <Label>Modelo de Remuneração</Label>

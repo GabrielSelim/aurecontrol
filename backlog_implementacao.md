@@ -26,7 +26,7 @@
 |---|---|---|---|
 | GAP-01 | Portal e Visão do PJ | ✅ | `PJDashboard`, `PJContratos`, `PJPagamentos`, `PJPerfil`, `PJLayout` — portal bilateral completo |
 | GAP-02 | Assinatura Digital Bilateral e Certificado | 🔄 | `SignaturePad.tsx`, `SignatureCertificate.tsx` existem. Falta: registro em blockchain e integração com provedor externo (ClickSign/DocuSign) |
-| GAP-03 | Status Contratual Estruturado com Histórico | 🔄 | Estados existem (`active`, `assinado`, `enviado`, `terminated`, etc). Falta: máquina de 9 estados do PRD completa + timeline visível por contrato |
+| GAP-03 | Status Contratual Estruturado com Histórico | 🔄 | Estados existem. Histórico de auditoria (`ContractAuditTrail`) integrado em `ContratoDetalhes`. Falta: máquina de 9 estados completa com timeline visual |
 | GAP-04 | Vínculo Automático Contrato → Obrigação Financeira | 🔄 | Campo de periodicidade existe no formulário. `gerarObrigacoesPJ` via edge function existe. Falta: vínculo automático real ao ativar contrato + fila de aprovação financeiro |
 
 ---
@@ -37,9 +37,9 @@
 |---|---|---|---|
 | GAP-05 | Tela de Detalhe do Contrato | ✅ | `ContratoDetalhes.tsx` (1254 linhas) — visualizador, dados, assinaturas, NFS-e, splits, anexos |
 | GAP-06 | Tela de Detalhe do Colaborador | ✅ | `ColaboradorDetalhes.tsx` — perfil completo, contratos, histórico de pagamentos, gestão de roles |
-| GAP-07 | PDF Inteligente do Contrato | 🔄 | `ContratoDocumento.tsx` existe. QR Code de verificação adicionado. Falta: seção de assinaturas formatada |
+| GAP-07 | PDF Inteligente do Contrato | ✅ | QR Code de verificação + seção de assinaturas formatada em grid (imagem, nome, papel, data, email) em `ContratoDocumento.tsx` |
 | GAP-08 | Onboarding Guiado do PJ após Convite | ✅ | `Registro.tsx` step 2 para colaboradores convidados com banco, agência, conta, tipo e chave PIX (campos opcionais, salvo em profiles) |
-| GAP-09 | Motor de Notificações Estruturado | 🔄 | `notificationService.ts`, `NotificationBell.tsx`, `NotificationPreferences.tsx`, `NotificationDeliveryLogs.tsx` existem. Falta: centro in-app com badge funcional, filtros e histórico 90 dias |
+| GAP-09 | Motor de Notificações Estruturado | ✅ | `NotificationBell.tsx` com badge, marcar todas como lidas, filtro por tipo (Todas / Notificações / Avisos), histórico de 90 dias |
 | GAP-10 | Controle de Permissões por Perfil (RBAC) | ✅ | `hasRole()` em `AuthContext`, sidebar dinâmica por perfil, roles no backend |
 
 ---
@@ -181,7 +181,7 @@
 |---|---|---|
 | ⬜ Campos contábeis eSocial | ⬜ | Não implementado — campos específicos de eSocial ausentes |
 | ⬜ Holerite digital | ⬜ | Não implementado — sem geração de holerite |
-| 🔄 Contratos CLT | 🔄 | Tipo `CLT` existe no formulário de contratos. Falta: campos específicos CLT (matrícula, CBO, CTPS) |
+| 🔄 Contratos CLT | ✅ | Campos CLT adicionados: matrícula, CBO, N° CTPS, Série CTPS, regime de trabalho. Migration `20260314010000`. Exibidos em `ContratoDetalhes.tsx` |
 
 ---
 
@@ -221,7 +221,7 @@
 
 ### Sprint 3 — Alta complexidade
 11. ✅ Remuneração variável (META, ENTREGÁVEL, HORA/HORA, MISTO)
-12. ⬜ Painel de metas e entregáveis vinculados ao pagamento variável
+12. ✅ Painel de metas e entregáveis vinculados ao pagamento variável
 13. ⬜ Integração real API NFS-e com prefeitura
 14. ✅ Geração automática de obrigação ao ativar contrato
 15. ⬜ Fluxo completo financeiro: nota emitida → aprovação → pagamento

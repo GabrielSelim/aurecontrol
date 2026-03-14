@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Bell, Check, CheckCheck, AlertTriangle, AlertCircle, Info,
-  FileText, CreditCard, PenLine,
+  FileText, CreditCard, PenLine, Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,7 @@ const eventIcons: Record<string, React.ElementType> = {
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [filterType, setFilterType] = useState<"all" | "notificacoes" | "avisos">("all");
   const { user } = useAuth();
   const { announcements, unreadCount: announcementUnread, isLoading: announcementsLoading, markAsRead, markAllAsRead } = useAnnouncements();
 
@@ -118,12 +119,30 @@ export function NotificationBell() {
           )}
         </div>
 
-        <ScrollArea className="h-[350px]">
+        {/* Filter tabs */}
+        <div className="flex border-b px-1 py-1 gap-0.5">
+          {([["all", "Todas"], ["notificacoes", "Notificações"], ["avisos", "Avisos"]] as const).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setFilterType(val)}
+              className={cn(
+                "flex-1 text-xs py-1 px-2 rounded transition-colors",
+                filterType === val
+                  ? "bg-primary text-primary-foreground font-medium"
+                  : "text-muted-foreground hover:bg-muted"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <ScrollArea className="h-[320px]">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
             </div>
-          ) : announcements.length === 0 && userNotifs.length === 0 ? (
+          ) : (filterType !== "avisos" ? userNotifs : []).length === 0 && (filterType !== "notificacoes" ? announcements : []).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <Bell className="h-8 w-8 mb-2 opacity-50" />
               <p className="text-sm">Nenhuma notificação</p>
@@ -131,7 +150,7 @@ export function NotificationBell() {
           ) : (
             <div className="divide-y">
               {/* User-specific in-app notifications */}
-              {userNotifs.map((notif) => {
+              {filterType !== "avisos" && userNotifs.map((notif) => {
                 const Icon = eventIcons[notif.event_type ?? "default"] ?? Bell;
                 return (
                   <div
@@ -174,7 +193,7 @@ export function NotificationBell() {
               })}
 
               {/* System announcements */}
-              {announcements.map((announcement) => {
+              {filterType !== "notificacoes" && announcements.map((announcement) => {
                 const config = priorityConfig[announcement.priority];
                 const Icon = config.icon;
                 return (

@@ -72,6 +72,8 @@ import {
   XCircle,
   ListTodo,
   Plus,
+  History,
+  CreditCard,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -79,6 +81,7 @@ import { logger } from "@/lib/logger";
 import { buildWitnessNotificationEmail } from "@/lib/emailTemplates";
 import { logAuditAction } from "@/lib/auditLog";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { ContractAuditTrail } from "@/components/contracts/ContractAuditTrail";
 
 interface Contract {
   id: string;
@@ -108,6 +111,11 @@ interface Contract {
   scope_description: string | null;
   adjustment_index: string | null;
   adjustment_date: string | null;
+  clt_employee_id: string | null;
+  clt_ctps_number: string | null;
+  clt_ctps_series: string | null;
+  clt_cbo_code: string | null;
+  clt_work_regime: string | null;
 }
 
 interface Profile {
@@ -965,6 +973,68 @@ const ContratoDetalhes = () => {
           </CardContent>
         </Card>
 
+        {/* Dados Trabalhistas CLT */}
+        {contract.contract_type !== "PJ" && (contract.clt_employee_id || contract.clt_ctps_number || contract.clt_cbo_code || contract.clt_work_regime) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Dados Trabalhistas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                {contract.clt_employee_id && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Matrícula</p>
+                    <p className="font-medium">{contract.clt_employee_id}</p>
+                  </div>
+                )}
+                {contract.clt_cbo_code && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Código CBO</p>
+                    <p className="font-medium">{contract.clt_cbo_code}</p>
+                  </div>
+                )}
+              </div>
+              {(contract.clt_ctps_number || contract.clt_ctps_series) && (
+                <>
+                  <Separator />
+                  <div className="grid grid-cols-2 gap-4">
+                    {contract.clt_ctps_number && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Nº CTPS</p>
+                        <p className="font-medium">{contract.clt_ctps_number}</p>
+                      </div>
+                    )}
+                    {contract.clt_ctps_series && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Série CTPS</p>
+                        <p className="font-medium">{contract.clt_ctps_series}</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              {contract.clt_work_regime && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Regime de Trabalho</p>
+                    <Badge variant="secondary">
+                      {contract.clt_work_regime === "presencial" ? "Presencial" :
+                       contract.clt_work_regime === "teletrabalho" ? "Teletrabalho (Home Office)" :
+                       contract.clt_work_regime === "hibrido" ? "Híbrido" :
+                       contract.clt_work_regime === "parcial" ? "Jornada Parcial" :
+                       contract.clt_work_regime}
+                    </Badge>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Datas e Duração */}
         <Card>
           <CardHeader>
@@ -1455,6 +1525,9 @@ const ContratoDetalhes = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Histórico de Auditoria */}
+      <ContractAuditTrail contractId={id!} />
 
       {/* Dialog para editar testemunha */}
       <Dialog open={!!editingWitness} onOpenChange={(open) => !open && setEditingWitness(null)}>
