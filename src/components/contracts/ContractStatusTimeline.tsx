@@ -114,7 +114,7 @@ const STEP_ORDER: Record<string, number> = {
 export function ContractStatusTimeline({
   status,
   endDate,
-  createdAt,
+  createdAt: _createdAt,
   className,
 }: ContractStatusTimelineProps) {
   // Dias até vencer (para badge "Vencendo")

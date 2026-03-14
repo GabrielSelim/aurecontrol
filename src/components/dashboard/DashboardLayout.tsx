@@ -226,7 +226,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       )}
 
-      {/* Navigation */}}
+      {/* Navigation */}
       <ScrollArea className={cn(
         "flex-1 py-4 transition-all duration-300",
         collapsed ? "px-2" : "px-3"
