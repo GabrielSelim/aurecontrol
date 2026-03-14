@@ -94,3 +94,15 @@ export function contractVersionsTable() {
   return (supabase as unknown as { from: (table: string) => ReturnType<typeof supabase.from> })
     .from("contract_versions");
 }
+
+/**
+ * Access the `contract_goals` table with typed Row/Insert support.
+ *
+ * `contract_goals` was added via migration after the last `supabase gen types` run.
+ * Uses an `as unknown as` cast internally so callers don't have to.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function contractGoalsTable(): any {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (supabase as any).from("contract_goals");
+}

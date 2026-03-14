@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { contractGoalsTable } from "@/integrations/supabase/extraTypes";
 
 export interface ContractGoal {
   id: string;
@@ -28,25 +28,23 @@ export interface ContractGoalInsert {
 }
 
 export async function fetchGoalsByContract(contractId: string): Promise<ContractGoal[]> {
-  const { data, error } = await supabase
-    .from("contract_goals")
+  const { data, error } = await contractGoalsTable()
     .select("*")
     .eq("contract_id", contractId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as ContractGoal[];
+  return (data ?? []) as unknown as ContractGoal[];
 }
 
 export async function createGoal(payload: ContractGoalInsert): Promise<ContractGoal> {
-  const { data, error } = await supabase
-    .from("contract_goals")
+  const { data, error } = await contractGoalsTable()
     .insert(payload as never)
     .select()
     .single();
 
   if (error) throw error;
-  return data as ContractGoal;
+  return data as unknown as ContractGoal;
 }
 
 export async function updateGoalStatus(
@@ -65,8 +63,7 @@ export async function updateGoalStatus(
     updates.achieved_at = new Date().toISOString();
   }
 
-  const { error } = await supabase
-    .from("contract_goals")
+  const { error } = await contractGoalsTable()
     .update(updates as never)
     .eq("id", goalId);
 
@@ -74,8 +71,7 @@ export async function updateGoalStatus(
 }
 
 export async function deleteGoal(goalId: string): Promise<void> {
-  const { error } = await supabase
-    .from("contract_goals")
+  const { error } = await contractGoalsTable()
     .delete()
     .eq("id", goalId);
 
