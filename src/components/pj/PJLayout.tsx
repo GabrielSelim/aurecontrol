@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import {
   LayoutDashboard,
   FileText,
@@ -47,12 +48,13 @@ export function PJLayout({ children }: { children: React.ReactNode }) {
 
   const Sidebar = () => (
     <div className="flex h-full flex-col bg-card border-r border-border w-64">
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b border-border px-6">
+      {/* Logo + Notificações */}
+      <div className="flex h-16 items-center justify-between border-b border-border px-4">
         <div>
           <LogoAure size="sm" />
           <span className="block text-xs text-muted-foreground leading-none mt-0.5">Portal PJ</span>
         </div>
+        <NotificationBell />
       </div>
 
       {/* Nav */}
@@ -140,6 +142,7 @@ export function PJLayout({ children }: { children: React.ReactNode }) {
             </Button>
             <span className="font-bold text-lg">Aure <span className="text-xs text-muted-foreground font-normal">Portal PJ</span></span>
           </div>
+          <NotificationBell />
         </header>
 
         <main className="p-6">

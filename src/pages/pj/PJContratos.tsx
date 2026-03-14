@@ -243,7 +243,7 @@ const PJContratos = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/contratos/${c.id}`)}
+                        onClick={() => navigate(`/pj/contratos/${c.id}`)}
                       >
                         <Eye className="h-4 w-4 mr-1" /> Ver
                       </Button>

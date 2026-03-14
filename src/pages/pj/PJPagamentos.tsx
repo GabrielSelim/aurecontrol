@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { fetchPJPayments } from "@/services/pjService";
 import { fetchNfseByContract } from "@/services/nfseService";
 import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
@@ -26,15 +27,10 @@ const PJPagamentos = () => {
   // NFS-e status per contract_id: "emitida" | "pendente" | "none"
   const [nfseMap, setNfseMap] = useState<Record<string, "emitida" | "pendente" | "none">>({});
 
-  useEffect(() => {
-    if (user) loadPayments();
-  }, [user]);
-
-  const loadPayments = async () => {
+  const loadPayments = useCallback(async () => {
     try {
       const data = await fetchPJPayments(user!.id);
       setPayments(data);
-      // Batch load NFS-e for all unique contract_ids
       const contractIds = [...new Set(data.map((p: any) => p.contract_id).filter(Boolean))] as string[];
       if (contractIds.length > 0) {
         const results = await Promise.allSettled(contractIds.map(fetchNfseByContract));
@@ -56,7 +52,32 @@ const PJPagamentos = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) loadPayments();
+  }, [user, loadPayments]);
+
+  // Realtime: atualiza ao vivo quando um pagamento mudar
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("pj-payments-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "payments",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          loadPayments();
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, loadPayments]);
 
   const filtered = payments.filter((p) => {
     const matchSearch = p.description?.toLowerCase().includes(search.toLowerCase()) ?? true;

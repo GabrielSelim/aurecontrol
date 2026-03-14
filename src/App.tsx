@@ -51,6 +51,7 @@ const Auditoria = lazy(() => import("./pages/dashboard/Auditoria"));
 const BemVindo = lazy(() => import("./pages/BemVindo"));
 const PJDashboard = lazy(() => import("./pages/pj/PJDashboard"));
 const PJContratos = lazy(() => import("./pages/pj/PJContratos"));
+const PJContratoView = lazy(() => import("./pages/pj/PJContratoView"));
 const PJPagamentos = lazy(() => import("./pages/pj/PJPagamentos"));
 const PJPerfil = lazy(() => import("./pages/pj/PJPerfil"));
 
@@ -231,6 +232,7 @@ function AppRoutes() {
               <Routes>
                 <Route path="dashboard" element={<PJDashboard />} />
                 <Route path="contratos" element={<PJContratos />} />
+                <Route path="contratos/:id" element={<PJContratoView />} />
                 <Route path="pagamentos" element={<PJPagamentos />} />
                 <Route path="perfil" element={<PJPerfil />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
