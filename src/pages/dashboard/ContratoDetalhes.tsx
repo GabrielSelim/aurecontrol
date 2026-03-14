@@ -11,6 +11,7 @@ import {
 } from "@/services/contractService";
 import { fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { sendEmail, gerarObrigacoesPJ } from "@/services/edgeFunctionService";
+import { fetchCompanyFull } from "@/services/companyService";
 import {
   fetchGoalsByContract,
   createGoal,
@@ -74,6 +75,7 @@ import {
   Plus,
   History,
   CreditCard,
+  Printer,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -82,6 +84,7 @@ import { buildWitnessNotificationEmail } from "@/lib/emailTemplates";
 import { logAuditAction } from "@/lib/auditLog";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ContractAuditTrail } from "@/components/contracts/ContractAuditTrail";
+import { HoleritoDigital } from "@/components/contracts/HoleritoDigital";
 
 interface Contract {
   id: string;
@@ -116,6 +119,12 @@ interface Contract {
   clt_ctps_series: string | null;
   clt_cbo_code: string | null;
   clt_work_regime: string | null;
+  pis_pasep: string | null;
+  esocial_categoria: string | null;
+  grau_instrucao: string | null;
+  raca_cor: string | null;
+  estado_civil: string | null;
+  data_admissao: string | null;
 }
 
 interface Profile {
@@ -179,6 +188,10 @@ const ContratoDetalhes = () => {
   const [isSavingGoal, setIsSavingGoal] = useState(false);
   const [reviewingGoal, setReviewingGoal] = useState<ContractGoal | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
+  // Holerite state
+  const [isHoleritoOpen, setIsHoleritoOpen] = useState(false);
+  const [holeritoMonth, setHoleritoMonth] = useState("");
+  const [companyInfo, setCompanyInfo] = useState<{ name: string; cnpj?: string | null; address?: string | null } | null>(null);
 
   // Compute SHA-256 of document_html for integrity verification
   useEffect(() => {
@@ -228,6 +241,14 @@ const ContratoDetalhes = () => {
       );
 
       setProfile(profileData as unknown as Profile);
+
+      // Fetch company info (for holerite)
+      try {
+        const company = await fetchCompanyFull(contractData.company_id);
+        if (company) setCompanyInfo({ name: company.name, cnpj: company.cnpj, address: company.address });
+      } catch {
+        // Non-critical
+      }
 
       // Fetch document if PJ contract
       if (contractData.contract_type === "PJ") {
@@ -810,6 +831,21 @@ const ContratoDetalhes = () => {
               Reativar
             </Button>
           )}
+          {/* Holerite button — CLT/estágio/temporário only */}
+          {contract.contract_type !== "PJ" && isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                setHoleritoMonth(new Date().toISOString().substring(0, 7));
+                setIsHoleritoOpen(true);
+              }}
+            >
+              <Printer className="h-4 w-4" />
+              Holerite
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1028,6 +1064,56 @@ const ContratoDetalhes = () => {
                        contract.clt_work_regime === "parcial" ? "Jornada Parcial" :
                        contract.clt_work_regime}
                     </Badge>
+                  </div>
+                </>
+              )}
+              {(contract.pis_pasep || contract.esocial_categoria || contract.grau_instrucao || contract.raca_cor || contract.estado_civil || contract.data_admissao) && (
+                <>
+                  <Separator />
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados eSocial</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {contract.pis_pasep && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">PIS/PASEP</p>
+                        <p className="font-medium font-mono">{contract.pis_pasep}</p>
+                      </div>
+                    )}
+                    {contract.data_admissao && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Data de Admissão</p>
+                        <p className="font-medium">{new Date(contract.data_admissao).toLocaleDateString("pt-BR")}</p>
+                      </div>
+                    )}
+                    {contract.esocial_categoria && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Categoria eSocial</p>
+                        <p className="font-medium">{contract.esocial_categoria}</p>
+                      </div>
+                    )}
+                    {contract.estado_civil && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Estado Civil</p>
+                        <p className="font-medium capitalize">{contract.estado_civil.replace("_", " ")}</p>
+                      </div>
+                    )}
+                    {contract.grau_instrucao && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Grau de Instrução</p>
+                        <p className="font-medium">{{
+                          "01": "Analfabeto", "02": "Fundamental incompleto", "03": "Fundamental completo",
+                          "04": "Médio incompleto", "05": "Médio completo", "06": "Superior incompleto",
+                          "07": "Superior completo", "08": "Pós-graduação", "09": "Mestrado", "10": "Doutorado"
+                        }[contract.grau_instrucao] || contract.grau_instrucao}</p>
+                      </div>
+                    )}
+                    {contract.raca_cor && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Raça/Cor</p>
+                        <p className="font-medium">{{
+                          "1": "Indígena", "2": "Branca", "4": "Preta", "6": "Amarela", "8": "Parda", "9": "Não informado"
+                        }[contract.raca_cor] || contract.raca_cor}</p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -1710,6 +1796,33 @@ const ContratoDetalhes = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Holerite Digital */}
+      {isHoleritoOpen && contract && profile && (
+        <HoleritoDigital
+          open={isHoleritoOpen}
+          onClose={() => setIsHoleritoOpen(false)}
+          referenceMonth={holeritoMonth}
+          contract={{
+            job_title: contract.job_title,
+            salary: contract.salary,
+            start_date: contract.start_date,
+            clt_employee_id: contract.clt_employee_id,
+            clt_work_regime: contract.clt_work_regime,
+            pis_pasep: contract.pis_pasep,
+            data_admissao: contract.data_admissao,
+          }}
+          profile={{
+            full_name: profile.full_name,
+            cpf: (authProfile?.cpf) ?? null,
+          }}
+          company={{
+            name: companyInfo?.name ?? "",
+            cnpj: companyInfo?.cnpj,
+            address: companyInfo?.address,
+          }}
+        />
+      )}
     </div>
   );
 };

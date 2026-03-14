@@ -134,6 +134,12 @@ interface Contract {
   clt_ctps_series: string | null;
   clt_cbo_code: string | null;
   clt_work_regime: string | null;
+  pis_pasep: string | null;
+  esocial_categoria: string | null;
+  grau_instrucao: string | null;
+  raca_cor: string | null;
+  estado_civil: string | null;
+  data_admissao: string | null;
   profile?: {
     full_name: string;
     email: string;
@@ -240,6 +246,19 @@ const Contratos = () => {
   const [durationValue, setDurationValue] = useState("");
   const [durationUnit, setDurationUnit] = useState("months");
   const [deliverableDescription, setDeliverableDescription] = useState("");
+  // CLT fields
+  const [cltEmployeeId, setCltEmployeeId] = useState("");
+  const [cltCtpsNumber, setCltCtpsNumber] = useState("");
+  const [cltCtpsSeries, setCltCtpsSeries] = useState("");
+  const [cltCboCode, setCltCboCode] = useState("");
+  const [cltWorkRegime, setCltWorkRegime] = useState("presencial");
+  // eSocial fields
+  const [pisPasep, setPisPasep] = useState("");
+  const [esocialCategoria, setEsocialCategoria] = useState("101");
+  const [grauInstrucao, setGrauInstrucao] = useState("");
+  const [racaCor, setRacaCor] = useState("");
+  const [estadoCivil, setEstadoCivil] = useState("");
+  const [dataAdmissao, setDataAdmissao] = useState("");
   // PJ document fields
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [witnessCount, setWitnessCount] = useState("0");
@@ -651,6 +670,12 @@ const Contratos = () => {
         clt_ctps_series: contractType !== "PJ" && cltCtpsSeries ? cltCtpsSeries : null,
         clt_cbo_code: contractType !== "PJ" && cltCboCode ? cltCboCode : null,
         clt_work_regime: contractType !== "PJ" ? cltWorkRegime : null,
+        pis_pasep: contractType !== "PJ" && pisPasep ? pisPasep : null,
+        esocial_categoria: contractType !== "PJ" && esocialCategoria ? esocialCategoria : null,
+        grau_instrucao: contractType !== "PJ" && grauInstrucao ? grauInstrucao : null,
+        raca_cor: contractType !== "PJ" && racaCor ? racaCor : null,
+        estado_civil: contractType !== "PJ" && estadoCivil ? estadoCivil : null,
+        data_admissao: contractType !== "PJ" && dataAdmissao ? dataAdmissao : null,
         hourly_rate: contractType === "PJ" && compensationType === "hourly" && salary ? parseCurrency(salary) : null,
         variable_component: contractType === "PJ" && compensationType === "mixed" && variableComponent ? parseCurrency(variableComponent) : null,
         goal_description: contractType === "PJ" && (compensationType === "variable_goal" || compensationType === "variable_deliverable") && goalDescription ? goalDescription : null,
@@ -865,6 +890,12 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setCltCtpsSeries("");
     setCltCboCode("");
     setCltWorkRegime("presencial");
+    setPisPasep("");
+    setEsocialCategoria("101");
+    setGrauInstrucao("");
+    setRacaCor("");
+    setEstadoCivil("");
+    setDataAdmissao("");
     setSelectedTemplateId("");
     setWitnessCount("0");
     setSelectedRepresentativeId("");
@@ -1422,6 +1453,100 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                               <SelectItem value="parcial">Jornada Parcial</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                        {/* eSocial fields */}
+                        <div className="space-y-2 pt-2 border-t">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados eSocial (opcional)</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label className="text-sm">PIS/PASEP</Label>
+                              <Input
+                                placeholder="000.00000.00-0"
+                                value={pisPasep}
+                                onChange={(e) => setPisPasep(e.target.value)}
+                                className="h-10"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Data de Admissão</Label>
+                              <Input
+                                type="date"
+                                value={dataAdmissao}
+                                onChange={(e) => setDataAdmissao(e.target.value)}
+                                className="h-10"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-sm">Categoria eSocial</Label>
+                            <Select value={esocialCategoria} onValueChange={setEsocialCategoria}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="101">101 — Empregado geral</SelectItem>
+                                <SelectItem value="103">103 — Trabalhador aprendiz</SelectItem>
+                                <SelectItem value="104">104 — Empregado doméstico</SelectItem>
+                                <SelectItem value="105">105 — Trabalhador intermitente</SelectItem>
+                                <SelectItem value="106">106 — Empregado rural</SelectItem>
+                                <SelectItem value="111">111 — Dirigente sindical</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="space-y-2">
+                              <Label className="text-sm">Grau de Instrução</Label>
+                              <Select value={grauInstrucao} onValueChange={setGrauInstrucao}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="01">Analfabeto</SelectItem>
+                                  <SelectItem value="02">Fundamental incompleto</SelectItem>
+                                  <SelectItem value="03">Fundamental completo</SelectItem>
+                                  <SelectItem value="04">Médio incompleto</SelectItem>
+                                  <SelectItem value="05">Médio completo</SelectItem>
+                                  <SelectItem value="06">Superior incompleto</SelectItem>
+                                  <SelectItem value="07">Superior completo</SelectItem>
+                                  <SelectItem value="08">Pós-graduação</SelectItem>
+                                  <SelectItem value="09">Mestrado</SelectItem>
+                                  <SelectItem value="10">Doutorado</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Raça/Cor</Label>
+                              <Select value={racaCor} onValueChange={setRacaCor}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">Indígena</SelectItem>
+                                  <SelectItem value="2">Branca</SelectItem>
+                                  <SelectItem value="4">Preta</SelectItem>
+                                  <SelectItem value="6">Amarela</SelectItem>
+                                  <SelectItem value="8">Parda</SelectItem>
+                                  <SelectItem value="9">Não informado</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Estado Civil</Label>
+                              <Select value={estadoCivil} onValueChange={setEstadoCivil}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                                  <SelectItem value="casado">Casado(a)</SelectItem>
+                                  <SelectItem value="separado">Separado(a)</SelectItem>
+                                  <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                                  <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                                  <SelectItem value="uniao_estavel">União estável</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}

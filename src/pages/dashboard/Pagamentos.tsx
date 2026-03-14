@@ -448,7 +448,7 @@ const Pagamentos = () => {
   const handleApprovePayment = async (paymentId: string) => {
     const payment = pagamentos.find(p => p.id === paymentId);
     
-    // Check NFS-e: if contract is PJ, warn if no emitted NFS-e for the same reference month
+    // Check NFS-e: if contract is PJ, BLOCK approval when no emitted NFS-e for the same reference month
     if (payment?.contract_id) {
       const contractType = contractsMap[payment.contract_id]?.contract_type;
       if (contractType === "PJ") {
@@ -459,14 +459,15 @@ const Pagamentos = () => {
             (n) => n.status === "emitida" && n.competencia?.startsWith(month ?? "")
           );
           if (!hasEmitted) {
-            toast.warning(
-              `Atenção: Nenhuma NFS-e emitida para ${month}. Verifique antes de aprovar o pagamento.`,
-              { duration: 6000 }
+            toast.error(
+              `Aprovação bloqueada: o prestador PJ deve emitir a NFS-e referente a ${month} antes da liberação do pagamento.`,
+              { duration: 8000 }
             );
-            // Not blocking — just warns. Falls through to approve.
+            return; // HARD BLOCK — does not proceed to approvePayment
           }
         } catch {
-          // Non-critical — proceed with approval
+          // If NFS-e lookup fails, warn but do not block (fail-open)
+          toast.warning("Não foi possível verificar a NFS-e. Prosseguindo com aprovação.", { duration: 4000 });
         }
       }
     }
