@@ -17,6 +17,7 @@ import {
   countPaymentsByUser,
   countPendingPayments,
   fetchPaidPaymentsInRange,
+  fetchOverduePaymentsSummary,
   countOverduePayments,
 } from "@/services/paymentService";
 import { fetchCompany } from "@/services/companyService";
@@ -36,6 +37,8 @@ export interface AdminStats {
   contratosAtivos: number;
   pagamentosPendentes: number;
   pagamentosMes: number;
+  pagamentosVencidos: number;
+  valorVencido: number;
   custoPrevistoProximoMes: number;
   custoComprometidoMes: number;
 }
@@ -120,6 +123,7 @@ export function useDashboardAdmin(companyId: string | undefined) {
       const activeContractSalaries = await fetchContractSalaries(cid, "active");
       const contratosCount = activeContractSalaries.length;
       const pagamentosPendentesCount = await countPendingPayments(cid);
+      const overduePayments = await fetchOverduePaymentsSummary(cid);
 
       const [totalPJ, totalCLT] = await Promise.all([
         countActiveContractsByType(cid, "PJ"),
@@ -157,6 +161,8 @@ export function useDashboardAdmin(companyId: string | undefined) {
         contratosAtivos: contratosCount,
         pagamentosPendentes: pagamentosPendentesCount,
         pagamentosMes: totalPagamentosMes,
+        pagamentosVencidos: overduePayments.count,
+        valorVencido: overduePayments.total,
         custoPrevistoProximoMes,
         custoComprometidoMes,
       };

@@ -12,6 +12,13 @@ import {
 import { fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { sendEmail, gerarObrigacoesPJ } from "@/services/edgeFunctionService";
 import {
+  fetchGoalsByContract,
+  createGoal,
+  updateGoalStatus,
+  deleteGoal,
+  type ContractGoal,
+} from "@/services/goalService";
+import {
   fetchContratoAnexos,
   uploadContratoAnexo,
   deleteContratoAnexo,
@@ -35,6 +42,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -60,6 +68,10 @@ import {
   Receipt,
   Percent,
   PlusCircle,
+  CheckCircle2,
+  XCircle,
+  ListTodo,
+  Plus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -127,7 +139,7 @@ const ContratoDetalhes = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { profile: authProfile } = useAuth();
+  const { profile: authProfile, hasRole } = useAuth();
   const [contract, setContract] = useState<Contract | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [document, setDocument] = useState<ContractDocument | null>(null);
@@ -149,6 +161,16 @@ const ContratoDetalhes = () => {
   const [splitPercentage, setSplitPercentage] = useState("");
   const [isSavingSplit, setIsSavingSplit] = useState(false);
   const [documentHash, setDocumentHash] = useState<string | null>(null);
+  // Goals state
+  const [goals, setGoals] = useState<ContractGoal[]>([]);
+  const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
+  const [goalName, setGoalName] = useState("");
+  const [goalDescription, setGoalDescription] = useState("");
+  const [goalTargetValue, setGoalTargetValue] = useState("");
+  const [goalDueDate, setGoalDueDate] = useState("");
+  const [isSavingGoal, setIsSavingGoal] = useState(false);
+  const [reviewingGoal, setReviewingGoal] = useState<ContractGoal | null>(null);
+  const [reviewNotes, setReviewNotes] = useState("");
 
   // Compute SHA-256 of document_html for integrity verification
   useEffect(() => {
@@ -184,6 +206,13 @@ const ContratoDetalhes = () => {
       if (contractData.contract_type === "PJ") {
         loadNfse(contractData.id);
         loadSplits(contractData.id);
+      }
+      if (
+        contractData.compensation_type === "variable_goal" ||
+        contractData.compensation_type === "variable_deliverable" ||
+        contractData.compensation_type === "mixed"
+      ) {
+        loadGoals(contractData.id);
       }
       const profileData = await fetchProfileByUserIdMaybe(
         contractData.user_id,
@@ -282,6 +311,73 @@ const ContratoDetalhes = () => {
       setSplits(data);
     } catch (err) {
       logger.error("loadSplits error:", err);
+    }
+  };
+
+  const loadGoals = async (contractId: string) => {
+    try {
+      const data = await fetchGoalsByContract(contractId);
+      setGoals(data);
+    } catch (err) {
+      logger.error("loadGoals error:", err);
+    }
+  };
+
+  const handleSaveGoal = async () => {
+    if (!contract || !goalName.trim()) return;
+    setIsSavingGoal(true);
+    try {
+      const newGoal = await createGoal({
+        contract_id: contract.id,
+        company_id: contract.company_id,
+        name: goalName.trim(),
+        description: goalDescription.trim() || null,
+        target_value: goalTargetValue ? parseFloat(goalTargetValue.replace(/[^0-9,.]/g, "").replace(",", ".")) : null,
+        due_date: goalDueDate || null,
+        created_by: authProfile?.user_id ?? null,
+      });
+      setGoals((prev) => [newGoal, ...prev]);
+      setIsGoalDialogOpen(false);
+      setGoalName("");
+      setGoalDescription("");
+      setGoalTargetValue("");
+      setGoalDueDate("");
+      toast({ title: "Meta criada com sucesso!" });
+    } catch (err) {
+      logger.error("handleSaveGoal error:", err);
+      toast({ title: "Erro ao criar meta", variant: "destructive" });
+    } finally {
+      setIsSavingGoal(false);
+    }
+  };
+
+  const handleReviewGoal = async (newStatus: ContractGoal["status"]) => {
+    if (!reviewingGoal || !authProfile) return;
+    try {
+      await updateGoalStatus(reviewingGoal.id, newStatus, authProfile.user_id, reviewNotes.trim() || undefined);
+      setGoals((prev) =>
+        prev.map((g) =>
+          g.id === reviewingGoal.id
+            ? { ...g, status: newStatus, reviewer_notes: reviewNotes.trim() || null, achieved_at: newStatus === "achieved" ? new Date().toISOString() : g.achieved_at }
+            : g
+        )
+      );
+      setReviewingGoal(null);
+      setReviewNotes("");
+      toast({ title: newStatus === "achieved" ? "Meta aprovada!" : newStatus === "rejected" ? "Meta rejeitada" : "Status atualizado" });
+    } catch (err) {
+      logger.error("handleReviewGoal error:", err);
+      toast({ title: "Erro ao atualizar meta", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    try {
+      await deleteGoal(goalId);
+      setGoals((prev) => prev.filter((g) => g.id !== goalId));
+      toast({ title: "Meta removida" });
+    } catch (err) {
+      logger.error("handleDeleteGoal error:", err);
     }
   };
 
@@ -1272,6 +1368,94 @@ const ContratoDetalhes = () => {
         </Card>
       )}
 
+      {/* Metas e Entregáveis (for variable compensation contracts) */}
+      {contract && (contract.compensation_type === "variable_goal" || contract.compensation_type === "variable_deliverable" || contract.compensation_type === "mixed") && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ListTodo className="h-4 w-4" />
+                {contract.compensation_type === "variable_deliverable" ? "Entregáveis" : "Metas"}
+              </CardTitle>
+              <CardDescription>
+                {contract.compensation_type === "variable_deliverable"
+                  ? "Registre entregáveis e libere pagamentos ao aprovar conclusão"
+                  : "Gerencie metas e libere pagamentos ao atingir cada objetivo"}
+              </CardDescription>
+            </div>
+            {(hasRole("master_admin") || hasRole("admin") || hasRole("financeiro")) && (
+              <Button variant="outline" size="sm" onClick={() => setIsGoalDialogOpen(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                {contract.compensation_type === "variable_deliverable" ? "Entregável" : "Meta"}
+              </Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {goals.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Nenhuma {contract.compensation_type === "variable_deliverable" ? "entregável" : "meta"} cadastrada
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {goals.map((goal) => (
+                  <div key={goal.id} className="rounded-lg border p-3 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{goal.name}</p>
+                          <Badge
+                            variant="outline"
+                            className={
+                              goal.status === "achieved"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200"
+                                : goal.status === "rejected"
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200"
+                                : goal.status === "partial"
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200"
+                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200"
+                            }
+                          >
+                            {goal.status === "achieved" ? "Atingida" : goal.status === "rejected" ? "Rejeitada" : goal.status === "partial" ? "Parcial" : "Pendente"}
+                          </Badge>
+                        </div>
+                        {goal.description && <p className="text-xs text-muted-foreground mt-0.5">{goal.description}</p>}
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                          {goal.target_value && (
+                            <span className="font-medium text-foreground">
+                              {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(goal.target_value)}
+                            </span>
+                          )}
+                          {goal.due_date && <span>Prazo: {format(new Date(goal.due_date + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR })}</span>}
+                          {goal.achieved_at && <span>Atingida em: {format(new Date(goal.achieved_at), "dd/MM/yyyy", { locale: ptBR })}</span>}
+                        </div>
+                        {goal.reviewer_notes && <p className="text-xs text-muted-foreground italic mt-0.5">"{goal.reviewer_notes}"</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {goal.status === "pending" && (hasRole("master_admin") || hasRole("admin") || hasRole("financeiro")) && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => { setReviewingGoal(goal); setReviewNotes(""); }}>
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => { setReviewingGoal({ ...goal, status: "rejected" }); setReviewNotes(""); }}>
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        {(hasRole("master_admin") || hasRole("admin")) && goal.status === "pending" && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteGoal(goal.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Dialog para editar testemunha */}
       <Dialog open={!!editingWitness} onOpenChange={(open) => !open && setEditingWitness(null)}>
         <DialogContent>
@@ -1370,6 +1554,85 @@ const ContratoDetalhes = () => {
             </Button>
             <Button onClick={handleSaveSplit} disabled={isSavingSplit || !splitName.trim() || !splitPercentage}>
               {isSavingSplit ? "Salvando..." : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para criar meta/entregável */}
+      <Dialog open={isGoalDialogOpen} onOpenChange={(open) => { setIsGoalDialogOpen(open); if (!open) { setGoalName(""); setGoalDescription(""); setGoalTargetValue(""); setGoalDueDate(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {contract?.compensation_type === "variable_deliverable" ? "Novo Entregável" : "Nova Meta"}
+            </DialogTitle>
+            <DialogDescription>
+              {contract?.compensation_type === "variable_deliverable"
+                ? "Cadastre um entregável. Ao aprovar a conclusão, o pagamento será liberado."
+                : "Cadastre uma meta. Ao marcar como atingida, o pagamento correspondente será liberado."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="goal-name">Nome *</Label>
+              <Input id="goal-name" value={goalName} onChange={(e) => setGoalName(e.target.value)} placeholder="Ex: Entrega do módulo de relatórios" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="goal-desc">Descrição / Critérios de Aceite</Label>
+              <Textarea id="goal-desc" value={goalDescription} onChange={(e) => setGoalDescription(e.target.value)} placeholder="Descreva os critérios de aceite, prazos, métricas..." rows={3} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="goal-value">Valor (R$)</Label>
+                <Input id="goal-value" type="number" min={0} step={0.01} value={goalTargetValue} onChange={(e) => setGoalTargetValue(e.target.value)} placeholder="0,00" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="goal-date">Prazo</Label>
+                <Input id="goal-date" type="date" value={goalDueDate} onChange={(e) => setGoalDueDate(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsGoalDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveGoal} disabled={isSavingGoal || !goalName.trim()}>
+              {isSavingGoal ? "Salvando..." : "Criar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para revisar meta/entregável */}
+      <Dialog open={!!reviewingGoal} onOpenChange={(open) => { if (!open) { setReviewingGoal(null); setReviewNotes(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {reviewingGoal?.status === "rejected" ? "Rejeitar" : "Aprovar"} {contract?.compensation_type === "variable_deliverable" ? "Entregável" : "Meta"}
+            </DialogTitle>
+            <DialogDescription>
+              {reviewingGoal?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="review-notes">Observações (opcional)</Label>
+              <Textarea id="review-notes" value={reviewNotes} onChange={(e) => setReviewNotes(e.target.value)} placeholder="Descreva o resultado, ressalvas ou motivo da rejeição..." rows={3} />
+            </div>
+            {reviewingGoal?.target_value && (
+              <p className="text-sm text-muted-foreground">
+                Valor a liberar: <span className="font-semibold text-foreground">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(reviewingGoal.target_value)}</span>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setReviewingGoal(null); setReviewNotes(""); }}>Cancelar</Button>
+            {reviewingGoal?.status !== "rejected" && (
+              <Button variant="destructive" onClick={() => handleReviewGoal("rejected")}>Rejeitar</Button>
+            )}
+            <Button
+              className={reviewingGoal?.status === "rejected" ? "" : "bg-green-600 hover:bg-green-700"}
+              onClick={() => handleReviewGoal(reviewingGoal?.status === "rejected" ? "rejected" : "achieved")}
+            >
+              {reviewingGoal?.status === "rejected" ? "Confirmar Rejeição" : "Aprovar"}
             </Button>
           </DialogFooter>
         </DialogContent>

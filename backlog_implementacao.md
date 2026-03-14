@@ -37,8 +37,8 @@
 |---|---|---|---|
 | GAP-05 | Tela de Detalhe do Contrato | ✅ | `ContratoDetalhes.tsx` (1254 linhas) — visualizador, dados, assinaturas, NFS-e, splits, anexos |
 | GAP-06 | Tela de Detalhe do Colaborador | ✅ | `ColaboradorDetalhes.tsx` — perfil completo, contratos, histórico de pagamentos, gestão de roles |
-| GAP-07 | PDF Inteligente do Contrato | 🔄 | `ContratoDocumento.tsx` existe. Falta: QR Code de verificação, seção de assinaturas formatada |
-| GAP-08 | Onboarding Guiado do PJ após Convite | 🔄 | `Registro.tsx` tem fluxo multi-etapas com convite. Falta: coleta de dados bancários e fiscais do PJ no onboarding |
+| GAP-07 | PDF Inteligente do Contrato | 🔄 | `ContratoDocumento.tsx` existe. QR Code de verificação adicionado. Falta: seção de assinaturas formatada |
+| GAP-08 | Onboarding Guiado do PJ após Convite | ✅ | `Registro.tsx` step 2 para colaboradores convidados com banco, agência, conta, tipo e chave PIX (campos opcionais, salvo em profiles) |
 | GAP-09 | Motor de Notificações Estruturado | 🔄 | `notificationService.ts`, `NotificationBell.tsx`, `NotificationPreferences.tsx`, `NotificationDeliveryLogs.tsx` existem. Falta: centro in-app com badge funcional, filtros e histórico 90 dias |
 | GAP-10 | Controle de Permissões por Perfil (RBAC) | ✅ | `hasRole()` em `AuthContext`, sidebar dinâmica por perfil, roles no backend |
 
@@ -53,7 +53,7 @@
 | GAP-13 | Configuração de Split por Contrato | 🔄 | `createContractSplits` no formulário de criação. Split visível em `ContratoDetalhes`. Falta: execução automática via Pix/gateway real |
 | GAP-14 | Campo de Escopo do Serviço no Contrato | ✅ | Campo "Escopo do Serviço" existe no formulário (`Contratos.tsx` linha 1369) |
 | GAP-15 | Alertas Inteligentes e Proativos | ✅ | `DashboardOverview.tsx` — alertas por cor (danger/warning) com contratos vencendo e pagamentos atrasados |
-| GAP-16 | Centro Financeiro Melhorado | 🔄 | `Pagamentos.tsx` tem filtros por período, status e contrato. Falta: exportação CSV/PDF/Excel, card de inadimplência |
+| GAP-16 | Centro Financeiro Melhorado | ✅ | `Pagamentos.tsx` com filtros, exportação CSV/PDF/Excel, card inadimplência no dashboard, aviso NFS-e ao aprovar |
 | GAP-17 | Controle de Reajuste Contratual | ✅ | Campo "Índice de Reajuste" e "Data-base do Reajuste" no formulário (linhas 1341–1364) |
 | GAP-18 | Anexos e Documentos por Contrato | ✅ | `contratoAnexosService.ts` — upload, listagem, download em `ContratoDetalhes` |
 
@@ -108,7 +108,7 @@
 | ⬜ Modelo VARIÁVEL POR ENTREGÁVEL | ✅ | Implementado junto ao modelo por meta |
 | ⬜ Modelo HORA/HORA | ✅ | Implementado: campo "Valor por Hora" com label dinâmico |
 | ⬜ Modelo MISTO (fixo + variável) | ✅ | Implementado: campo Parte Fixa + campo Parte Variável (teto) |
-| ⬜ Painel de Metas e Entregáveis | ⬜ | Não implementado — cadastro de metas, aprovação, liberação de pagamento variável |
+| ⬜ Painel de Metas e Entregáveis | ✅ | `goalService.ts` + migration `contract_goals` + UI completo em `ContratoDetalhes.tsx`: listar, criar, aprovar/rejeitar metas com notas |
 
 ### Ciclo de Vida (9 estados do PRD)
 
@@ -132,7 +132,7 @@
 | 🔄 PDF inline sem precisar baixar | 🔄 | `ContratoDocumento.tsx` existe mas não é visualizador inline (PDF.js) |
 | ✅ Dados do contrato e assinaturas | ✅ | Implementado |
 | ✅ Hash SHA-256 exibível | ✅ | Computado client-side via Web Crypto API a partir do document_html e exibido em ContratoDetalhes quando assinatura_status=completed |
-| ⬜ QR Code no PDF | ⬜ | Não implementado |
+| ⬜ QR Code no PDF | ✅ | QR Code via api.qrserver.com em `ContratoDocumento.tsx`: seção impressão + card lateral na UI |
 
 ---
 
@@ -169,9 +169,9 @@
 | 🔄 Filtros avançados | 🔄 | Filtro por período, status e contrato implementados. Falta: exportação CSV/PDF/Excel |
 | ✅ Exportação CSV/PDF/Excel | ✅ | CSV já existia; PDF adicionado via browser print (rel. HTML formatado) |
 | 🔄 Geração automática de obrigações | ✅ | `gerarObrigacoesPJ` chamado em `Contratos.tsx` ao criar e em `ContratoDetalhes.tsx` ao reativar |
-| ⬜ Fluxo de aprovação financeiro | 🔄 | `approvePayment`, `batchApprovePayments` implementados. Falta: integração com nfse para só aprovar após nota emitida |
+| ⬜ Fluxo de aprovação financeiro | 🔄 | `approvePayment`, `batchApprovePayments` implementados. Aviso toast.warning se NFS-e não emitida ao aprovar PJ (não bloqueante). Integração real de bloqueio pendente |
 | ⬜ Integração gateway Pix/Split real | ⬜ | Não implementado — pagamentos são aprovados manualmente |
-| ⬜ Card inadimplência no dashboard financeiro | ⬜ | Não existe card dedicado de inadimplência |
+| ⬜ Card inadimplência no dashboard financeiro | ✅ | Card "Em Atraso" em `DashboardOverview.tsx` — `fetchOverduePaymentsSummary` em `paymentService.ts`, count + valor total |
 
 ---
 

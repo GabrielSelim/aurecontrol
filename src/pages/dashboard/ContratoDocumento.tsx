@@ -447,6 +447,19 @@ const ContratoDocumento = () => {
               </div>
             `).join('')}
           </div>
+
+          <div style="margin-top: 40px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: center; gap: 20px; background: #f9fafb;">
+            <img
+              src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`${window.location.origin}/assinar-contrato/${id}`)}"
+              alt="QR Code de verificação"
+              style="width: 100px; height: 100px; border-radius: 4px;"
+            />
+            <div>
+              <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #111;">Verificação de Autenticidade</p>
+              <p style="margin: 0 0 4px 0; font-size: 11px; color: #666;">Aponte a câmera para o QR Code ou acesse o link para verificar a autenticidade deste contrato:</p>
+              <p style="margin: 0; font-size: 10px; color: #888; word-break: break-all;">${window.location.origin}/assinar-contrato/${id}</p>
+            </div>
+          </div>
         </body>
         </html>
       `);
@@ -670,6 +683,24 @@ const ContratoDocumento = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* QR Code de verificação */}
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <p className="text-xs font-medium text-muted-foreground mb-3">Verificação de Autenticidade</p>
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`${window.location.origin}/assinar-contrato/${id}`)}`}
+                      alt="QR Code de verificação"
+                      className="w-20 h-20 rounded border"
+                    />
+                    <p className="text-[10px] text-muted-foreground break-all">
+                      Aponte para verificar ou acesse:<br />
+                      <span className="font-mono">{window.location.origin}/assinar-contrato/{id}</span>
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </TabsContent>

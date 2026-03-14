@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchPaymentsByCompany, createPayments, approvePayment, batchApprovePayments, rejectPayment, fetchContractSplits } from "@/services/paymentService";
 import { fetchProfileByUserId, fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { fetchActiveContractsByCompany } from "@/services/contractService";
+import { fetchNfseByContract } from "@/services/nfseService";
 import { sendEmail, gerarObrigacoesPJ } from "@/services/edgeFunctionService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -447,6 +448,29 @@ const Pagamentos = () => {
   const handleApprovePayment = async (paymentId: string) => {
     const payment = pagamentos.find(p => p.id === paymentId);
     
+    // Check NFS-e: if contract is PJ, warn if no emitted NFS-e for the same reference month
+    if (payment?.contract_id) {
+      const contractType = contractsMap[payment.contract_id]?.contract_type;
+      if (contractType === "PJ") {
+        try {
+          const nfseList = await fetchNfseByContract(payment.contract_id);
+          const month = payment.reference_month?.substring(0, 7); // "YYYY-MM"
+          const hasEmitted = nfseList.some(
+            (n) => n.status === "emitida" && n.competencia?.startsWith(month ?? "")
+          );
+          if (!hasEmitted) {
+            toast.warning(
+              `Atenção: Nenhuma NFS-e emitida para ${month}. Verifique antes de aprovar o pagamento.`,
+              { duration: 6000 }
+            );
+            // Not blocking — just warns. Falls through to approve.
+          }
+        } catch {
+          // Non-critical — proceed with approval
+        }
+      }
+    }
+
     try {
       await approvePayment(paymentId, profile?.user_id ?? "", new Date().toISOString().split("T")[0]);
 

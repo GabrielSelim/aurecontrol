@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, ArrowLeft, Loader2, UserPlus, CheckCircle2, XCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Eye, EyeOff, ArrowLeft, Loader2, UserPlus, CheckCircle2, XCircle, Landmark } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getInviteByToken } from "@/services/inviteService";
 import { validateCnpj } from "@/services/edgeFunctionService";
@@ -80,6 +82,14 @@ const Registro = () => {
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [cnpj, setCnpj] = useState("");
+
+  // Bank data (for PJ invited collaborators — step 2)
+  const [bankName, setBankName] = useState("");
+  const [bankAgency, setBankAgency] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [bankAccountType, setBankAccountType] = useState<"corrente" | "poupanca">("corrente");
+  const [pixKey, setPixKey] = useState("");
+  const [pixKeyType, setPixKeyType] = useState<"cpf" | "email" | "telefone" | "aleatoria">("cpf");
   
   const [errors, setErrors] = useState({
     cpf: "",
@@ -205,26 +215,38 @@ const Registro = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // For invited users, only personal data is needed (no company step)
+    // For invited users: step 1 = personal data, step 2 = bank data (colaborador only)
     if (inviteData) {
-      const validation = step1Schema.safeParse({
-        fullName,
-        email,
-        cpf: cpf.replace(/\D/g, ""),
-        phone: phone.replace(/\D/g, ""),
-        password,
-      });
+      const isColaborador = inviteData.role === "colaborador";
 
-      if (!validation.success) {
-        toast.error(validation.error.errors[0].message);
-        return;
+      // Step 1: personal data validation
+      if (step === 1) {
+        const validation = step1Schema.safeParse({
+          fullName,
+          email,
+          cpf: cpf.replace(/\D/g, ""),
+          phone: phone.replace(/\D/g, ""),
+          password,
+        });
+
+        if (!validation.success) {
+          toast.error(validation.error.errors[0].message);
+          return;
+        }
+
+        if (!acceptedTerms || !acceptedPrivacy) {
+          toast.error("Você precisa aceitar os termos para continuar");
+          return;
+        }
+
+        // Colaboradores go to step 2 for bank data
+        if (isColaborador) {
+          setStep(2);
+          return;
+        }
       }
 
-      if (!acceptedTerms || !acceptedPrivacy) {
-        toast.error("Você precisa aceitar os termos para continuar");
-        return;
-      }
-
+      // Step 2 (or non-colaborador): create account
       setIsLoading(true);
 
       const { error } = await signUpWithInvite({
@@ -244,11 +266,35 @@ const Registro = () => {
         } else {
           toast.error("Erro ao criar conta. Tente novamente.");
         }
-      } else {
-        toast.success("Conta criada com sucesso!");
-        navigate("/dashboard");
+        setIsLoading(false);
+        return;
       }
 
+      // Save bank data if provided (non-blocking)
+      if (isColaborador && (bankName || bankAgency || bankAccount || pixKey)) {
+        try {
+          const { data: { user: newUser } } = await supabase.auth.getUser();
+          if (newUser) {
+            await supabase
+              .from("profiles")
+              .update({
+                pj_bank_name: bankName || null,
+                pj_bank_agency: bankAgency || null,
+                pj_bank_account: bankAccount || null,
+                pj_bank_account_type: bankAccountType,
+                pj_pix_key: pixKey || null,
+                pj_pix_key_type: pixKey ? pixKeyType : null,
+              })
+              .eq("user_id", newUser.id);
+          }
+        } catch (bankError) {
+          logger.error("Error saving bank data:", bankError);
+          // Non-blocking — user can fill later in profile
+        }
+      }
+
+      toast.success("Conta criada com sucesso!");
+      navigate("/dashboard");
       setIsLoading(false);
       return;
     }
@@ -364,12 +410,19 @@ const Registro = () => {
               : "Crie sua conta em minutos e tenha acesso a todos os recursos do Aure."}
           </p>
           
-          {/* Steps Preview - only for regular signup */}
+          {/* Steps Preview */}
           {!inviteData && (
             <div className="flex items-center justify-center gap-4">
               <StepIndicator number={1} label="Dados Pessoais" active={step === 1} completed={step > 1} />
               <div className="w-12 h-0.5 bg-primary-foreground/30" />
               <StepIndicator number={2} label="Empresa" active={step === 2} completed={step > 2} />
+            </div>
+          )}
+          {inviteData?.role === "colaborador" && (
+            <div className="flex items-center justify-center gap-4">
+              <StepIndicator number={1} label="Dados Pessoais" active={step === 1} completed={step > 1} />
+              <div className="w-12 h-0.5 bg-primary-foreground/30" />
+              <StepIndicator number={2} label="Dados Bancários" active={step === 2} completed={step > 2} />
             </div>
           )}
         </div>
@@ -380,11 +433,11 @@ const Registro = () => {
         <div className="w-full max-w-md py-8">
           {/* Back Link */}
           <button
-            onClick={() => (step > 1 && !inviteData ? setStep(step - 1) : null)}
+            onClick={() => (step > 1 ? setStep(step - 1) : null)}
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            {step > 1 && !inviteData ? "Voltar" : <Link to="/">Voltar para o início</Link>}
+            {step > 1 ? "Voltar" : <Link to="/">Voltar para o início</Link>}
           </button>
 
           {/* Logo */}
@@ -396,14 +449,18 @@ const Registro = () => {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">
               {inviteData
-                ? "Complete seu cadastro"
+                ? step === 2
+                  ? "Dados bancários"
+                  : "Complete seu cadastro"
                 : step === 1
                 ? "Criar sua conta"
                 : "Dados da empresa"}
             </h1>
             <p className="text-muted-foreground">
               {inviteData
-                ? "Preencha seus dados pessoais para aceitar o convite"
+                ? step === 2
+                  ? "Informe seus dados bancários para receber pagamentos"
+                  : "Preencha seus dados pessoais para aceitar o convite"
                 : step === 1
                 ? "Preencha seus dados pessoais para começar"
                 : "Informe os dados da sua empresa"}
@@ -420,7 +477,99 @@ const Registro = () => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {(step === 1 || inviteData) ? (
+            {/* Invited collaborator: step 2 = bank data */}
+            {inviteData?.role === "colaborador" && step === 2 ? (
+              <>
+                <div className="flex items-center gap-2 mb-2 text-muted-foreground">
+                  <Landmark className="h-5 w-5" />
+                  <span className="text-sm font-medium">Dados bancários para recebimento (opcional)</span>
+                </div>
+                <p className="text-xs text-muted-foreground -mt-3 mb-2">
+                  Você pode pular este passo e preencher depois no seu perfil.
+                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Banco</Label>
+                  <Input
+                    id="bankName"
+                    type="text"
+                    placeholder="Ex: Nubank, Itaú, Bradesco..."
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    className="h-12"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="bankAgency">Agência</Label>
+                    <Input
+                      id="bankAgency"
+                      type="text"
+                      placeholder="0000"
+                      value={bankAgency}
+                      onChange={(e) => setBankAgency(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bankAccount">Conta</Label>
+                    <Input
+                      id="bankAccount"
+                      type="text"
+                      placeholder="00000-0"
+                      value={bankAccount}
+                      onChange={(e) => setBankAccount(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bankAccountType">Tipo de conta</Label>
+                  <Select value={bankAccountType} onValueChange={(v) => setBankAccountType(v as "corrente" | "poupanca")}>
+                    <SelectTrigger className="h-12">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="corrente">Conta Corrente</SelectItem>
+                      <SelectItem value="poupanca">Conta Poupança</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t">
+                  <Label className="text-sm font-medium">Chave PIX (opcional)</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="pixKeyType" className="text-xs text-muted-foreground">Tipo</Label>
+                      <Select value={pixKeyType} onValueChange={(v) => setPixKeyType(v as typeof pixKeyType)}>
+                        <SelectTrigger className="h-12">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cpf">CPF</SelectItem>
+                          <SelectItem value="email">E-mail</SelectItem>
+                          <SelectItem value="telefone">Telefone</SelectItem>
+                          <SelectItem value="aleatoria">Chave aleatória</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pixKey" className="text-xs text-muted-foreground">Chave</Label>
+                      <Input
+                        id="pixKey"
+                        type="text"
+                        placeholder="Sua chave PIX"
+                        value={pixKey}
+                        onChange={(e) => setPixKey(e.target.value)}
+                        className="h-12"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (step === 1 || inviteData) ? (
               <>
                 {/* Step 1: Personal Data */}
                 <div className="space-y-2">
@@ -664,18 +813,38 @@ const Registro = () => {
               disabled={
                 isLoading ||
                 isValidatingCNPJ ||
-                (inviteData && (!acceptedTerms || !acceptedPrivacy)) ||
+                (inviteData && step === 1 && (!acceptedTerms || !acceptedPrivacy)) ||
                 (!inviteData && step === 2 && (!acceptedTerms || !acceptedPrivacy || !cnpjValidated))
               }
             >
               {isLoading
                 ? "Criando conta..."
+                : inviteData?.role === "colaborador" && step === 1
+                ? "Continuar"
+                : inviteData?.role === "colaborador" && step === 2
+                ? "Finalizar cadastro"
                 : inviteData
                 ? "Aceitar convite e criar conta"
                 : step === 1
                 ? "Continuar"
                 : "Criar minha conta"}
             </Button>
+            {/* Skip bank data step */}
+            {inviteData?.role === "colaborador" && step === 2 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                className="w-full text-muted-foreground"
+                disabled={isLoading}
+                onClick={async () => {
+                  setBankName(""); setBankAgency(""); setBankAccount(""); setPixKey("");
+                  await handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                }}
+              >
+                Pular e preencher depois
+              </Button>
+            )}
           </form>
 
           {/* Login Link */}

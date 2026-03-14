@@ -467,6 +467,37 @@ const DashboardOverview = () => {
 
         <Tooltip>
           <TooltipTrigger asChild>
+            <Card
+              className={`cursor-pointer transition-all hover:shadow-md hover:border-primary/50 ${(adminStats?.pagamentosVencidos ?? 0) > 0 ? "border-red-400 dark:border-red-800" : ""}`}
+              onClick={() => navigate("/dashboard/pagamentos")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Em Atraso</CardTitle>
+                <AlertTriangle className={`h-4 w-4 ${(adminStats?.pagamentosVencidos ?? 0) > 0 ? "text-red-500" : "text-muted-foreground"}`} />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <>
+                    <div className={`text-2xl font-bold ${(adminStats?.pagamentosVencidos ?? 0) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                      {adminStats?.pagamentosVencidos ?? 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {(adminStats?.pagamentosVencidos ?? 0) > 0
+                        ? `${formatCurrency(adminStats!.valorVencido)} em aberto`
+                        : "Nenhum em atraso"}
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>Pagamentos pendentes com data de vencimento ultrapassada</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
             <Card 
               className="cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
               onClick={() => navigate("/dashboard/pagamentos")}

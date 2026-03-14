@@ -243,6 +243,23 @@ export async function fetchDelinquentContractIds(companyId: string) {
   return data ?? [];
 }
 
+export async function fetchOverduePaymentsSummary(companyId: string): Promise<{ count: number; total: number }> {
+  const today = new Date().toISOString().split("T")[0];
+  const { data, error } = await supabase
+    .from("payments")
+    .select("id, amount")
+    .eq("company_id", companyId)
+    .eq("status", "pending")
+    .lt("due_date", today);
+
+  if (error) throw error;
+  const rows = data ?? [];
+  return {
+    count: rows.length,
+    total: rows.reduce((sum, p) => sum + Number(p.amount), 0),
+  };
+}
+
 export async function fetchBillingsByCompany(companyId: string) {
   const { data, error } = await supabase
     .from("company_billings")
