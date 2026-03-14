@@ -19,7 +19,7 @@ import {
 } from "@/services/profileService";
 import { fetchCompanyFull } from "@/services/companyService";
 import { fetchDelinquentContractIds, fetchPaymentsByCompany } from "@/services/paymentService";
-import { sendEmail } from "@/services/edgeFunctionService";
+import { sendEmail, gerarObrigacoesPJ } from "@/services/edgeFunctionService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -112,6 +112,9 @@ interface Contract {
   department: string | null;
   salary: number | null;
   hourly_rate: number | null;
+  compensation_type: string | null;
+  variable_component: number | null;
+  goal_description: string | null;
   start_date: string;
   end_date: string | null;
   status: string;
@@ -215,6 +218,9 @@ const Contratos = () => {
   const [seniority, setSeniority] = useState("");
   
   const [salary, setSalary] = useState("");
+  const [compensationType, setCompensationType] = useState("fixed");
+  const [variableComponent, setVariableComponent] = useState("");
+  const [goalDescription, setGoalDescription] = useState("");
   const [startDate, setStartDate] = useState("");
   // PJ financial fields
   const [paymentFrequency, setPaymentFrequency] = useState("monthly");
@@ -634,6 +640,10 @@ const Contratos = () => {
         scope_description: contractType === "PJ" && scopeDescription ? scopeDescription : null,
         adjustment_index: contractType === "PJ" && adjustmentIndex && adjustmentIndex !== "none" ? adjustmentIndex : null,
         adjustment_date: contractType === "PJ" && adjustmentDate ? adjustmentDate : null,
+        compensation_type: contractType === "PJ" ? compensationType : "fixed",
+        hourly_rate: contractType === "PJ" && compensationType === "hourly" && salary ? parseCurrency(salary) : null,
+        variable_component: contractType === "PJ" && compensationType === "mixed" && variableComponent ? parseCurrency(variableComponent) : null,
+        goal_description: contractType === "PJ" && (compensationType === "variable_goal" || compensationType === "variable_deliverable") && goalDescription ? goalDescription : null,
       };
 
       const contractData = await createContract(insertData);
@@ -749,6 +759,14 @@ const Contratos = () => {
         });
       }
 
+      // For PJ contracts, generate financial obligations for the current month
+      if (contractType === "PJ" && contractData) {
+        const now = new Date();
+        gerarObrigacoesPJ(now.getFullYear(), now.getMonth() + 1).catch((err) => {
+          logger.error("Erro ao gerar obrigações financeiras:", err);
+        });
+      }
+
       toast.success("Contrato criado com sucesso!");
 
       // Mark old contract as renewed if this was a renewal
@@ -818,6 +836,9 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setSeniority("");
     
     setSalary("");
+    setCompensationType("fixed");
+    setVariableComponent("");
+    setGoalDescription("");
     setStartDate("");
     setPaymentFrequency("monthly");
     setPaymentDay("5");
@@ -972,6 +993,9 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     setJobTitle(contrato.job_title);
     setSeniority(contrato.seniority || "");
     setSalary(contrato.salary ? formatCurrencyMask(String(contrato.salary)) : "");
+    setCompensationType(contrato.compensation_type || "fixed");
+    if (contrato.variable_component) setVariableComponent(formatCurrencyMask(String(contrato.variable_component)));
+    if (contrato.goal_description) setGoalDescription(contrato.goal_description);
     setDeliverableDescription(contrato.deliverable_description || "");
 
     // Set start date to the day after the existing contract ends, or today
@@ -1325,8 +1349,31 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                         </SelectContent>
                       </Select>
                     </div>
+                    {contractType === "PJ" && (
+                      <div className="space-y-2">
+                        <Label>Modelo de Remuneração</Label>
+                        <Select value={compensationType} onValueChange={setCompensationType}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o modelo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="fixed">Fixo Mensal</SelectItem>
+                            <SelectItem value="hourly">Hora/Hora</SelectItem>
+                            <SelectItem value="variable_goal">Variável por Meta</SelectItem>
+                            <SelectItem value="variable_deliverable">Variável por Entregável</SelectItem>
+                            <SelectItem value="mixed">Misto (Fixo + Variável)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="space-y-2">
-                      <Label>Salário</Label>
+                      <Label>
+                        {contractType === "PJ" && compensationType === "hourly" ? "Valor por Hora" :
+                         contractType === "PJ" && compensationType === "variable_goal" ? "Valor da Meta" :
+                         contractType === "PJ" && compensationType === "variable_deliverable" ? "Valor por Entregável" :
+                         contractType === "PJ" && compensationType === "mixed" ? "Parte Fixa Mensal" :
+                         "Salário"}
+                      </Label>
                       <Input
                         type="text"
                         placeholder="R$ 0,00"
@@ -1334,6 +1381,29 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                         onChange={(e) => setSalary(formatCurrencyMask(e.target.value))}
                       />
                     </div>
+                    {contractType === "PJ" && compensationType === "mixed" && (
+                      <div className="space-y-2">
+                        <Label>Parte Variável (teto)</Label>
+                        <Input
+                          type="text"
+                          placeholder="R$ 0,00"
+                          value={variableComponent}
+                          onChange={(e) => setVariableComponent(formatCurrencyMask(e.target.value))}
+                        />
+                        <p className="text-xs text-muted-foreground">Valor máximo da parte variável do modelo misto</p>
+                      </div>
+                    )}
+                    {contractType === "PJ" && (compensationType === "variable_goal" || compensationType === "variable_deliverable") && (
+                      <div className="space-y-2">
+                        <Label>{compensationType === "variable_goal" ? "Descrição da Meta" : "Descrição do Entregável"}</Label>
+                        <Textarea
+                          placeholder={compensationType === "variable_goal" ? "Descreva a meta, critérios e prazo..." : "Descreva o entregável, critérios de aceite e prazo..."}
+                          value={goalDescription}
+                          onChange={(e) => setGoalDescription(e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+                    )}
                     {/* Summary of step 1 */}
                     <div className="p-3 rounded-lg bg-muted/50 border text-sm space-y-1">
                       <p className="text-xs font-medium text-muted-foreground mb-2">Resumo da Etapa 1</p>
@@ -2047,12 +2117,24 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            variant="outline"
-                            className={getStatusClassName(contrato.status)}
-                          >
-                            {getStatusLabel(contrato.status)}
-                          </Badge>
+                          {(() => {
+                            const expAlert = getExpirationAlert(contrato);
+                            if (expAlert && expAlert.level !== "expired") {
+                              return (
+                                <Badge variant="outline" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                                  Vencendo ({expAlert.days}d)
+                                </Badge>
+                              );
+                            }
+                            return (
+                              <Badge 
+                                variant="outline"
+                                className={getStatusClassName(contrato.status)}
+                              >
+                                {getStatusLabel(contrato.status)}
+                              </Badge>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>

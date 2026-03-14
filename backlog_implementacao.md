@@ -104,10 +104,10 @@
 | Item | Status | Observação |
 |---|---|---|
 | ⬜ Modelo FIXO (já existe) | ✅ | Implementado — valor mensal fixo |
-| ⬜ Modelo VARIÁVEL POR META | ⬜ | Não implementado |
-| ⬜ Modelo VARIÁVEL POR ENTREGÁVEL | ⬜ | Não implementado |
-| ⬜ Modelo HORA/HORA | ⬜ | Não implementado |
-| ⬜ Modelo MISTO (fixo + variável) | ⬜ | Não implementado |
+| ⬜ Modelo VARIÁVEL POR META | ✅ | Campo "Modelo de Remuneração" no formulário + campos dinâmicos de meta/entregável. Migração `20260313010000` |
+| ⬜ Modelo VARIÁVEL POR ENTREGÁVEL | ✅ | Implementado junto ao modelo por meta |
+| ⬜ Modelo HORA/HORA | ✅ | Implementado: campo "Valor por Hora" com label dinâmico |
+| ⬜ Modelo MISTO (fixo + variável) | ✅ | Implementado: campo Parte Fixa + campo Parte Variável (teto) |
 | ⬜ Painel de Metas e Entregáveis | ⬜ | Não implementado — cadastro de metas, aprovação, liberação de pagamento variável |
 
 ### Ciclo de Vida (9 estados do PRD)
@@ -119,7 +119,7 @@
 | 3. Em Revisão | ✅ | Implementado: filtro, Kanban (laranja), badge, botão em ContratoDetalhes |
 | 4. Assinado | ✅ | Status `assinado` implementado |
 | 5. Vigente | ✅ | Status `active` implementado |
-| 6. Vencendo (< 30 dias) | 🔄 | Lógica de alerta existe, mas não é um estado formal do contrato |
+| 6. Vencendo (< 30 dias) | ✅ | Badge "Vencendo em Nd" na lista e detalhe do contrato quando end_date ≤ 30 dias |
 | 7. Renovado | ✅ | Implementado: estado teal no Kanban, labels e ao renovar marca o anterior como Renovado |
 | 8. Encerrado | ✅ | Status `terminated` implementado |
 | 9. Suspenso | ✅ | Implementado: filtro, Kanban (cinza), botão em ContratoDetalhes |
@@ -142,7 +142,7 @@
 |---|---|---|
 | ✅ Editor em tela cheia (fullscreen) | ✅ | Página dedicada `/dashboard/templates-contrato/:id/editar` com layout 2 colunas: editor + sidebar de variáveis |
 | ✅ Auto-save com indicador "Salvo às HH:MM" | ✅ | Implementado no editor fullscreen com indicador visual de status |
-| ⬜ Histórico de versões com rollback (10 versões) | 🔄 | `fetchTemplateVersions`, `createTemplateVersion` existem no service. Falta: UI de rollback |
+| ⬜ Histórico de versões com rollback (10 versões) | ✅ | UI de rollback completa na aba "Histórico" de TemplatesContrato — botão "Restaurar" já funcional |
 | ✅ Painel lateral de variáveis dinâmicas | ✅ | Sidebar com grupos colapsoáveis e clique para inserir no cursor via `insertVariable` |
 | ✅ Categorias de templates | ✅ | Campo categoria implementado com filtro na listagem |
 | ✅ Operações: Duplicar, Arquivar, Editar | ✅ | `duplicateTemplate`, `softDeleteTemplate` implementados |
@@ -168,7 +168,7 @@
 |---|---|---|
 | 🔄 Filtros avançados | 🔄 | Filtro por período, status e contrato implementados. Falta: exportação CSV/PDF/Excel |
 | ✅ Exportação CSV/PDF/Excel | ✅ | CSV já existia; PDF adicionado via browser print (rel. HTML formatado) |
-| 🔄 Geração automática de obrigações | 🔄 | `gerarObrigacoesPJ` (edge function) existe. Falta: acionamento automático na ativação do contrato |
+| 🔄 Geração automática de obrigações | ✅ | `gerarObrigacoesPJ` chamado em `Contratos.tsx` ao criar e em `ContratoDetalhes.tsx` ao reativar |
 | ⬜ Fluxo de aprovação financeiro | 🔄 | `approvePayment`, `batchApprovePayments` implementados. Falta: integração com nfse para só aprovar após nota emitida |
 | ⬜ Integração gateway Pix/Split real | ⬜ | Não implementado — pagamentos são aprovados manualmente |
 | ⬜ Card inadimplência no dashboard financeiro | ⬜ | Não existe card dedicado de inadimplência |
@@ -220,10 +220,10 @@
 10. ✅ Fluxo de renovação de contrato (estado "Renovado")
 
 ### Sprint 3 — Alta complexidade
-11. ⬜ Remuneração variável (META, ENTREGÁVEL, HORA/HORA, MISTO)
+11. ✅ Remuneração variável (META, ENTREGÁVEL, HORA/HORA, MISTO)
 12. ⬜ Painel de metas e entregáveis vinculados ao pagamento variável
 13. ⬜ Integração real API NFS-e com prefeitura
-14. ⬜ Geração automática de obrigação ao ativar contrato
+14. ✅ Geração automática de obrigação ao ativar contrato
 15. ⬜ Fluxo completo financeiro: nota emitida → aprovação → pagamento
 
 ### Fases 2–4 (Longo prazo)

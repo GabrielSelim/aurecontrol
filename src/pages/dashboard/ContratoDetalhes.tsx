@@ -10,7 +10,7 @@ import {
   updateContractStatus,
 } from "@/services/contractService";
 import { fetchProfileByUserIdMaybe } from "@/services/profileService";
-import { sendEmail } from "@/services/edgeFunctionService";
+import { sendEmail, gerarObrigacoesPJ } from "@/services/edgeFunctionService";
 import {
   fetchContratoAnexos,
   uploadContratoAnexo,
@@ -77,6 +77,9 @@ interface Contract {
   department: string | null;
   salary: number | null;
   hourly_rate: number | null;
+  compensation_type: string | null;
+  variable_component: number | null;
+  goal_description: string | null;
   start_date: string;
   end_date: string | null;
   status: string;
@@ -528,6 +531,13 @@ const ContratoDetalhes = () => {
     return labels[status] || status;
   };
 
+  const getDaysUntilExpiry = () => {
+    if (!contract?.end_date || contract.status !== "active") return null;
+    const today = new Date();
+    const endDate = new Date(contract.end_date);
+    return Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
   const getDurationTypeLabel = (type: string | null) => {
     if (!type) return "Não definido";
     const labels: Record<string, string> = {
@@ -637,9 +647,21 @@ const ContratoDetalhes = () => {
             {profile?.full_name} • {getContractTypeLabel(contract.contract_type)}
           </p>
         </div>
-        <Badge variant={getStatusBadgeVariant(contract.status)} className="text-sm">
-          {getStatusLabel(contract.status)}
-        </Badge>
+        {(() => {
+          const daysLeft = getDaysUntilExpiry();
+          if (daysLeft !== null && daysLeft <= 30 && daysLeft >= 0) {
+            return (
+              <Badge variant="outline" className="text-sm bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+                Vencendo em {daysLeft}d
+              </Badge>
+            );
+          }
+          return (
+            <Badge variant={getStatusBadgeVariant(contract.status)} className="text-sm">
+              {getStatusLabel(contract.status)}
+            </Badge>
+          );
+        })()}
         {/* Status Actions */}
         <div className="flex gap-2">
           {(contract.status === "active" || contract.status === "assinado") && (
@@ -674,6 +696,10 @@ const ContratoDetalhes = () => {
               className="text-green-600 border-green-400 hover:bg-green-50"
               onClick={async () => {
                 await updateContractStatus(contract.id, "active");
+                if (contract.contract_type === "PJ") {
+                  const now = new Date();
+                  gerarObrigacoesPJ(now.getFullYear(), now.getMonth() + 1).catch(() => {});
+                }
                 window.location.reload();
               }}
             >
@@ -741,20 +767,53 @@ const ContratoDetalhes = () => {
             <div className="grid grid-cols-2 gap-4">
               {contract.salary && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Salário</p>
+                  <p className="text-sm text-muted-foreground">
+                    {contract.compensation_type === "hourly" ? "Valor/Hora" :
+                     contract.compensation_type === "variable_goal" ? "Valor da Meta" :
+                     contract.compensation_type === "variable_deliverable" ? "Valor por Entregável" :
+                     contract.compensation_type === "mixed" ? "Parte Fixa Mensal" :
+                     "Salário"}
+                  </p>
                   <p className="font-medium flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                     {formatCurrency(contract.salary)}
+                    {contract.compensation_type === "hourly" && <span className="text-xs text-muted-foreground">/hora</span>}
                   </p>
                 </div>
               )}
-              {contract.hourly_rate && (
+              {contract.hourly_rate && !contract.salary && (
                 <div>
                   <p className="text-sm text-muted-foreground">Valor/Hora</p>
                   <p className="font-medium">{formatCurrency(contract.hourly_rate)}</p>
                 </div>
               )}
+              {contract.compensation_type && contract.compensation_type !== "fixed" && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Modelo de Remuneração</p>
+                  <p className="font-medium">
+                    {contract.compensation_type === "hourly" ? "Hora/Hora" :
+                     contract.compensation_type === "variable_goal" ? "Variável por Meta" :
+                     contract.compensation_type === "variable_deliverable" ? "Variável por Entregável" :
+                     contract.compensation_type === "mixed" ? "Misto (Fixo + Variável)" :
+                     contract.compensation_type}
+                  </p>
+                </div>
+              )}
             </div>
+            {contract.compensation_type === "mixed" && contract.variable_component && (
+              <div>
+                <p className="text-sm text-muted-foreground">Parte Variável (teto)</p>
+                <p className="font-medium">{formatCurrency(contract.variable_component)}</p>
+              </div>
+            )}
+            {contract.goal_description && (
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {contract.compensation_type === "variable_goal" ? "Descrição da Meta" : "Descrição do Entregável"}
+                </p>
+                <p className="text-sm">{contract.goal_description}</p>
+              </div>
+            )}
             {contract.contract_type === "PJ" && (contract.payment_frequency || contract.payment_day) && (
               <>
                 <Separator />
