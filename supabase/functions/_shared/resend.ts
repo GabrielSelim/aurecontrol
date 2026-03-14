@@ -15,7 +15,7 @@ export async function sendEmailViaResend(
   if (!resendApiKey) throw new Error("RESEND_API_KEY not configured");
 
   const fromEmail =
-    Deno.env.get("RESEND_FROM_EMAIL") ?? "noreply@aurecontrol.com.br";
+    Deno.env.get("RESEND_FROM_EMAIL") ?? "noreply@gabrielsanztech.com.br";
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
