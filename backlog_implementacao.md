@@ -1,6 +1,6 @@
 # AURE — Backlog de Implementação
 > Referência: `nova_implementacao_12_03_2026.md`
-> Atualizado em: 13/03/2026
+> Atualizado em: 14/03/2026
 > **Como usar:** Ao concluir um item, troque `⬜` por `✅` e adicione a data.
 
 ---
@@ -26,8 +26,8 @@
 |---|---|---|---|
 | GAP-01 | Portal e Visão do PJ | ✅ | `PJDashboard`, `PJContratos`, `PJPagamentos`, `PJPerfil`, `PJLayout` — portal bilateral completo |
 | GAP-02 | Assinatura Digital Bilateral e Certificado | 🔄 | `SignaturePad.tsx`, `SignatureCertificate.tsx` existem. Falta: registro em blockchain e integração com provedor externo (ClickSign/DocuSign) |
-| GAP-03 | Status Contratual Estruturado com Histórico | 🔄 | Estados existem. Histórico de auditoria (`ContractAuditTrail`) integrado em `ContratoDetalhes`. Falta: máquina de 9 estados completa com timeline visual |
-| GAP-04 | Vínculo Automático Contrato → Obrigação Financeira | 🔄 | Campo de periodicidade existe no formulário. `gerarObrigacoesPJ` via edge function existe. Falta: vínculo automático real ao ativar contrato + fila de aprovação financeiro |
+| GAP-03 | Status Contratual Estruturado com Histórico | ✅ | `ContractStatusTimeline.tsx` — stepper visual dos 9 estados com tooltip por etapa, integrado em `ContratoDetalhes.tsx` — 14/03/2026 |
+| GAP-04 | Vínculo Automático Contrato → Obrigação Financeira | 🔄 | Botão "Ativar Contrato" (assinado → active) com `gerarObrigacoesPJ` automático + auditlog em `ContratoDetalhes.tsx` — 14/03/2026. Falta: fila de aprovação automática |
 
 ---
 
@@ -158,7 +158,7 @@
 | 🔄 Ciclo de vida da nota (Rascunho → Emitida) | 🔄 | Estados mapeados em `nfseService.ts`. Falta: sincronização com retorno real da prefeitura |
 | ⬜ Integração API NFS-e municipal | ⬜ | Não implementado — necessário integrar com API da prefeitura (ex: Campo Grande/MS) |
 | ⬜ Fila de reprocessamento (timeout 10s) | ⬜ | Não implementado |
-| ⬜ Conferência pelo financeiro | ⬜ | Não existe fluxo de aprovação financeiro → liberação após nota emitida |
+| 🔄 Conferência pelo financeiro | 🔄 | Badge NFS-e por linha em `Pagamentos.tsx` — prefetch em lote mostra "NFS-e emitida" ✓ (verde) ou "NFS-e pendente" (âmbar) para pagamentos PJ pending — 14/03/2026. Falta: fluxo de fila automática |
 
 ---
 
@@ -169,7 +169,7 @@
 | 🔄 Filtros avançados | 🔄 | Filtro por período, status e contrato implementados. Falta: exportação CSV/PDF/Excel |
 | ✅ Exportação CSV/PDF/Excel | ✅ | CSV já existia; PDF adicionado via browser print (rel. HTML formatado) |
 | 🔄 Geração automática de obrigações | ✅ | `gerarObrigacoesPJ` chamado em `Contratos.tsx` ao criar e em `ContratoDetalhes.tsx` ao reativar |
-| ⬜ Fluxo de aprovação financeiro | 🔄 | `approvePayment`, `batchApprovePayments` implementados. Aviso toast.warning se NFS-e não emitida ao aprovar PJ (não bloqueante). Integração real de bloqueio pendente |
+| 🔄 Fluxo de aprovação financeiro | 🔄 | `approvePayment`, `batchApprovePayments` implementados. **Bloqueio hard** se NFS-e não emitida ao aprovar PJ (`toast.error + return` em `Pagamentos.tsx`) — 14/03/2026. Falta: fila automática de aprovação |
 | ⬜ Integração gateway Pix/Split real | ⬜ | Não implementado — pagamentos são aprovados manualmente |
 | ⬜ Card inadimplência no dashboard financeiro | ✅ | Card "Em Atraso" em `DashboardOverview.tsx` — `fetchOverduePaymentsSummary` em `paymentService.ts`, count + valor total |
 
@@ -179,8 +179,8 @@
 
 | Item | Status | Observação |
 |---|---|---|
-| ⬜ Campos contábeis eSocial | ⬜ | Não implementado — campos específicos de eSocial ausentes |
-| ⬜ Holerite digital | ⬜ | Não implementado — sem geração de holerite |
+| ✅ Campos contábeis eSocial | ✅ | Migration `20260314020000`: PIS/PASEP, esocial_categoria, grau_instrucao, raca_cor, estado_civil, data_admissao. UI em `Contratos.tsx` e `ContratoDetalhes.tsx` — 14/03/2026 |
+| ✅ Holerite digital | ✅ | `HoleritoDigital.tsx` — INSS progressivo 2024, IRRF, FGTS informativo, impressão/PDF — 14/03/2026 |
 | 🔄 Contratos CLT | ✅ | Campos CLT adicionados: matrícula, CBO, N° CTPS, Série CTPS, regime de trabalho. Migration `20260314010000`. Exibidos em `ContratoDetalhes.tsx` |
 
 ---

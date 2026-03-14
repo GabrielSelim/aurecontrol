@@ -17,11 +17,29 @@ services:
     command:
       - postgres
       - -c
-      - max_connections=400
+      - max_connections=200
       - -c
       - shared_buffers=256MB
       - -c
       - listen_addresses=*
+      - -c
+      - idle_in_transaction_session_timeout=30000
+      - -c
+      - idle_session_timeout=600000
+      - -c
+      - statement_timeout=60000
+      - -c
+      - tcp_keepalives_idle=60
+      - -c
+      - tcp_keepalives_interval=10
+      - -c
+      - tcp_keepalives_count=5
+      - -c
+      - wal_level=logical
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
@@ -70,13 +88,14 @@ services:
     container_name: aurecontrol-rest
     restart: unless-stopped
     depends_on:
-      pgbouncer:
+      db:
         condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@aurecontrol-pgbouncer:6432/${POSTGRES_DB:-postgres}
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
       PGRST_DB_SCHEMAS: public,graphql_public
       PGRST_DB_ANON_ROLE: anon
-      PGRST_DB_POOL: "10"
+      PGRST_DB_POOL: "5"
+      PGRST_DB_POOL_ACQUISITION_TIMEOUT: "10"
       PGRST_JWT_SECRET: ${JWT_SECRET}
       PGRST_DB_USE_LEGACY_GUCS: "false"
       PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
@@ -90,15 +109,15 @@ services:
     container_name: aurecontrol-auth
     restart: unless-stopped
     depends_on:
-      pgbouncer:
+      db:
         condition: service_healthy
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
       API_EXTERNAL_URL: ${API_EXTERNAL_URL}
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@aurecontrol-pgbouncer:6432/${POSTGRES_DB:-postgres}
-      GOTRUE_DB_MAX_POOL_SIZE: "10"
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_DB_MAX_POOL_SIZE: "5"
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-}
       GOTRUE_DISABLE_SIGNUP: "false"
@@ -136,7 +155,7 @@ services:
       DB_USER: supabase_admin
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB:-postgres}
-      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO realtime"
       DB_ENC_KEY: supabaserealtime
       API_JWT_SECRET: ${JWT_SECRET}
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}
@@ -146,7 +165,7 @@ services:
       RLIMIT_NOFILE: "10000"
       APP_NAME: realtime
       SEED_SELF_HOST: "true"
-      DB_POOL_SIZE: "5"
+      DB_POOL_SIZE: "3"
     networks:
       - aurecontrol
 

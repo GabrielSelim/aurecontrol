@@ -177,7 +177,7 @@ export async function fetchContractsByCompany(
 export async function fetchActiveContractsByCompany(companyId: string) {
   const { data, error } = await supabase
     .from("contracts")
-    .select("id, job_title, user_id, salary")
+    .select("id, job_title, user_id, salary, contract_type")
     .eq("company_id", companyId)
     .eq("status", "active");
 

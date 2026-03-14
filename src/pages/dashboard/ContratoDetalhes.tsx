@@ -85,6 +85,7 @@ import { logAuditAction } from "@/lib/auditLog";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ContractAuditTrail } from "@/components/contracts/ContractAuditTrail";
 import { HoleritoDigital } from "@/components/contracts/HoleritoDigital";
+import { ContractStatusTimeline } from "@/components/contracts/ContractStatusTimeline";
 
 interface Contract {
   id: string;
@@ -814,6 +815,27 @@ const ContratoDetalhes = () => {
               Suspender
             </Button>
           )}
+          {contract.status === "assinado" && isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-green-600 border-green-500 hover:bg-green-50"
+              onClick={async () => {
+                await updateContractStatus(contract.id, "active");
+                logAuditAction(contract.id, "contract_activated", "contract",
+                  { previous_status: "assinado" }, "Contrato ativado pelo administrador");
+                if (contract.contract_type === "PJ") {
+                  const now = new Date();
+                  gerarObrigacoesPJ(now.getFullYear(), now.getMonth() + 1).catch(() => {});
+                }
+                toast({ title: "Contrato ativado", description: "Status alterado para Vigente" + (contract.contract_type === "PJ" ? " e obrigações financeiras geradas." : ".") });
+                window.location.reload();
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-1" />
+              Ativar Contrato
+            </Button>
+          )}
           {(contract.status === "suspended" || contract.status === "em_revisao") && (
             <Button
               variant="outline"
@@ -848,6 +870,20 @@ const ContratoDetalhes = () => {
           )}
         </div>
       </div>
+
+      {/* Status Timeline */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Ciclo de Vida do Contrato</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ContractStatusTimeline
+            status={contract.status}
+            endDate={contract.end_date}
+            createdAt={contract.created_at}
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Informações do Colaborador */}

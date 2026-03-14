@@ -35,6 +35,8 @@ import {
   X,
   Users,
   Zap,
+  FileCheck,
+  FileClock,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -98,6 +100,7 @@ interface Contract {
   user_id: string;
   job_title: string;
   salary: number | null;
+  contract_type?: string;
   profile?: {
     full_name: string;
   };
@@ -110,6 +113,7 @@ const Pagamentos = () => {
   const [pagamentos, setPagamentos] = useState<Payment[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [splitsMap, setSplitsMap] = useState<Record<string, { beneficiary_name: string; beneficiary_document: string | null; percentage: number }[]>>({});
+  const [nfseStatusMap, setNfseStatusMap] = useState<Record<string, "emitida" | "pendente" | "loading">>({});
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm);
@@ -206,6 +210,42 @@ const Pagamentos = () => {
     fetchContracts();
     fetchSplits();
   }, [profile?.company_id]);
+
+  // Prefetch NFS-e status for pending PJ payments
+  useEffect(() => {
+    if (pagamentos.length === 0 || contracts.length === 0) return;
+    const contractTypeMap: Record<string, string> = {};
+    contracts.forEach((c) => { if (c.contract_type) contractTypeMap[c.id] = c.contract_type; });
+
+    const pendingPjContractIds = [...new Set(
+      pagamentos
+        .filter((p) => p.status === "pending" && contractTypeMap[p.contract_id] === "PJ")
+        .map((p) => p.contract_id)
+    )];
+
+    if (pendingPjContractIds.length === 0) return;
+
+    // Mark all as loading first
+    setNfseStatusMap((prev) => {
+      const updated = { ...prev };
+      pendingPjContractIds.forEach((id) => { if (!(id in updated)) updated[id] = "loading"; });
+      return updated;
+    });
+
+    // Fetch NFS-e for each PJ contract
+    pendingPjContractIds.forEach(async (contractId) => {
+      try {
+        const nfseList = await fetchNfseByContract(contractId);
+        const month = new Date().toISOString().substring(0, 7);
+        const hasEmitted = nfseList.some(
+          (n) => n.status === "emitida" && n.reference_month?.startsWith(month)
+        );
+        setNfseStatusMap((prev) => ({ ...prev, [contractId]: hasEmitted ? "emitida" : "pendente" }));
+      } catch {
+        setNfseStatusMap((prev) => ({ ...prev, [contractId]: "pendente" }));
+      }
+    });
+  }, [pagamentos, contracts]);
 
   const fetchPagamentos = async () => {
     if (!profile?.company_id) return;
@@ -1249,11 +1289,25 @@ const Pagamentos = () => {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(pagamento.status)}
-                          <Badge variant={getStatusBadgeVariant(pagamento.status)}>
-                            {getStatusLabel(pagamento.status)}
-                          </Badge>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(pagamento.status)}
+                            <Badge variant={getStatusBadgeVariant(pagamento.status)}>
+                              {getStatusLabel(pagamento.status)}
+                            </Badge>
+                          </div>
+                          {/* NFS-e indicator for pending PJ payments */}
+                          {pagamento.status === "pending" && contractsMap[pagamento.contract_id]?.contract_type === "PJ" && (
+                            nfseStatusMap[pagamento.contract_id] === "emitida" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5 w-fit">
+                                <FileCheck className="h-3 w-3" /> NFS-e emitida
+                              </span>
+                            ) : nfseStatusMap[pagamento.contract_id] === "pendente" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 w-fit">
+                                <FileClock className="h-3 w-3" /> NFS-e pendente
+                              </span>
+                            ) : null
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
