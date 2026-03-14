@@ -1,3 +1,5 @@
+import { useTheme } from "next-themes";
+
 interface LogoAureProps {
   /** "full" = logo completa com AURE (default), "icon" = ícone quadrado só */
   variant?: "full" | "icon";
@@ -21,6 +23,8 @@ export function LogoAure({
   className = "",
 }: LogoAureProps) {
   const { imgH, box, radius, fontSize } = sizeMap[size];
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   if (variant === "full") {
     return (
@@ -30,8 +34,13 @@ export function LogoAure({
         style={{
           height: imgH,
           width: "auto",
-          // dark=true: inverte para branco (purple→black→white), transparência preservada
-          filter: dark ? "brightness(0) invert(1)" : undefined,
+          // dark prop (for explicit dark bg): inverte para branco
+          // isDark (modo escuro do app): clareia o roxo para melhor legibilidade
+          filter: dark
+            ? "brightness(0) invert(1)"
+            : isDark
+            ? "brightness(2.4) saturate(0.75)"
+            : undefined,
           flexShrink: 0,
         }}
         className={className}
@@ -58,7 +67,7 @@ export function LogoAure({
           width="48"
           height="48"
           rx={radius * (48 / box)}
-          fill={dark ? "white" : "#34095e"}
+          fill={dark ? "white" : isDark ? "#7c3aed" : "#34095e"}
         />
         <text
           x="24"

@@ -216,7 +216,22 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       )}
 
-      {/* Navigation */}
+      {/* Notifications — topo do sidebar */}
+      {!collapsed && (
+        <div className="px-4 py-2 border-b border-border">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">Notificações</span>
+            <NotificationBell />
+          </div>
+        </div>
+      )}
+      {collapsed && (
+        <div className="px-2 py-2 border-b border-border flex justify-center">
+          <NotificationBell />
+        </div>
+      )}
+
+      {/* Navigation */}}
       <ScrollArea className={cn(
         "flex-1 py-4 transition-all duration-300",
         collapsed ? "px-2" : "px-3"
@@ -294,21 +309,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           })}
         </nav>
       </ScrollArea>
-
-      {/* Notification Bell - Desktop */}
-      {!collapsed && (
-        <div className="px-4 py-2 border-t border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Notificações</span>
-            <NotificationBell />
-          </div>
-        </div>
-      )}
-      {collapsed && (
-        <div className="px-2 py-2 border-t border-border flex justify-center">
-          <NotificationBell />
-        </div>
-      )}
 
       {/* Theme Toggle */}
       {!collapsed && (
