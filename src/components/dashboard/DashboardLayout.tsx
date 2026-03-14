@@ -186,12 +186,22 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       "flex h-full flex-col bg-card border-r border-border transition-all duration-300",
       collapsed ? "w-16" : "w-72"
     )}>
-      {/* Logo */}
+      {/* Logo + NotificationBell */}
       <div className={cn(
-        "flex h-16 items-center gap-2 border-b border-border transition-all duration-300",
-        collapsed ? "px-3 justify-center" : "px-6"
+        "flex h-16 items-center border-b border-border transition-all duration-300",
+        collapsed ? "px-3 flex-col justify-center gap-0 h-auto py-2" : "px-4 gap-2"
       )}>
-        <LogoAure variant={collapsed ? "icon" : "full"} size="sm" />
+        {collapsed ? (
+          <>
+            <LogoAure variant="icon" size="sm" />
+            <NotificationBell />
+          </>
+        ) : (
+          <>
+            <LogoAure variant="full" size="sm" className="flex-1" />
+            <NotificationBell />
+          </>
+        )}
       </div>
 
       {/* Collapse Button */}
@@ -213,21 +223,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <ChevronLeft className="h-4 w-4" />
             )}
           </Button>
-        </div>
-      )}
-
-      {/* Notifications — topo do sidebar */}
-      {!collapsed && (
-        <div className="px-4 py-2 border-b border-border">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Notificações</span>
-            <NotificationBell />
-          </div>
-        </div>
-      )}
-      {collapsed && (
-        <div className="px-2 py-2 border-b border-border flex justify-center">
-          <NotificationBell />
         </div>
       )}
 
