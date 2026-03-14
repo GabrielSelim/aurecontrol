@@ -35,6 +35,7 @@ import {
   deleteContractSplit,
   type NfseRecord,
   type ContractSplit,
+  markNfseEmitida,
 } from "@/services/nfseService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,6 +77,7 @@ import {
   History,
   CreditCard,
   Printer,
+  FileCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -438,6 +440,19 @@ const ContratoDetalhes = () => {
     } catch (err) {
       logger.error("handleCancelNfse error:", err);
       toast({ title: "Erro ao cancelar NFS-e", variant: "destructive" });
+    }
+  };
+
+  const handleMarkNfseEmitida = async (nfseId: string) => {
+    try {
+      await markNfseEmitida(nfseId);
+      setNfseList((prev) => prev.map((n) =>
+        n.id === nfseId ? { ...n, status: "emitida" as const, emitida_em: new Date().toISOString() } : n
+      ));
+      toast({ title: "NFS-e marcada como emitida." });
+    } catch (err) {
+      logger.error("markNfseEmitida error:", err);
+      toast({ title: "Erro ao atualizar NFS-e", variant: "destructive" });
     }
   };
 
@@ -1497,6 +1512,17 @@ const ContratoDetalhes = () => {
                       {nfse.pdf_url && (
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open(nfse.pdf_url!, "_blank")}>
                           <Download className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {nfse.status === "pendente" && (hasRole("master_admin") || hasRole("admin") || hasRole("financeiro")) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-green-600 hover:text-green-700 dark:text-green-400"
+                          title="Marcar como emitida (admin)"
+                          onClick={() => handleMarkNfseEmitida(nfse.id)}
+                        >
+                          <FileCheck className="h-4 w-4" />
                         </Button>
                       )}
                       {nfse.status === "emitida" && (

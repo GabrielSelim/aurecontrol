@@ -70,6 +70,23 @@ export async function cancelNfse(nfseId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Manually marks an NFS-e as emitida (admin workaround until real prefeitura API).
+ * Optionally records the nota number.
+ */
+export async function markNfseEmitida(nfseId: string, numero?: string): Promise<void> {
+  const { error } = await supabase
+    .from("nfse")
+    .update({
+      status: "emitida",
+      emitida_em: new Date().toISOString(),
+      ...(numero ? { numero } : {}),
+    })
+    .eq("id", nfseId);
+
+  if (error) throw error;
+}
+
 // Contract Splits
 
 export async function fetchSplitsByContract(contractId: string): Promise<ContractSplit[]> {

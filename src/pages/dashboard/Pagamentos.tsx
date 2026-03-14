@@ -37,6 +37,7 @@ import {
   Zap,
   FileCheck,
   FileClock,
+  Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -137,6 +138,12 @@ const Pagamentos = () => {
   const [batchMonths, setBatchMonths] = useState("3");
   const [duplicateWarning, setDuplicateWarning] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBatchChecking, setIsBatchChecking] = useState(false);
+  const [batchApproveDialog, setBatchApproveDialog] = useState<{
+    open: boolean;
+    eligible: string[];
+    blocked: { id: string; name: string; month: string }[];
+  } | null>(null);
 
   const canManagePayments = isAdmin() || hasRole("financeiro");
 
@@ -538,11 +545,56 @@ const Pagamentos = () => {
 
   const handleBatchApprove = async () => {
     if (selectedIds.size === 0) return;
+    setIsBatchChecking(true);
     const ids = Array.from(selectedIds);
+    const eligible: string[] = [];
+    const blocked: { id: string; name: string; month: string }[] = [];
+
+    await Promise.all(ids.map(async (id) => {
+      const payment = pagamentos.find((p) => p.id === id);
+      if (!payment) return;
+      const contractType = contractsMap[payment.contract_id]?.contract_type;
+      if (contractType === "PJ" && payment.contract_id) {
+        try {
+          const nfseList = await fetchNfseByContract(payment.contract_id);
+          const month = payment.reference_month?.substring(0, 7);
+          const hasEmitted = nfseList.some(
+            (n) => n.status === "emitida" && n.competencia?.startsWith(month ?? "")
+          );
+          if (hasEmitted) {
+            eligible.push(id);
+          } else {
+            blocked.push({
+              id,
+              name: payment.profile?.full_name ?? "Prestador",
+              month: month ?? payment.reference_month,
+            });
+          }
+        } catch {
+          eligible.push(id); // fail-open
+        }
+      } else {
+        eligible.push(id);
+      }
+    }));
+
+    setIsBatchChecking(false);
+
+    if (blocked.length === 0) {
+      // All clear — approve directly without showing dialog
+      await executeBatchApprove(eligible);
+      return;
+    }
+    setBatchApproveDialog({ open: true, eligible, blocked });
+  };
+
+  const executeBatchApprove = async (ids: string[]) => {
+    if (ids.length === 0) return;
     try {
       await batchApprovePayments(ids, profile?.user_id ?? "", new Date().toISOString().split("T")[0]);
       toast.success(`${ids.length} pagamento(s) aprovado(s)!`);
       setSelectedIds(new Set());
+      setBatchApproveDialog(null);
       fetchPagamentos();
     } catch (error) {
       logger.error("Error batch approving:", error);
@@ -1150,9 +1202,12 @@ const Pagamentos = () => {
               <span className="text-sm font-medium">
                 {selectedIds.size} pagamento(s) selecionado(s)
               </span>
-              <Button size="sm" onClick={handleBatchApprove} className="gap-1">
-                <CheckCircle className="h-3.5 w-3.5" />
-                Aprovar selecionados
+              <Button size="sm" onClick={handleBatchApprove} disabled={isBatchChecking} className="gap-1">
+                {isBatchChecking ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Verificando...</>
+                ) : (
+                  <><CheckCircle className="h-3.5 w-3.5" /> Aprovar selecionados</>
+                )}
               </Button>
               <Button
                 variant="ghost"
@@ -1348,6 +1403,63 @@ const Pagamentos = () => {
           </div>
         </CardContent>
       </Card>
+      {/* Batch Approve Confirmation Dialog */}
+      {batchApproveDialog && (
+        <Dialog
+          open={batchApproveDialog.open}
+          onOpenChange={(open) => { if (!open) setBatchApproveDialog(null); }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Aprovação em Lote</DialogTitle>
+              <DialogDescription>
+                Alguns pagamentos PJ não possuem NFS-e emitida para o período de referência.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {batchApproveDialog.eligible.length > 0 && (
+                <div className="flex items-center gap-2 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-3">
+                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+                  <p className="text-sm text-green-800 dark:text-green-300">
+                    <strong>{batchApproveDialog.eligible.length}</strong> pagamento(s) elegível(is) para aprovação imediata.
+                  </p>
+                </div>
+              )}
+              {batchApproveDialog.blocked.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <p className="text-sm text-amber-800 dark:text-amber-300">
+                      <strong>{batchApproveDialog.blocked.length}</strong> pagamento(s) bloqueados — NFS-e não emitida:
+                    </p>
+                  </div>
+                  <ul className="text-sm space-y-1 pl-4 text-muted-foreground">
+                    {batchApproveDialog.blocked.map((b) => (
+                      <li key={b.id}>• {b.name} — competência {b.month}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {batchApproveDialog.eligible.length === 0 && (
+                <p className="text-sm text-center text-muted-foreground py-2">
+                  Nenhum pagamento elegível. Solicite as NFS-e pendentes antes de aprovar.
+                </p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBatchApproveDialog(null)}>
+                Cancelar
+              </Button>
+              {batchApproveDialog.eligible.length > 0 && (
+                <Button onClick={() => executeBatchApprove(batchApproveDialog!.eligible)}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Aprovar {batchApproveDialog.eligible.length} elegível(is)
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

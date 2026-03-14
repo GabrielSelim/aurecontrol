@@ -49,7 +49,7 @@
 | # | Gap | Status | Observação |
 |---|---|---|---|
 | GAP-11 | Timeline de Auditoria por Contrato | ✅ | `ContractAuditTrail.tsx` — histórico de eventos by contrato |
-| GAP-12 | Módulo de Notas Fiscais (NFS-e) | 🔄 | `nfseService.ts`, emissão em `ContratoDetalhes`. Falta: integração real com API da prefeitura (hoje é registro interno apenas) |
+| GAP-12 | Módulo de Notas Fiscais (NFS-e) | 🔄 | `nfseService.ts`, emissão em `ContratoDetalhes` e `PJContratos`. Admin pode marcar NFS-e pendente como emitida manualmente (workaround até API real da prefeitura) — 14/03/2026. Falta: integração real com API |
 | GAP-13 | Configuração de Split por Contrato | 🔄 | `createContractSplits` no formulário de criação. Split visível em `ContratoDetalhes`. Falta: execução automática via Pix/gateway real |
 | GAP-14 | Campo de Escopo do Serviço no Contrato | ✅ | Campo "Escopo do Serviço" existe no formulário (`Contratos.tsx` linha 1369) |
 | GAP-15 | Alertas Inteligentes e Proativos | ✅ | `DashboardOverview.tsx` — alertas por cor (danger/warning) com contratos vencendo e pagamentos atrasados |
@@ -64,7 +64,7 @@
 | # | Gap | Status | Observação |
 |---|---|---|---|
 | GAP-19 | Validação Automática de CNPJ (KYC/KYB) | 🔄 | CNPJ validado via API Receita Federal no `Registro.tsx`. Falta: coleta de documentos KYB, validação de situação cadastral |
-| GAP-20 | Painel Administrativo e Logs de Auditoria Central | 🔄 | `Auditoria.tsx` existe. Falta: hash de integridade por linha, exportação IPFS |
+| GAP-20 | Painel Administrativo e Logs de Auditoria Central | ✅ | `Auditoria.tsx`: hash SHA-256 por linha via Web Crypto API, exibido na tabela (truncado + tooltip) e incluído no CSV — 14/03/2026 |
 | GAP-21 | Módulo de Escrow Digital | ⬜ | Não implementado — Fase 3 (6–9 meses) |
 | GAP-22 | Integração Blockchain e IPFS (Produção) | ⬜ | Não implementado — Fase 4 |
 
@@ -158,7 +158,7 @@
 | 🔄 Ciclo de vida da nota (Rascunho → Emitida) | 🔄 | Estados mapeados em `nfseService.ts`. Falta: sincronização com retorno real da prefeitura |
 | ⬜ Integração API NFS-e municipal | ⬜ | Não implementado — necessário integrar com API da prefeitura (ex: Campo Grande/MS) |
 | ⬜ Fila de reprocessamento (timeout 10s) | ⬜ | Não implementado |
-| 🔄 Conferência pelo financeiro | 🔄 | Badge NFS-e por linha em `Pagamentos.tsx` — prefetch em lote mostra "NFS-e emitida" ✓ (verde) ou "NFS-e pendente" (âmbar) para pagamentos PJ pending — 14/03/2026. Falta: fluxo de fila automática |
+| 🔄 Conferência pelo financeiro | ✅ | Badge NFS-e por linha em `Pagamentos.tsx`. Aprovação em lote com pré-verificação NFS-e: dialog mostra elegíveis vs bloqueados, aprova apenas os com NFS-e emitida — 14/03/2026 |
 
 ---
 
@@ -224,7 +224,7 @@
 12. ✅ Painel de metas e entregáveis vinculados ao pagamento variável
 13. ⬜ Integração real API NFS-e com prefeitura
 14. ✅ Geração automática de obrigação ao ativar contrato
-15. ⬜ Fluxo completo financeiro: nota emitida → aprovação → pagamento
+15. ✅ Fluxo completo financeiro: nota emitida → aprovação → pagamento
 
 ### Fases 2–4 (Longo prazo)
 16. ⬜ Campos CLT: eSocial, holerite, CTPS, CBO
