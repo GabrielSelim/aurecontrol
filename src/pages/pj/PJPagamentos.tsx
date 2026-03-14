@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchPJPayments } from "@/services/pjService";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { fetchNfseByContract } from "@/services/nfseService";
+import { Card, CardContent, CardHeader, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, Search, CheckCircle, Clock } from "lucide-react";
+import { CreditCard, Search, CheckCircle, Clock, FileCheck, FileClock } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -22,6 +23,8 @@ const PJPagamentos = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  // NFS-e status per contract_id: "emitida" | "pendente" | "none"
+  const [nfseMap, setNfseMap] = useState<Record<string, "emitida" | "pendente" | "none">>({});
 
   useEffect(() => {
     if (user) loadPayments();
@@ -31,6 +34,22 @@ const PJPagamentos = () => {
     try {
       const data = await fetchPJPayments(user!.id);
       setPayments(data);
+      // Batch load NFS-e for all unique contract_ids
+      const contractIds = [...new Set(data.map((p: any) => p.contract_id).filter(Boolean))] as string[];
+      if (contractIds.length > 0) {
+        const results = await Promise.allSettled(contractIds.map(fetchNfseByContract));
+        const map: Record<string, "emitida" | "pendente" | "none"> = {};
+        contractIds.forEach((cid, i) => {
+          const r = results[i];
+          if (r.status === "fulfilled" && r.value.length > 0) {
+            const hasEmitida = r.value.some((n) => n.status === "emitida");
+            map[cid] = hasEmitida ? "emitida" : "pendente";
+          } else {
+            map[cid] = "none";
+          }
+        });
+        setNfseMap(map);
+      }
     } catch (err) {
       logger.error("PJPagamentos load error:", err);
       toast({ title: "Erro ao carregar pagamentos", variant: "destructive" });
@@ -157,6 +176,17 @@ const PJPagamentos = () => {
                   <p className="text-xs text-muted-foreground">
                     Pago em: {format(new Date(p.paid_at), "dd/MM/yyyy", { locale: ptBR })}
                   </p>
+                )}
+                {/* NFS-e status badge */}
+                {p.contract_id && nfseMap[p.contract_id] === "emitida" && (
+                  <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                    <FileCheck className="h-3.5 w-3.5" /> NFS-e emitida
+                  </span>
+                )}
+                {p.contract_id && nfseMap[p.contract_id] === "pendente" && (
+                  <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                    <FileClock className="h-3.5 w-3.5" /> NFS-e pendente
+                  </span>
                 )}
               </div>
 

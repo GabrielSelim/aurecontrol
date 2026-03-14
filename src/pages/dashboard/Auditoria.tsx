@@ -24,7 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, Search, ShieldCheck } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Download, Search, ShieldCheck, Hash } from "lucide-react";
 
 interface AuditLogEntry {
   id: string;
@@ -46,11 +52,22 @@ const CATEGORY_BADGE: Record<string, string> = {
   general: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
 };
 
+/** Compute SHA-256 integrity hash for an audit log entry. */
+async function computeIntegrityHash(log: AuditLogEntry): Promise<string> {
+  const payload = `${log.id}|${log.action}|${log.actor_email}|${log.contract_id}|${log.created_at}|${JSON.stringify(log.details)}`;
+  const encoder = new TextEncoder();
+  const buffer = await crypto.subtle.digest("SHA-256", encoder.encode(payload));
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 const Auditoria = () => {
   useDocumentTitle("Auditoria");
   const { hasRole } = useAuth();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [integrityHashes, setIntegrityHashes] = useState<Record<string, string>>({});
 
   // Filters
   const [search, setSearch] = useState("");
@@ -73,7 +90,13 @@ const Auditoria = () => {
         .limit(500);
 
       if (error) throw error;
-      setLogs((data as AuditLogEntry[]) ?? []);
+      const entries = (data as AuditLogEntry[]) ?? [];
+      setLogs(entries);
+      // Compute integrity hashes (Web Crypto API — runs off the main thread)
+      const hashEntries = await Promise.all(
+        entries.map(async (log) => [log.id, await computeIntegrityHash(log)] as const)
+      );
+      setIntegrityHashes(Object.fromEntries(hashEntries));
     } catch (err) {
       logger.error("fetchLogs error:", err);
     } finally {
@@ -102,7 +125,7 @@ const Auditoria = () => {
   }, [logs, search, categoryFilter, dateFrom, dateTo]);
 
   const exportToCSV = () => {
-    const headers = ["Data/Hora", "Ação", "Categoria", "Usuário", "Email", "Contrato", "IP"];
+    const headers = ["Data/Hora", "Ação", "Categoria", "Usuário", "Email", "Contrato", "IP", "Hash SHA-256"];
     const rows = filtered.map((log) => [
       new Date(log.created_at).toLocaleString("pt-BR"),
       getAuditActionLabel(log.action),
@@ -111,6 +134,7 @@ const Auditoria = () => {
       log.actor_email,
       log.contract_id,
       log.ip_address ?? "",
+      integrityHashes[log.id] ?? "",
     ]);
 
     const csvContent = [headers, ...rows]
@@ -230,6 +254,9 @@ const Auditoria = () => {
                   <TableHead>Usuário</TableHead>
                   <TableHead>Contrato</TableHead>
                   <TableHead>IP</TableHead>
+                  <TableHead className="flex items-center gap-1">
+                    <Hash className="h-3.5 w-3.5" /> Hash
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -263,6 +290,24 @@ const Auditoria = () => {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {log.ip_address ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <code className="font-mono text-xs text-muted-foreground cursor-default select-all">
+                              {integrityHashes[log.id]
+                                ? `${integrityHashes[log.id].slice(0, 8)}…`
+                                : "—"}
+                            </code>
+                          </TooltipTrigger>
+                          {integrityHashes[log.id] && (
+                            <TooltipContent side="left" className="max-w-xs break-all font-mono text-xs">
+                              {integrityHashes[log.id]}
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 ))}
