@@ -104,6 +104,44 @@ export const ContractAuditTrail = ({ contractId, documentId: _documentId }: Cont
     ? logs
     : logs.filter(l => l.action_category === categoryFilter);
 
+  const handleExportPDF = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const rows = filteredLogs.map(log => `
+      <tr>
+        <td>${format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss")}</td>
+        <td>${getAuditActionLabel(log.action)}</td>
+        <td>${getAuditCategoryLabel(log.action_category)}</td>
+        <td>${log.actor_name || "-"}</td>
+        <td>${log.actor_email || "-"}</td>
+        <td>${log.ip_address || "-"}</td>
+      </tr>
+    `).join("");
+    printWindow.document.write(`
+      <!DOCTYPE html><html><head>
+      <title>Auditoria — Contrato ${contractId.slice(0, 8)}</title>
+      <style>
+        body{font-family:Arial,sans-serif;font-size:11px;padding:24px;}
+        h1{font-size:16px;margin-bottom:4px;}
+        p{color:#666;font-size:10px;margin:0 0 16px;}
+        table{width:100%;border-collapse:collapse;}
+        th{background:#f3f4f6;text-align:left;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.04em;}
+        td{padding:5px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top;}
+        tr:nth-child(even)td{background:#fafafa;}
+        @media print{@page{size:A4 landscape;margin:10mm}}
+      </style></head><body>
+      <h1>Trilha de Auditoria</h1>
+      <p>Contrato ID: ${contractId} &nbsp;|&nbsp; Exportado em: ${format(new Date(), "dd/MM/yyyy HH:mm:ss")}</p>
+      <table>
+        <thead><tr><th>Data/Hora</th><th>Ação</th><th>Categoria</th><th>Usuário</th><th>Email</th><th>IP</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   const handleExportCSV = () => {
     const headers = ["Data/Hora", "Ação", "Categoria", "Usuário", "Email", "IP", "Detalhes"];
     const rows = filteredLogs.map(log => [
@@ -216,6 +254,10 @@ export const ContractAuditTrail = ({ contractId, documentId: _documentId }: Cont
           <Button variant="outline" size="sm" onClick={handleExportJSON}>
             <Download className="mr-1.5 h-4 w-4" />
             JSON
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF}>
+            <Download className="mr-1.5 h-4 w-4" />
+            PDF
           </Button>
         </div>
       </div>

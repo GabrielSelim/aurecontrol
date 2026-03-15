@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +35,19 @@ serve(async (req) => {
   try {
     const { cnpj, check_duplicate = true, exclude_company_id } = await req.json();
 
+    // Rate limit: 30 CNPJ lookups per minute per IP
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const ip = getClientIp(req);
+    const allowed = await checkRateLimit(supabase, `cnpj:${ip}`, 30, 60);
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ valid: false, error: "Muitas requisições. Aguarde um momento." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (!cnpj) {
       return new Response(
         JSON.stringify({ valid: false, error: 'CNPJ não informado' }),
@@ -55,10 +69,6 @@ serve(async (req) => {
 
     // Check if CNPJ already exists in database
     if (check_duplicate) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
       let query = supabase
         .from('companies')
         .select('id, name')

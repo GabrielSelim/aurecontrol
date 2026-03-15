@@ -185,6 +185,17 @@ export async function fetchActiveContractsByCompany(companyId: string) {
   return data ?? [];
 }
 
+export async function searchContractsByCompany(companyId: string, searchQuery: string) {
+  const { data, error } = await supabase
+    .from("contracts")
+    .select("*")
+    .eq("company_id", companyId)
+    .textSearch("search_vector", searchQuery, { type: "plain", config: "portuguese" });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function updateContractStatus(
   contractId: string,
   status: string

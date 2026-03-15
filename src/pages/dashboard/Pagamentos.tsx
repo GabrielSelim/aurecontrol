@@ -755,11 +755,13 @@ const Pagamentos = () => {
     return { count: overdue.length, percent };
   }, [pagamentos]);
 
-  // Chart data: last 6 months
+  // Chart data: dynamic period
+  const [chartPeriod, setChartPeriod] = useState<"3" | "6" | "12">("6");
   const chartData = useMemo(() => {
+    const numMonths = parseInt(chartPeriod, 10);
     const months: { month: string; label: string; pago: number; pendente: number }[] = [];
     
-    for (let i = 5; i >= 0; i--) {
+    for (let i = numMonths - 1; i >= 0; i--) {
       const date = subMonths(new Date(), i);
       const monthKey = format(date, "yyyy-MM");
       const label = format(date, "MMM/yy", { locale: ptBR });
@@ -776,7 +778,7 @@ const Pagamentos = () => {
     }
     
     return months;
-  }, [pagamentos]);
+  }, [pagamentos, chartPeriod]);
 
   // Available periods for filter
   const availablePeriods = useMemo(() => {
@@ -1084,12 +1086,26 @@ const Pagamentos = () => {
         </Card>
       </div>
 
-      {/* Chart - Last 6 months */}
+      {/* Chart - Dynamic period */}
       {!isLoading && pagamentos.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Pagamentos — Últimos 6 meses</CardTitle>
-            <CardDescription>Comparativo entre valores pagos e pendentes por mês</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Pagamentos — Comparativo mensal</CardTitle>
+                <CardDescription>Comparativo entre valores pagos e pendentes por mês</CardDescription>
+              </div>
+              <Select value={chartPeriod} onValueChange={(v) => setChartPeriod(v as "3" | "6" | "12")}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">Últimos 3 meses</SelectItem>
+                  <SelectItem value="6">Últimos 6 meses</SelectItem>
+                  <SelectItem value="12">Últimos 12 meses</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">

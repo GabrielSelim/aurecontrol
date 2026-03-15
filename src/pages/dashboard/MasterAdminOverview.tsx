@@ -6,19 +6,131 @@ import {
 } from "@/hooks/queries/useCompanyQueries";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, FileText, CreditCard, Plus, Eye, TrendingUp, AlertCircle } from "lucide-react";
+import { Building2, FileText, CreditCard, Plus, Eye, TrendingUp, AlertCircle, ChevronRight, X, PartyPopper } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useState, useEffect } from "react";
 
 type GlobalStats = MasterAdminGlobalStats;
 type Company = RecentCompanyWithCounts;
+
+const TOUR_KEY = "master_admin_tour_done_v1";
+
+const TOUR_STEPS = [
+  {
+    title: "Bem-vindo ao Aure! 🎉",
+    description: "Este é o seu painel Master Admin. Vamos fazer um tour rápido pelas principais funcionalidades.",
+    action: null,
+    actionLabel: null,
+  },
+  {
+    title: "Empresas",
+    description: "Cadastre e gerencie as empresas clientes. Cada empresa tem seu próprio conjunto de colaboradores, contratos e pagamentos.",
+    action: "/dashboard/empresas",
+    actionLabel: "Ir para Empresas",
+  },
+  {
+    title: "Contratos PJ Faturáveis",
+    description: "Acompanhe todos os contratos PJ ativos em todas as empresas. Use para controle de faturamento mensal.",
+    action: "/dashboard/contratos-faturaveis",
+    actionLabel: "Ver Contratos PJ",
+  },
+  {
+    title: "Faturamento",
+    description: "Controle os planos e faturamento de cada empresa cliente. Veja o histórico e projeções de receita.",
+    action: "/dashboard/faturamento",
+    actionLabel: "Ver Faturamento",
+  },
+  {
+    title: "Auditoria & LGPD",
+    description: "Acesse os logs de auditoria do sistema e gerencie solicitações LGPD de exclusão de dados.",
+    action: "/dashboard/auditoria",
+    actionLabel: "Ver Auditoria",
+  },
+];
+
+function OnboardingTour({ onDone }: { onDone: () => void }) {
+  const [step, setStep] = useState(0);
+  const navigate = useNavigate();
+  const current = TOUR_STEPS[step];
+  const isLast = step === TOUR_STEPS.length - 1;
+
+  const handleNext = () => {
+    if (isLast) {
+      onDone();
+    } else {
+      setStep((s) => s + 1);
+    }
+  };
+
+  const handleNavigate = () => {
+    if (current.action) {
+      onDone();
+      navigate(current.action);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <Card className="w-full max-w-md mx-4 shadow-2xl border-primary/30">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PartyPopper className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">{current.title}</CardTitle>
+            </div>
+            <Button variant="ghost" size="icon" onClick={onDone} className="h-7 w-7 -mr-1">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex gap-1 mt-1">
+            {TOUR_STEPS.map((_, i) => (
+              <div
+                key={i}
+                className={`h-1 flex-1 rounded-full transition-colors ${i <= step ? "bg-primary" : "bg-muted"}`}
+              />
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground leading-relaxed">{current.description}</p>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">{step + 1} de {TOUR_STEPS.length}</span>
+            <div className="flex gap-2">
+              {current.action && (
+                <Button variant="outline" size="sm" onClick={handleNavigate}>
+                  {current.actionLabel}
+                </Button>
+              )}
+              <Button size="sm" onClick={handleNext} className="gap-1">
+                {isLast ? "Concluir" : "Próximo"}
+                {!isLast && <ChevronRight className="h-4 w-4" />}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 const MasterAdminOverview = () => {
   const { profile } = useAuth();
   useDocumentTitle("Painel Master Admin");
   const navigate = useNavigate();
+  const [showTour, setShowTour] = useState(false);
+
+  useEffect(() => {
+    const done = localStorage.getItem(TOUR_KEY);
+    if (!done) setShowTour(true);
+  }, []);
+
+  const handleTourDone = () => {
+    localStorage.setItem(TOUR_KEY, "1");
+    setShowTour(false);
+  };
 
   // --- TanStack Query -------------------------------------------------------
   const overviewQuery = useMasterAdminOverview();
@@ -46,6 +158,7 @@ const MasterAdminOverview = () => {
 
   return (
     <div className="space-y-6">
+      {showTour && <OnboardingTour onDone={handleTourDone} />}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -56,10 +169,16 @@ const MasterAdminOverview = () => {
             Painel de administração do sistema Aure
           </p>
         </div>
-        <Button onClick={() => navigate("/dashboard/empresas/nova")}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Empresa
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowTour(true)} className="gap-1">
+            <PartyPopper className="h-4 w-4" />
+            Tour
+          </Button>
+          <Button onClick={() => navigate("/dashboard/empresas/nova")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Empresa
+          </Button>
+        </div>
       </div>
 
       {/* Global Stats */}

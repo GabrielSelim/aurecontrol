@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { User, Building2, Lock, Camera, Loader2, Save, Briefcase, MapPin, Bell } from "lucide-react";
+import { User, Building2, Lock, Camera, Loader2, Save, Briefcase, MapPin, Bell, ShieldCheck, Smartphone } from "lucide-react";
 import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
 import { formatCPF, formatPhone, formatCNPJ, validateCPF, validatePhone, validateCNPJ } from "@/lib/masks";
 import { AddressForm } from "@/components/AddressForm";
@@ -94,11 +95,93 @@ export default function Perfil() {
     confirmPassword: "",
   });
 
+  // 2FA / MFA state
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaEnrolling, setMfaEnrolling] = useState(false);
+  const [mfaQR, setMfaQR] = useState<{ qr: string; secret: string; factorId: string } | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaVerifying, setMfaVerifying] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+
   const [errors, setErrors] = useState({
     cpf: "",
     phone: "",
     pj_cnpj: "",
   });
+
+  // Load MFA status on mount
+  useEffect(() => {
+    loadMfaStatus();
+  }, []);
+
+  const loadMfaStatus = async () => {
+    setMfaLoading(true);
+    try {
+      const { data } = await supabase.auth.mfa.listFactors();
+      const verified = data?.all?.find(f => f.factor_type === "totp" && f.status === "verified");
+      setMfaEnabled(!!verified);
+      setMfaFactorId(verified?.id ?? null);
+    } catch (err) {
+      logger.error("MFA status:", err);
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleEnrollMFA = async () => {
+    setMfaEnrolling(true);
+    try {
+      const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", issuer: "Aure" });
+      if (error) throw error;
+      if (data?.totp) {
+        setMfaQR({ qr: data.totp.qr_code, secret: data.totp.secret, factorId: data.id });
+      }
+    } catch (err) {
+      logger.error("MFA enroll:", err);
+      toast.error("Erro ao configurar autenticação em dois fatores.");
+    } finally {
+      setMfaEnrolling(false);
+    }
+  };
+
+  const handleVerifyMFA = async () => {
+    if (!mfaQR || !mfaCode) return;
+    setMfaVerifying(true);
+    try {
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: mfaQR.factorId });
+      if (challengeError) throw challengeError;
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: mfaQR.factorId,
+        challengeId: challengeData.id,
+        code: mfaCode,
+      });
+      if (verifyError) throw verifyError;
+      toast.success("Autenticação em dois fatores ativada com sucesso!");
+      setMfaQR(null);
+      setMfaCode("");
+      await loadMfaStatus();
+    } catch (err) {
+      logger.error("MFA verify:", err);
+      toast.error("Código inválido. Verifique o app autenticador e tente novamente.");
+    } finally {
+      setMfaVerifying(false);
+    }
+  };
+
+  const handleDisableMFA = async () => {
+    if (!mfaFactorId) return;
+    try {
+      const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
+      if (error) throw error;
+      setMfaEnabled(false);
+      setMfaFactorId(null);
+      toast.success("Autenticação em dois fatores desativada.");
+    } catch (err) {
+      logger.error("MFA unenroll:", err);
+      toast.error("Erro ao desativar autenticação em dois fatores.");
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -837,6 +920,76 @@ export default function Perfil() {
                       Alterar Senha
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* 2FA / MFA Card */}
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Smartphone className="h-5 w-5" />
+                    Autenticação em Dois Fatores (2FA)
+                  </CardTitle>
+                  <CardDescription>
+                    Adicione uma camada extra de segurança com um app autenticador (Google Authenticator, Authy, etc.)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {mfaLoading ? (
+                    <Skeleton className="h-10 w-40" />
+                  ) : mfaEnabled ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-green-600">
+                        <ShieldCheck className="h-5 w-5" />
+                        <span className="font-medium">2FA ativo</span>
+                        <Badge variant="default" className="bg-green-600">Protegido</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Sua conta está protegida por autenticação em dois fatores.
+                      </p>
+                      <Button variant="destructive" size="sm" onClick={handleDisableMFA}>
+                        Desativar 2FA
+                      </Button>
+                    </div>
+                  ) : mfaQR ? (
+                    <div className="space-y-4">
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p className="font-medium text-foreground">1. Escaneie o QR Code no seu app autenticador</p>
+                        <p>Ou insira o código manualmente: <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{mfaQR.secret}</code></p>
+                      </div>
+                      <div className="flex justify-center">
+                        <img src={mfaQR.qr} alt="QR Code 2FA" className="w-48 h-48 border rounded-lg" />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">2. Digite o código de 6 dígitos gerado pelo app</p>
+                        <div className="flex gap-2">
+                          <Input
+                            value={mfaCode}
+                            onChange={e => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                            placeholder="000000"
+                            maxLength={6}
+                            className="font-mono text-center text-lg w-32"
+                          />
+                          <Button onClick={handleVerifyMFA} disabled={mfaVerifying || mfaCode.length < 6}>
+                            {mfaVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verificar"}
+                          </Button>
+                          <Button variant="outline" onClick={() => { setMfaQR(null); setMfaCode(""); }}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Sua conta não possui autenticação em dois fatores. Recomendamos ativar para maior segurança.
+                      </p>
+                      <Button onClick={handleEnrollMFA} disabled={mfaEnrolling}>
+                        {mfaEnrolling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Smartphone className="mr-2 h-4 w-4" />}
+                        Ativar Autenticação 2FA
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

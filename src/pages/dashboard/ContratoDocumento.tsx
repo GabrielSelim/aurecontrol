@@ -39,6 +39,7 @@ import {
   Send,
   Shield,
   History,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -301,20 +302,11 @@ const ContratoDocumento = () => {
     }
   };
 
-  const handleDownloadPDF = () => {
-    if (contract && document) {
-      logAuditAction({
-        contractId: contract.id,
-        documentId: document.id,
-        action: "pdf_downloaded",
-        actorName: profile?.full_name || "",
-        actorEmail: profile?.email || "",
-      });
-    }
-    const printWindow = window.open("", "_blank");
-    if (printWindow && document) {
-      // Group signatures by page
-      const signaturesByPage: Record<number, ContractSignature[]> = {};
+  /** Builds the full A4 HTML for print/preview — shared by download and inline preview. */
+  const buildPdfHtml = (): string => {
+    if (!document) return "";
+    // Group signatures by page
+    const signaturesByPage: Record<number, ContractSignature[]> = {};
       signatures.forEach(sig => {
         const page = sig.position_page || 1;
         if (!signaturesByPage[page]) signaturesByPage[page] = [];
@@ -359,170 +351,48 @@ const ContratoDocumento = () => {
 
       // Get all pages that have signatures
       const maxPage = Math.max(...signatures.map(s => s.position_page || 1), 1);
+      const contractUrl = window.location.origin + "/assinar-contrato/" + id;
+      const qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=" + encodeURIComponent(contractUrl);
 
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Contrato - ${contract?.job_title}</title>
-          <style>
-            @page {
-              size: A4;
-              margin: 20mm;
-            }
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 0;
-              padding: 0;
-            }
-            .page {
-              position: relative;
-              min-height: 100vh;
-              padding: 40px;
-              box-sizing: border-box;
-              page-break-after: always;
-            }
-            .page:last-child {
-              page-break-after: auto;
-            }
-            .document-content {
-              position: relative;
-            }
-            .signatures-overlay {
-              position: absolute;
-              top: 0;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              pointer-events: none;
-            }
-            .signature-summary {
-              margin-top: 40px;
-              padding-top: 20px;
-              border-top: 2px solid #374151;
-              page-break-inside: avoid;
-            }
-            .signature-summary h3 {
-              text-align: center;
-              font-size: 14px;
-              font-weight: 700;
-              text-transform: uppercase;
-              letter-spacing: 0.05em;
-              color: #111827;
-              margin-bottom: 24px;
-            }
-            .signatures-grid {
-              display: grid;
-              grid-template-columns: repeat(2, 1fr);
-              gap: 32px;
-            }
-            .signature-block {
-              text-align: center;
-            }
-            .signature-image-area {
-              height: 72px;
-              display: flex;
-              align-items: flex-end;
-              justify-content: center;
-              margin-bottom: 8px;
-            }
-            .signature-image-area img {
-              max-height: 64px;
-              max-width: 200px;
-              object-fit: contain;
-            }
-            .signature-line {
-              border-top: 1px solid #374151;
-              margin: 0 20px 8px;
-            }
-            .signature-name {
-              font-size: 12px;
-              font-weight: 600;
-              color: #111827;
-              margin-bottom: 2px;
-            }
-            .signature-role {
-              font-size: 10px;
-              color: #6b7280;
-              margin-bottom: 2px;
-            }
-            .signature-email {
-              font-size: 10px;
-              color: #6b7280;
-              margin-bottom: 4px;
-            }
-            .signature-date {
-              font-size: 10px;
-              font-weight: 600;
-              color: #16a34a;
-            }
-            .signature-pending {
-              font-size: 10px;
-              color: #9ca3af;
-            }
-            img { max-width: 200px; height: auto; }
-            @media print {
-              .page { min-height: auto; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="page">
-            <div class="document-content">
-              ${document.document_html}
-            </div>
-            <div class="signatures-overlay">
-              ${(signaturesByPage[1] || []).map(generateSignatureOverlay).join('')}
-            </div>
-          </div>
-          
-          ${maxPage > 1 ? Array.from({ length: maxPage - 1 }, (_, i) => i + 2).map(page => `
-            <div class="page">
-              <div class="signatures-overlay" style="position: relative; height: 100vh;">
-                ${(signaturesByPage[page] || []).map(generateSignatureOverlay).join('')}
-              </div>
-            </div>
-          `).join('') : ''}
-          
-          <div class="signature-summary">
-            <h3>Assinaturas Digitais</h3>
-            <div class="signatures-grid">
-              ${signatures.map(s => `
-                <div class="signature-block">
-                  <div class="signature-image-area">
-                    ${s.signature_image_url
-                      ? `<img src="${s.signature_image_url}" alt="Assinatura de ${s.signer_name}" />`
-                      : `<span style="font-size:11px;color:#9ca3af;font-style:italic;">Sem assinatura digital</span>`
-                    }
-                  </div>
-                  <div class="signature-line"></div>
-                  <p class="signature-name">${s.signer_name}</p>
-                  <p class="signature-role">${getSignerTypeLabel(s.signer_type)}${s.signer_type === "witness" ? ` ${s.signer_order || ""}` : ""}</p>
-                  <p class="signature-email">${s.signer_email}</p>
-                  ${s.signed_at
-                    ? `<p class="signature-date">✓ ${format(new Date(s.signed_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>`
-                    : `<p class="signature-pending">⏳ Aguardando assinatura</p>`
-                  }
-                </div>
-              `).join('')}
-            </div>
-          </div>
+      // Pre-compute extra pages HTML
+      const extraPagesHtml = maxPage > 1
+        ? Array.from({ length: maxPage - 1 }, (_, i) => {
+            const page = i + 2;
+            const overlays = (signaturesByPage[page] || []).map(generateSignatureOverlay).join("");
+            return '<div class="page"><div class="signatures-overlay" style="position: relative; height: 100vh;">' + overlays + "</div></div>";
+          }).join("")
+        : "";
 
-          <div style="margin-top: 40px; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px; display: flex; align-items: center; gap: 20px; background: #f9fafb;">
-            <img
-              src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`${window.location.origin}/assinar-contrato/${id}`)}"
-              alt="QR Code de verificação"
-              style="width: 100px; height: 100px; border-radius: 4px;"
-            />
-            <div>
-              <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #111;">Verificação de Autenticidade</p>
-              <p style="margin: 0 0 4px 0; font-size: 11px; color: #666;">Aponte a câmera para o QR Code ou acesse o link para verificar a autenticidade deste contrato:</p>
-              <p style="margin: 0; font-size: 10px; color: #888; word-break: break-all;">${window.location.origin}/assinar-contrato/${id}</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `);
+      // Pre-compute signatures summary HTML
+      const signaturesHtml = signatures.map(s => {
+        const imgHtml = s.signature_image_url
+          ? '<img src="' + s.signature_image_url + '" alt="Assinatura de ' + s.signer_name + '" />'
+          : '<span style="font-size:11px;color:#9ca3af;font-style:italic;">Sem assinatura digital</span>';
+        const roleText = getSignerTypeLabel(s.signer_type) + (s.signer_type === "witness" ? " " + (s.signer_order || "") : "");
+        const dateHtml = s.signed_at
+          ? '<p class="signature-date">\u2713 ' + format(new Date(s.signed_at), "dd/MM/yyyy '\u00e0s' HH:mm", { locale: ptBR }) + "</p>"
+          : '<p class="signature-pending">\u23f3 Aguardando assinatura</p>';
+        return '<div class="signature-block"><div class="signature-image-area">' + imgHtml + '</div><div class="signature-line"></div><p class="signature-name">' + s.signer_name + '</p><p class="signature-role">' + roleText + '</p><p class="signature-email">' + s.signer_email + "</p>" + dateHtml + "</div>";
+      }).join("");
+
+      const page1Overlays = (signaturesByPage[1] || []).map(generateSignatureOverlay).join("");
+
+      return "<" + "!DOCTYPE html><html><head><title>Contrato - " + (contract?.job_title || "") + "</title><style>@page{size:A4;margin:20mm}body{font-family:Arial,sans-serif;margin:0;padding:0}.page{position:relative;min-height:100vh;padding:40px;box-sizing:border-box;page-break-after:always}.page:last-child{page-break-after:auto}.document-content{position:relative}.signatures-overlay{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none}.signature-summary{margin-top:40px;padding-top:20px;border-top:2px solid #374151;page-break-inside:avoid}.signature-summary h3{text-align:center;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#111827;margin-bottom:24px}.signatures-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:32px}.signature-block{text-align:center}.signature-image-area{height:72px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:8px}.signature-image-area img{max-height:64px;max-width:200px;object-fit:contain}.signature-line{border-top:1px solid #374151;margin:0 20px 8px}.signature-name{font-size:12px;font-weight:600;color:#111827;margin-bottom:2px}.signature-role{font-size:10px;color:#6b7280;margin-bottom:2px}.signature-email{font-size:10px;color:#6b7280;margin-bottom:4px}.signature-date{font-size:10px;font-weight:600;color:#16a34a}.signature-pending{font-size:10px;color:#9ca3af}img{max-width:200px;height:auto}@media print{.page{min-height:auto}}</style></head><body><div class=\"page\"><div class=\"document-content\">" + document.document_html + '</div><div class="signatures-overlay">' + page1Overlays + "</div></div>" + extraPagesHtml + '<div class="signature-summary"><h3>Assinaturas Digitais</h3><div class="signatures-grid">' + signaturesHtml + '</div></div><div style="margin-top:40px;padding:20px;border:1px solid #e5e7eb;border-radius:8px;display:flex;align-items:center;gap:20px;background:#f9fafb;"><img src="' + qrCodeUrl + '" alt="QR Code de verificação" style="width:100px;height:100px;border-radius:4px;" /><div><p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#111;">Verificação de Autenticidade</p><p style="margin:0 0 4px 0;font-size:11px;color:#666;">Aponte a câmera para o QR Code ou acesse o link para verificar a autenticidade deste contrato:</p><p style="margin:0;font-size:10px;color:#888;word-break:break-all;">' + contractUrl + "</p></div></div></body></html>";
+  };
+
+  const handleDownloadPDF = () => {
+    if (contract && document) {
+      logAuditAction({
+        contractId: contract.id,
+        documentId: document.id,
+        action: "pdf_downloaded",
+        actorName: profile?.full_name || "",
+        actorEmail: profile?.email || "",
+      });
+    }
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(buildPdfHtml());
       printWindow.document.close();
       printWindow.print();
     }
@@ -611,6 +481,10 @@ const ContratoDocumento = () => {
           <TabsTrigger value="auditoria">
             <History className="h-4 w-4 mr-2" />
             Auditoria
+          </TabsTrigger>
+          <TabsTrigger value="previa">
+            <Eye className="h-4 w-4 mr-2" />
+            Prévia PDF
           </TabsTrigger>
         </TabsList>
 
@@ -813,6 +687,36 @@ const ContratoDocumento = () => {
             contractId={contract?.id || ""}
             documentId={document.id}
           />
+        </TabsContent>
+
+        <TabsContent value="previa" className="mt-6">
+          <Card>
+            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-primary" />
+                  Prévia do PDF
+                </CardTitle>
+                <CardDescription>
+                  Visualização do documento como aparecerá no PDF final, com assinaturas e QR code
+                </CardDescription>
+              </div>
+              <Button variant="outline" onClick={handleDownloadPDF}>
+                <Download className="h-4 w-4 mr-2" />
+                Imprimir / Salvar PDF
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <iframe
+                key={document.id}
+                srcDoc={buildPdfHtml()}
+                title="Prévia PDF do contrato"
+                className="w-full border-0 rounded-b-lg"
+                style={{ height: "80vh", minHeight: 600 }}
+                sandbox="allow-same-origin"
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

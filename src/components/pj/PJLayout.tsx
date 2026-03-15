@@ -15,6 +15,8 @@ import {
   LogOut,
   Menu,
   ChevronDown,
+  FolderOpen,
+  Receipt,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -29,6 +31,8 @@ const PJ_NAV = [
   { name: "Meu Painel", href: "/pj/dashboard", icon: LayoutDashboard },
   { name: "Meus Contratos", href: "/pj/contratos", icon: FileText },
   { name: "Meus Pagamentos", href: "/pj/pagamentos", icon: CreditCard },
+  { name: "Documentos", href: "/pj/documentos", icon: FolderOpen },
+  { name: "Notas Fiscais", href: "/pj/notas-fiscais", icon: Receipt },
   { name: "Meu Perfil", href: "/pj/perfil", icon: Briefcase },
 ];
 

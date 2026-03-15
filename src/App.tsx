@@ -54,6 +54,10 @@ const PJContratos = lazy(() => import("./pages/pj/PJContratos"));
 const PJContratoView = lazy(() => import("./pages/pj/PJContratoView"));
 const PJPagamentos = lazy(() => import("./pages/pj/PJPagamentos"));
 const PJPerfil = lazy(() => import("./pages/pj/PJPerfil"));
+const PJDocumentos = lazy(() => import("./pages/pj/PJDocumentos"));
+const PJNotasFiscais = lazy(() => import("./pages/pj/PJNotasFiscais"));
+const ColaboradorExtrato = lazy(() => import("./pages/dashboard/ColaboradorExtrato"));
+const LGPD = lazy(() => import("./pages/dashboard/LGPD"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -91,6 +95,7 @@ function DashboardRoutes() {
           <Route index element={<DashboardHome />} />
           <Route path="notificacoes" element={<Notificacoes />} />
           <Route path="perfil" element={<Perfil />} />
+          <Route path="lgpd" element={<LGPD />} />
           
           {/* Rotas de colaboradores - admin, gestor, financeiro */}
           <Route path="colaboradores" element={
@@ -106,6 +111,11 @@ function DashboardRoutes() {
           <Route path="colaboradores/:id/editar" element={
             <ProtectedRoute requiredRoles={["master_admin", "admin", "gestor"]}>
               <ColaboradorEditar />
+            </ProtectedRoute>
+          } />
+          <Route path="colaboradores/:id/extrato" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "financeiro"]}>
+              <ColaboradorExtrato />
             </ProtectedRoute>
           } />
           
@@ -234,6 +244,8 @@ function AppRoutes() {
                 <Route path="contratos" element={<PJContratos />} />
                 <Route path="contratos/:id" element={<PJContratoView />} />
                 <Route path="pagamentos" element={<PJPagamentos />} />
+                <Route path="documentos" element={<PJDocumentos />} />
+                <Route path="notas-fiscais" element={<PJNotasFiscais />} />
                 <Route path="perfil" element={<PJPerfil />} />
                 <Route index element={<Navigate to="dashboard" replace />} />
               </Routes>

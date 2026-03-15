@@ -34,7 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Pencil, Mail, Phone, FileText, CreditCard, UserCog } from "lucide-react";
+import { ArrowLeft, Pencil, Mail, Phone, FileText, CreditCard, UserCog, BarChart2 } from "lucide-react";
 import { formatCPF, formatPhone } from "@/lib/masks";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -276,10 +276,16 @@ const ColaboradorDetalhes = () => {
             </p>
           </div>
         </div>
-        <Button onClick={() => navigate(`/dashboard/colaboradores/${id}/editar`)}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Editar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate(`/dashboard/colaboradores/${id}/extrato`)}>
+            <BarChart2 className="mr-2 h-4 w-4" />
+            Ver Extrato
+          </Button>
+          <Button onClick={() => navigate(`/dashboard/colaboradores/${id}/editar`)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Editar
+          </Button>
+        </div>
       </div>
 
       {/* Profile Card */}

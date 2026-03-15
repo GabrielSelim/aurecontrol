@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendEmailViaResend } from "../_shared/resend.ts";
+import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +21,20 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Rate limiting: 10 emails per minute per IP
+    const supabaseService = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+    const ip = getClientIp(req);
+    const allowed = await checkRateLimit(supabaseService, `email:${ip}`, 10, 60);
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ error: "Muitas requisições. Aguarde um momento." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Verify authentication
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {

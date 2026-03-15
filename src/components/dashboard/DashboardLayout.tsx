@@ -24,6 +24,7 @@ import {
   Search,
   Briefcase,
   ShieldCheck,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -61,6 +62,7 @@ const navigationItems = {
   notificacoes: { name: "Notificações", href: "/dashboard/notificacoes", icon: Bell },
   configuracoes: { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
   auditoria: { name: "Auditoria", href: "/dashboard/auditoria", icon: ShieldCheck },
+  lgpd: { name: "LGPD / Privacidade", href: "/dashboard/lgpd", icon: Scale },
   // PJ
   pjDashboard: { name: "Meu Painel", href: "/pj/dashboard", icon: LayoutDashboard },
   pjContratos: { name: "Meus Contratos", href: "/pj/contratos", icon: FileText },
@@ -76,6 +78,7 @@ const masterAdminNavigation = [
   navigationItems.notificacoes,
   navigationItems.configuracoes,
   navigationItems.auditoria,
+  navigationItems.lgpd,
 ];
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -155,7 +158,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         navigationItems.templatesContrato,
         navigationItems.pagamentos,
         navigationItems.convites,
-        navigationItems.empresa
+        navigationItems.empresa,
+        navigationItems.lgpd
       );
       return nav;
     }
@@ -175,6 +179,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     if (hasRole("financeiro")) {
       nav.push(navigationItems.pagamentos);
     }
+
+    // LGPD available to all non-PJ authenticated users
+    nav.push(navigationItems.lgpd);
     
     return nav;
   };

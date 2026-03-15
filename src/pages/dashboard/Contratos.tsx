@@ -11,6 +11,7 @@ import {
   createContractSplits,
   updateContractStatus,
   fetchDocumentHtml,
+  searchContractsByCompany,
 } from "@/services/contractService";
 import {
   fetchProfilesByCompany,
@@ -213,6 +214,8 @@ const Contratos = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm);
+  const [fullTextMode, setFullTextMode] = useState(false);
+  const [fullTextResults, setFullTextResults] = useState<Contract[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
@@ -273,6 +276,28 @@ const Contratos = () => {
   const [overdueContracts, setOverdueContracts] = useState<Set<string>>(new Set());
   // Contracts that have no payments at all
   const [noPaymentContracts, setNoPaymentContracts] = useState<Set<string>>(new Set());
+
+  // Full-text search effect — fires when fullTextMode is on and query >= 3 chars
+  useEffect(() => {
+    if (!fullTextMode || !profile?.company_id) {
+      setFullTextResults([]);
+      return;
+    }
+    if (debouncedSearchTerm.trim().length < 3) {
+      setFullTextResults([]);
+      return;
+    }
+    searchContractsByCompany(profile.company_id, debouncedSearchTerm.trim())
+      .then(async (data) => {
+        const userIds = [...new Set(data.map((c: any) => c.user_id))];
+        const profilesData = userIds.length > 0
+          ? await fetchProfilesByUserIds(userIds, "user_id, full_name, email")
+          : [];
+        const profileMap = new Map(profilesData.map((p: any) => [p.user_id, p]));
+        setFullTextResults(data.map((c: any) => ({ ...c, profile: profileMap.get(c.user_id) || undefined })));
+      })
+      .catch(() => setFullTextResults([]));
+  }, [fullTextMode, debouncedSearchTerm, profile?.company_id]);
 
   useEffect(() => {
     fetchContratos();
@@ -1172,10 +1197,13 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
 
   const [quickFilter, setQuickFilter] = useState<"" | "expiring30" | "noPayment">("")
 
-  const filteredContratos = useMemo(() => contratos.filter((c) => {
-    const matchesSearch =
-      c.profile?.full_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-      c.job_title.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+  const filteredContratos = useMemo(() => {
+    const source = fullTextMode && debouncedSearchTerm.trim().length >= 3 ? fullTextResults : contratos;
+    return source.filter((c) => {
+    const matchesSearch = fullTextMode
+      ? true // already filtered by DB
+      : c.profile?.full_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        c.job_title.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
     const matchesType = typeFilter === "all" || c.contract_type === typeFilter;
     const matchesQuick = !quickFilter || 
@@ -1185,7 +1213,8 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       })()) ||
       (quickFilter === "noPayment" && noPaymentContracts.has(c.id));
     return matchesSearch && matchesStatus && matchesType && matchesQuick;
-  }), [contratos, debouncedSearchTerm, statusFilter, typeFilter, quickFilter, noPaymentContracts]);
+  });
+  }, [contratos, fullTextResults, fullTextMode, debouncedSearchTerm, statusFilter, typeFilter, quickFilter, noPaymentContracts]);
 
   // Total comprometido mensal (contratos ativos)
   const totalComprometido = contratos
@@ -2111,12 +2140,26 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nome ou cargo..."
+                placeholder={fullTextMode ? "Busca inteligente (mín. 3 caracteres)..." : "Buscar por nome ou cargo..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={fullTextMode ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => { setFullTextMode((v) => !v); setSearchTerm(""); }}
+                  className="gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  {fullTextMode ? "Busca inteligente ON" : "Busca inteligente"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Busca full-text no banco de dados</TooltipContent>
+            </Tooltip>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Status" />
