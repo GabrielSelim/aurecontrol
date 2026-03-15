@@ -21,6 +21,112 @@ interface WebhookPayload {
   };
 }
 
+// ─── Reminder mode: find pending_signature contracts ≥ 3 days old ───────────
+async function handleReminderMode(supabase: ReturnType<typeof createClient>) {
+  const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: pendingContracts, error } = await supabase
+    .from("contracts")
+    .select(`
+      id, job_title, company_id, user_id, created_at,
+      companies:company_id (name),
+      profiles:user_id (full_name, email)
+    `)
+    .eq("status", "pending_signature")
+    .lte("created_at", cutoff);
+
+  if (error) {
+    console.error("Error fetching pending contracts:", error);
+    return { reminders: 0 };
+  }
+
+  if (!pendingContracts || pendingContracts.length === 0) {
+    console.log("No contracts pending signature for ≥3 days");
+    return { reminders: 0 };
+  }
+
+  let reminders = 0;
+
+  for (const contract of pendingContracts) {
+    // Fetch pending signers (not yet signed)
+    const { data: pendingSigners } = await supabase
+      .from("contract_signatures")
+      .select("signer_email, signer_name, signer_type")
+      .is("signed_at", null)
+      .eq("contract_id", contract.id);
+
+    if (!pendingSigners || pendingSigners.length === 0) continue;
+
+    const companyName = (contract.companies as any)?.name || "Empresa";
+    const collaboratorName = (contract.profiles as any)?.full_name || "Colaborador";
+    const daysPending = Math.floor(
+      (Date.now() - new Date(contract.created_at).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    for (const signer of pendingSigners) {
+      // Check idempotency — don't send more than one reminder per day per signer
+      const todayKey = `reminder_${contract.id}_${signer.signer_email}_${new Date().toISOString().slice(0, 10)}`;
+      const { data: existing } = await supabase
+        .from("notification_logs")
+        .select("id")
+        .eq("notification_type", "signature_reminder")
+        .eq("recipient_email", signer.signer_email)
+        .filter("metadata->>idempotency_key", "eq", todayKey)
+        .maybeSingle();
+
+      if (existing) continue;
+
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #f59e0b;">⏳ Lembrete: Contrato aguardando sua assinatura</h2>
+          <p>Olá <strong>${signer.signer_name}</strong>,</p>
+          <p>O contrato PJ <strong>${contract.job_title}</strong> com <strong>${companyName}</strong>
+             está aguardando sua assinatura há <strong>${daysPending} dia${daysPending > 1 ? "s" : ""}</strong>.</p>
+          <p>Por favor, acesse o sistema para assinar o contrato o quanto antes.</p>
+          <p style="margin: 24px 0;">
+            <a href="${Deno.env.get("SUPABASE_URL")?.replace("/rest/v1", "").replace("http://supabase-kong:8000", "https://aurecontrol.com.br")}/assinar-contrato/${contract.id}"
+               style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
+              Assinar Contrato
+            </a>
+          </p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />
+          <p style="color:#6b7280;font-size:12px;">Este lembrete foi enviado automaticamente pelo Aure System.
+          Colaborador: ${collaboratorName}</p>
+        </div>
+      `;
+
+      try {
+        await sendEmailViaResend(
+          signer.signer_email,
+          `⏳ Lembrete: Contrato aguardando assinatura — ${companyName}`,
+          html
+        );
+        await supabase.from("notification_logs").insert({
+          notification_type: "signature_reminder",
+          recipient_email: signer.signer_email,
+          subject: `Lembrete: Contrato aguardando assinatura — ${companyName}`,
+          status: "sent",
+          company_id: contract.company_id,
+          metadata: { contract_id: contract.id, days_pending: daysPending, idempotency_key: todayKey },
+        });
+        reminders++;
+      } catch (err) {
+        console.error(`Failed to send reminder to ${signer.signer_email}:`, err);
+        await supabase.from("notification_logs").insert({
+          notification_type: "signature_reminder",
+          recipient_email: signer.signer_email,
+          subject: `Lembrete: Contrato aguardando assinatura — ${companyName}`,
+          status: "failed",
+          company_id: contract.company_id,
+          metadata: { contract_id: contract.id, days_pending: daysPending, idempotency_key: todayKey, error: String(err) },
+        });
+      }
+    }
+  }
+
+  return { reminders };
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -32,12 +138,24 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const payload: WebhookPayload = await req.json();
-    
+    const body = await req.json().catch(() => ({}));
+
+    // ── reminder_mode: called by pg_cron daily ─────────────────────────────
+    if (body.reminder_mode === true) {
+      const result = await handleReminderMode(supabaseClient);
+      return new Response(
+        JSON.stringify({ success: true, ...result }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── webhook mode: called when contract_documents updated ───────────────
+    const payload = body as WebhookPayload;
+
     // Only process when signature_status changes to 'completed'
     if (
-      payload.record.signature_status !== "completed" ||
-      payload.old_record.signature_status === "completed"
+      payload.record?.signature_status !== "completed" ||
+      payload.old_record?.signature_status === "completed"
     ) {
       return new Response(
         JSON.stringify({ message: "Not a completion event, skipping" }),
