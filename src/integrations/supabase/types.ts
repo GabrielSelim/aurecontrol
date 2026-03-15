@@ -1688,6 +1688,99 @@ export type Database = {
         }
         Relationships: []
       }
+      lgpd_deletion_requests: {
+        Row: {
+          id: string
+          user_id: string
+          requester_email: string
+          reason: string | null
+          status: "pending" | "in_review" | "completed" | "rejected"
+          rejection_reason: string | null
+          anonymized_at: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          requester_email: string
+          reason?: string | null
+          status?: "pending" | "in_review" | "completed" | "rejected"
+          rejection_reason?: string | null
+          anonymized_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          requester_email?: string
+          reason?: string | null
+          status?: "pending" | "in_review" | "completed" | "rejected"
+          rejection_reason?: string | null
+          anonymized_at?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pj_documents: {
+        Row: {
+          id: string
+          user_id: string
+          company_id: string | null
+          document_type: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          mime_type: string | null
+          status: "pending" | "approved" | "rejected"
+          rejection_reason: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          company_id?: string | null
+          document_type: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          mime_type?: string | null
+          status?: "pending" | "approved" | "rejected"
+          rejection_reason?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          company_id?: string | null
+          document_type?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          mime_type?: string | null
+          status?: "pending" | "approved" | "rejected"
+          rejection_reason?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -2077,6 +2170,10 @@ export type Database = {
       is_company_admin: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
+      }
+      anonymize_user_data: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       is_master_admin: { Args: { _user_id: string }; Returns: boolean }
     }

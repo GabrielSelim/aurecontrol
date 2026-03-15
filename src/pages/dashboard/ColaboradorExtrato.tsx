@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchPaymentsByUser } from "@/services/paymentService";
-import { fetchProfile } from "@/services/profileService";
+import { fetchProfileByUserId } from "@/services/profileService";
 import { fetchContractsByUser } from "@/services/contractService";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,8 +77,8 @@ const ColaboradorExtrato = () => {
   const loadData = async () => {
     try {
       const [payments, prof] = await Promise.all([
-        fetchPaymentsByUser(userId!, authProfile!.company_id!),
-        fetchProfile(userId!).catch(() => null),
+        fetchPaymentsByUser(userId!),
+        fetchProfileByUserId(userId!).catch(() => null),
       ]);
       setPayments(payments as Payment[]);
       if (prof) setProfile({ full_name: prof.full_name, email: prof.email });
