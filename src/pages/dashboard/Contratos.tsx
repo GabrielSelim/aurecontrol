@@ -54,6 +54,7 @@ import {
   RefreshCw,
   Trash2,
   UserPlus,
+  Download,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -1234,6 +1235,37 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     .filter((c) => c.status === "active")
     .reduce((sum, c) => sum + (c.salary || 0), 0);
 
+  const exportToCSV = () => {
+    const statusLabel: Record<string, string> = {
+      active: "Ativo", inactive: "Inativo", terminated: "Encerrado",
+      assinado: "Assinado", enviado: "Aguardando assinaturas", cancelado: "Cancelado",
+    };
+    const typeLabel: Record<string, string> = {
+      CLT: "CLT", PJ: "PJ", freelancer: "Freelancer", estagio: "Estágio", temporario: "Temporário",
+    };
+    const headers = ["Nome", "E-mail", "Cargo", "Tipo", "Departamento", "Início", "Fim", "Salário/Valor", "Status"];
+    const rows = filteredContratos.map((c) => [
+      c.profile?.full_name ?? "",
+      c.profile?.email ?? "",
+      c.job_title,
+      typeLabel[c.contract_type] ?? c.contract_type,
+      c.department ?? "",
+      c.start_date ? format(new Date(c.start_date), "dd/MM/yyyy", { locale: ptBR }) : "",
+      c.end_date ? format(new Date(c.end_date), "dd/MM/yyyy", { locale: ptBR }) : "",
+      c.salary != null ? c.salary.toFixed(2).replace(".", ",")
+        : c.hourly_rate != null ? c.hourly_rate.toFixed(2).replace(".", ",")
+        : "",
+      statusLabel[c.status] ?? c.status,
+    ]);
+    const csvContent = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `contratos_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    toast.success("Contratos exportados com sucesso!");
+  };
+
   return (
     <div className="space-y-6">
       {/* Alert Banner */}
@@ -1259,6 +1291,11 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
             Gerencie os contratos dos colaboradores
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportToCSV} title="Exportar lista filtrada como CSV">
+            <Download className="mr-2 h-4 w-4" />
+            Exportar CSV
+          </Button>
         {isAdmin() && (
           <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setIsDialogOpen(open); }}>
             <DialogTrigger asChild>
@@ -2102,6 +2139,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
             </DialogContent>
           </Dialog>
         )}
+        </div>
       </div>
 
       {/* List */}
