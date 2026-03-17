@@ -4,12 +4,12 @@
 -- ============================================================
 
 -- 1. PRICING TIERS
-INSERT INTO public.pricing_tiers (id, name, min_contracts, max_contracts, price_per_contract, is_active) VALUES
-  ('8f88c5cd-c31a-40af-87a6-cc8ce95e83b8', 'Básico', 1, 10, 49.90, true),
-  ('d2895b4b-6a7d-4587-a887-2d7e3c2c86db', 'Profissional', 11, 50, 44.90, true),
-  ('4b201668-b7a2-41e1-8beb-d0640b6ceacc', 'Empresarial', 51, 100, 39.90, true),
-  ('d1e8764f-9204-43be-a07d-a99cab54087c', 'Enterprise', 101, NULL, 34.90, true)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.pricing_tiers (name, min_contracts, max_contracts, price_per_contract, is_active) VALUES
+  ('Básico', 1, 10, 49.90, true),
+  ('Profissional', 11, 50, 44.90, true),
+  ('Empresarial', 51, 100, 39.90, true),
+  ('Enterprise', 101, NULL, 34.90, true)
+ON CONFLICT (min_contracts) DO NOTHING;
 
 -- 2. SYSTEM SETTINGS
 INSERT INTO public.system_settings (id, key, value, description) VALUES
