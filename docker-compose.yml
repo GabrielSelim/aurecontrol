@@ -255,6 +255,9 @@ services:
       VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT:-false}"
       RESEND_API_KEY: ${RESEND_API_KEY}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL}
+      ASAAS_API_KEY: ${ASAAS_API_KEY}
+      ASAAS_SANDBOX: ${ASAAS_SANDBOX:-true}
+      ASAAS_WEBHOOK_TOKEN: ${ASAAS_WEBHOOK_TOKEN}
     networks:
       - aurecontrol
 
