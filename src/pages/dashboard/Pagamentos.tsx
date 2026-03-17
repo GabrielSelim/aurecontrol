@@ -38,6 +38,8 @@ import {
   FileCheck,
   FileClock,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -146,6 +148,7 @@ const Pagamentos = () => {
   } | null>(null);
 
   const canManagePayments = isAdmin() || hasRole("financeiro");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Auto-fill when contract is selected
   const handleContractSelect = async (contractId: string) => {
@@ -602,6 +605,8 @@ const Pagamentos = () => {
     }
   };
 
+  const PAGAMENTOS_PER_PAGE = 30;
+
   const filteredPagamentos = useMemo(() => {
     return pagamentos.filter((p) => {
       const matchesSearch =
@@ -622,6 +627,9 @@ const Pagamentos = () => {
   }, [pagamentos, debouncedSearchTerm, statusFilter, periodFilter, contractFilter]);
 
   const toggleSelectAll = useCallback(() => {
+    // pagination reset
+    setCurrentPage(1);
+
     const pendingIds = filteredPagamentos
       .filter((p) => p.status === "pending")
       .map((p) => p.id);
@@ -633,6 +641,12 @@ const Pagamentos = () => {
       setSelectedIds(new Set(pendingIds));
     }
   }, [filteredPagamentos, selectedIds]);
+
+  const totalPagamentosPages = Math.max(1, Math.ceil(filteredPagamentos.length / PAGAMENTOS_PER_PAGE));
+  const paginatedPagamentos = filteredPagamentos.slice(
+    (currentPage - 1) * PAGAMENTOS_PER_PAGE,
+    currentPage * PAGAMENTOS_PER_PAGE
+  );
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -1283,7 +1297,7 @@ const Pagamentos = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPagamentos.map((pagamento) => (
+                  paginatedPagamentos.map((pagamento) => (
                     <TableRow key={pagamento.id} className={selectedIds.has(pagamento.id) ? "bg-primary/5" : ""}>
                       {canManagePayments && (
                         <TableCell>
@@ -1419,6 +1433,39 @@ const Pagamentos = () => {
           </div>
         </CardContent>
       </Card>
+      {/* Pagination */}
+      {totalPagamentosPages > 1 && (
+        <div className="flex items-center justify-between px-2 py-3">
+          <p className="text-sm text-muted-foreground">
+            Exibindo {(currentPage - 1) * PAGAMENTOS_PER_PAGE + 1}–{Math.min(currentPage * PAGAMENTOS_PER_PAGE, filteredPagamentos.length)} de {filteredPagamentos.length}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            {Array.from({ length: totalPagamentosPages }, (_, i) => i + 1)
+              .filter(p => Math.abs(p - currentPage) <= 1 || p === 1 || p === totalPagamentosPages)
+              .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("…");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((item, idx) =>
+                item === "…" ? (
+                  <span key={`e${idx}`} className="px-2 text-muted-foreground text-sm">…</span>
+                ) : (
+                  <Button key={item} variant={currentPage === item ? "default" : "outline"} size="icon" className="h-8 w-8 text-xs" onClick={() => setCurrentPage(item as number)}>
+                    {item}
+                  </Button>
+                )
+              )}
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalPagamentosPages} onClick={() => setCurrentPage(p => Math.min(totalPagamentosPages, p + 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Batch Approve Confirmation Dialog */}
       {batchApproveDialog && (
         <Dialog

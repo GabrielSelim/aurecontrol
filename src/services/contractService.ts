@@ -208,6 +208,17 @@ export async function updateContractStatus(
   if (error) throw error;
 }
 
+export async function updateContractFields(
+  contractId: string,
+  fields: Record<string, string | null>
+) {
+  const { error } = await supabase
+    .from("contracts")
+    .update(fields as never)
+    .eq("id", contractId);
+  if (error) throw error;
+}
+
 export async function countContractsByCompany(
   companyId: string,
   contractType?: string

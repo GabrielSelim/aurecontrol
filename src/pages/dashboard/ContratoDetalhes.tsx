@@ -8,6 +8,7 @@ import {
   updateSignature,
   fetchSignatureToken,
   updateContractStatus,
+  updateContractFields,
 } from "@/services/contractService";
 import { fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { sendEmail, gerarObrigacoesPJ } from "@/services/edgeFunctionService";
@@ -44,6 +45,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -195,6 +203,20 @@ const ContratoDetalhes = () => {
   const [isHoleritoOpen, setIsHoleritoOpen] = useState(false);
   const [holeritoMonth, setHoleritoMonth] = useState("");
   const [companyInfo, setCompanyInfo] = useState<{ name: string; cnpj?: string | null; address?: string | null } | null>(null);
+  // CLT/eSocial edit state
+  const [editingCLT, setEditingCLT] = useState(false);
+  const [isSavingCLT, setIsSavingCLT] = useState(false);
+  const [cltForm, setCltForm] = useState<{
+    clt_employee_id: string; clt_ctps_number: string; clt_ctps_series: string;
+    clt_cbo_code: string; clt_work_regime: string; pis_pasep: string;
+    data_admissao: string; esocial_categoria: string; grau_instrucao: string;
+    raca_cor: string; estado_civil: string;
+  }>({
+    clt_employee_id: "", clt_ctps_number: "", clt_ctps_series: "",
+    clt_cbo_code: "", clt_work_regime: "", pis_pasep: "",
+    data_admissao: "", esocial_categoria: "", grau_instrucao: "",
+    raca_cor: "", estado_civil: "",
+  });
 
   // Compute SHA-256 of document_html for integrity verification
   useEffect(() => {
@@ -352,6 +374,44 @@ const ContratoDetalhes = () => {
       setGoals(data);
     } catch (err) {
       logger.error("loadGoals error:", err);
+    }
+  };
+
+  const openCLTEdit = () => {
+    if (!contract) return;
+    setCltForm({
+      clt_employee_id: contract.clt_employee_id ?? "",
+      clt_ctps_number: contract.clt_ctps_number ?? "",
+      clt_ctps_series: contract.clt_ctps_series ?? "",
+      clt_cbo_code: contract.clt_cbo_code ?? "",
+      clt_work_regime: contract.clt_work_regime ?? "",
+      pis_pasep: contract.pis_pasep ?? "",
+      data_admissao: contract.data_admissao ?? "",
+      esocial_categoria: contract.esocial_categoria ?? "",
+      grau_instrucao: contract.grau_instrucao ?? "",
+      raca_cor: contract.raca_cor ?? "",
+      estado_civil: contract.estado_civil ?? "",
+    });
+    setEditingCLT(true);
+  };
+
+  const saveCLTFields = async () => {
+    if (!contract) return;
+    setIsSavingCLT(true);
+    try {
+      const fields = Object.fromEntries(
+        Object.entries(cltForm).map(([k, v]) => [k, v.trim() || null])
+      );
+      await updateContractFields(contract.id, fields);
+      // Update local state
+      setContract((prev) => prev ? { ...prev, ...fields } : prev);
+      setEditingCLT(false);
+      toast({ title: "Dados trabalhistas atualizados" });
+    } catch (err) {
+      logger.error("saveCLTFields:", err);
+      toast({ title: "Erro ao salvar", variant: "destructive" });
+    } finally {
+      setIsSavingCLT(false);
     }
   };
 
@@ -1061,111 +1121,161 @@ const ContratoDetalhes = () => {
         </Card>
 
         {/* Dados Trabalhistas CLT */}
-        {contract.contract_type !== "PJ" && (contract.clt_employee_id || contract.clt_ctps_number || contract.clt_cbo_code || contract.clt_work_regime) && (
+        {contract.contract_type !== "PJ" && (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
                 Dados Trabalhistas
               </CardTitle>
+              {isAdmin() && !editingCLT && (
+                <Button variant="outline" size="sm" onClick={openCLTEdit}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                {contract.clt_employee_id && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Matrícula</p>
-                    <p className="font-medium">{contract.clt_employee_id}</p>
-                  </div>
-                )}
-                {contract.clt_cbo_code && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Código CBO</p>
-                    <p className="font-medium">{contract.clt_cbo_code}</p>
-                  </div>
-                )}
-              </div>
-              {(contract.clt_ctps_number || contract.clt_ctps_series) && (
+              {editingCLT ? (
                 <>
-                  <Separator />
                   <div className="grid grid-cols-2 gap-4">
-                    {contract.clt_ctps_number && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Nº CTPS</p>
-                        <p className="font-medium">{contract.clt_ctps_number}</p>
-                      </div>
-                    )}
-                    {contract.clt_ctps_series && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Série CTPS</p>
-                        <p className="font-medium">{contract.clt_ctps_series}</p>
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Matrícula</Label>
+                      <Input value={cltForm.clt_employee_id} onChange={e => setCltForm(f => ({ ...f, clt_employee_id: e.target.value }))} placeholder="Ex: 00123" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Código CBO</Label>
+                      <Input value={cltForm.clt_cbo_code} onChange={e => setCltForm(f => ({ ...f, clt_cbo_code: e.target.value }))} placeholder="Ex: 2521-05" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Nº CTPS</Label>
+                      <Input value={cltForm.clt_ctps_number} onChange={e => setCltForm(f => ({ ...f, clt_ctps_number: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Série CTPS</Label>
+                      <Input value={cltForm.clt_ctps_series} onChange={e => setCltForm(f => ({ ...f, clt_ctps_series: e.target.value }))} />
+                    </div>
                   </div>
-                </>
-              )}
-              {contract.clt_work_regime && (
-                <>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Regime de Trabalho</p>
-                    <Badge variant="secondary">
-                      {contract.clt_work_regime === "presencial" ? "Presencial" :
-                       contract.clt_work_regime === "teletrabalho" ? "Teletrabalho (Home Office)" :
-                       contract.clt_work_regime === "hibrido" ? "Híbrido" :
-                       contract.clt_work_regime === "parcial" ? "Jornada Parcial" :
-                       contract.clt_work_regime}
-                    </Badge>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Regime de Trabalho</Label>
+                      <Select value={cltForm.clt_work_regime} onValueChange={v => setCltForm(f => ({ ...f, clt_work_regime: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="presencial">Presencial</SelectItem>
+                          <SelectItem value="teletrabalho">Teletrabalho (Home Office)</SelectItem>
+                          <SelectItem value="hibrido">Híbrido</SelectItem>
+                          <SelectItem value="parcial">Jornada Parcial</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Estado Civil</Label>
+                      <Select value={cltForm.estado_civil} onValueChange={v => setCltForm(f => ({ ...f, estado_civil: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                          <SelectItem value="casado">Casado(a)</SelectItem>
+                          <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                          <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                          <SelectItem value="uniao_estavel">União Estável</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </>
-              )}
-              {(contract.pis_pasep || contract.esocial_categoria || contract.grau_instrucao || contract.raca_cor || contract.estado_civil || contract.data_admissao) && (
-                <>
                   <Separator />
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados eSocial</p>
                   <div className="grid grid-cols-2 gap-4">
-                    {contract.pis_pasep && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">PIS/PASEP</p>
-                        <p className="font-medium font-mono">{contract.pis_pasep}</p>
-                      </div>
-                    )}
-                    {contract.data_admissao && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Data de Admissão</p>
-                        <p className="font-medium">{new Date(contract.data_admissao).toLocaleDateString("pt-BR")}</p>
-                      </div>
-                    )}
-                    {contract.esocial_categoria && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Categoria eSocial</p>
-                        <p className="font-medium">{contract.esocial_categoria}</p>
-                      </div>
-                    )}
-                    {contract.estado_civil && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Estado Civil</p>
-                        <p className="font-medium capitalize">{contract.estado_civil.replace("_", " ")}</p>
-                      </div>
-                    )}
-                    {contract.grau_instrucao && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Grau de Instrução</p>
-                        <p className="font-medium">{{
-                          "01": "Analfabeto", "02": "Fundamental incompleto", "03": "Fundamental completo",
-                          "04": "Médio incompleto", "05": "Médio completo", "06": "Superior incompleto",
-                          "07": "Superior completo", "08": "Pós-graduação", "09": "Mestrado", "10": "Doutorado"
-                        }[contract.grau_instrucao] || contract.grau_instrucao}</p>
-                      </div>
-                    )}
-                    {contract.raca_cor && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Raça/Cor</p>
-                        <p className="font-medium">{{
-                          "1": "Indígena", "2": "Branca", "4": "Preta", "6": "Amarela", "8": "Parda", "9": "Não informado"
-                        }[contract.raca_cor] || contract.raca_cor}</p>
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      <Label className="text-xs">PIS/PASEP</Label>
+                      <Input value={cltForm.pis_pasep} onChange={e => setCltForm(f => ({ ...f, pis_pasep: e.target.value }))} placeholder="000.00000.00-0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Data de Admissão</Label>
+                      <Input type="date" value={cltForm.data_admissao} onChange={e => setCltForm(f => ({ ...f, data_admissao: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Categoria eSocial</Label>
+                      <Input value={cltForm.esocial_categoria} onChange={e => setCltForm(f => ({ ...f, esocial_categoria: e.target.value }))} placeholder="Ex: 101" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Grau de Instrução</Label>
+                      <Select value={cltForm.grau_instrucao} onValueChange={v => setCltForm(f => ({ ...f, grau_instrucao: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="01">Analfabeto</SelectItem>
+                          <SelectItem value="02">Fundamental incompleto</SelectItem>
+                          <SelectItem value="03">Fundamental completo</SelectItem>
+                          <SelectItem value="04">Médio incompleto</SelectItem>
+                          <SelectItem value="05">Médio completo</SelectItem>
+                          <SelectItem value="06">Superior incompleto</SelectItem>
+                          <SelectItem value="07">Superior completo</SelectItem>
+                          <SelectItem value="08">Pós-graduação</SelectItem>
+                          <SelectItem value="09">Mestrado</SelectItem>
+                          <SelectItem value="10">Doutorado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Raça/Cor</Label>
+                      <Select value={cltForm.raca_cor} onValueChange={v => setCltForm(f => ({ ...f, raca_cor: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Indígena</SelectItem>
+                          <SelectItem value="2">Branca</SelectItem>
+                          <SelectItem value="4">Preta</SelectItem>
+                          <SelectItem value="6">Amarela</SelectItem>
+                          <SelectItem value="8">Parda</SelectItem>
+                          <SelectItem value="9">Não informado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button onClick={saveCLTFields} disabled={isSavingCLT}>
+                      {isSavingCLT ? "Salvando…" : "Salvar"}
+                    </Button>
+                    <Button variant="outline" onClick={() => setEditingCLT(false)} disabled={isSavingCLT}>Cancelar</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {(contract.clt_employee_id || contract.clt_ctps_number || contract.clt_cbo_code || contract.clt_work_regime) ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        {contract.clt_employee_id && <div><p className="text-sm text-muted-foreground">Matrícula</p><p className="font-medium">{contract.clt_employee_id}</p></div>}
+                        {contract.clt_cbo_code && <div><p className="text-sm text-muted-foreground">Código CBO</p><p className="font-medium">{contract.clt_cbo_code}</p></div>}
+                      </div>
+                      {(contract.clt_ctps_number || contract.clt_ctps_series) && (
+                        <><Separator />
+                        <div className="grid grid-cols-2 gap-4">
+                          {contract.clt_ctps_number && <div><p className="text-sm text-muted-foreground">Nº CTPS</p><p className="font-medium">{contract.clt_ctps_number}</p></div>}
+                          {contract.clt_ctps_series && <div><p className="text-sm text-muted-foreground">Série CTPS</p><p className="font-medium">{contract.clt_ctps_series}</p></div>}
+                        </div></>
+                      )}
+                      {contract.clt_work_regime && (
+                        <><Separator />
+                        <div><p className="text-sm text-muted-foreground">Regime de Trabalho</p>
+                          <Badge variant="secondary">{{presencial:"Presencial",teletrabalho:"Teletrabalho",hibrido:"Híbrido",parcial:"Jornada Parcial"}[contract.clt_work_regime] || contract.clt_work_regime}</Badge>
+                        </div></>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">Nenhum dado trabalhista cadastrado. Use Editar para preencher.</p>
+                  )}
+                  {(contract.pis_pasep || contract.esocial_categoria || contract.grau_instrucao || contract.raca_cor || contract.estado_civil || contract.data_admissao) && (
+                    <>
+                      <Separator />
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Dados eSocial</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        {contract.pis_pasep && <div><p className="text-sm text-muted-foreground">PIS/PASEP</p><p className="font-medium font-mono">{contract.pis_pasep}</p></div>}
+                        {contract.data_admissao && <div><p className="text-sm text-muted-foreground">Data de Admissão</p><p className="font-medium">{new Date(contract.data_admissao).toLocaleDateString("pt-BR")}</p></div>}
+                        {contract.esocial_categoria && <div><p className="text-sm text-muted-foreground">Categoria eSocial</p><p className="font-medium">{contract.esocial_categoria}</p></div>}
+                        {contract.estado_civil && <div><p className="text-sm text-muted-foreground">Estado Civil</p><p className="font-medium capitalize">{contract.estado_civil.replace("_"," ")}</p></div>}
+                        {contract.grau_instrucao && <div><p className="text-sm text-muted-foreground">Grau de Instrução</p><p className="font-medium">{{"01":"Analfabeto","02":"Fund. incompleto","03":"Fund. completo","04":"Médio incompleto","05":"Médio completo","06":"Superior incompleto","07":"Superior completo","08":"Pós-graduação","09":"Mestrado","10":"Doutorado"}[contract.grau_instrucao]||contract.grau_instrucao}</p></div>}
+                        {contract.raca_cor && <div><p className="text-sm text-muted-foreground">Raça/Cor</p><p className="font-medium">{{"1":"Indígena","2":"Branca","4":"Preta","6":"Amarela","8":"Parda","9":"Não informado"}[contract.raca_cor]||contract.raca_cor}</p></div>}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </CardContent>

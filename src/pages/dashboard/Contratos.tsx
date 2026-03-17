@@ -219,6 +219,7 @@ const Contratos = () => {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [currentPage, setCurrentPage] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isTerminateDialogOpen, setIsTerminateDialogOpen] = useState(false);
@@ -1216,6 +1217,18 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
   });
   }, [contratos, fullTextResults, fullTextMode, debouncedSearchTerm, statusFilter, typeFilter, quickFilter, noPaymentContracts]);
 
+  const CONTRATOS_PER_PAGE = 25;
+  const totalContratosPages = Math.max(1, Math.ceil(filteredContratos.length / CONTRATOS_PER_PAGE));
+  const paginatedContratos = filteredContratos.slice(
+    (currentPage - 1) * CONTRATOS_PER_PAGE,
+    currentPage * CONTRATOS_PER_PAGE
+  );
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, typeFilter, debouncedSearchTerm, fullTextMode, quickFilter]);
+
   // Total comprometido mensal (contratos ativos)
   const totalComprometido = contratos
     .filter((c) => c.status === "active")
@@ -2101,6 +2114,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                 {filteredContratos.length === contratos.length
                   ? `${contratos.length} contrato(s)`
                   : `${filteredContratos.length} de ${contratos.length} contrato(s)`}
+                {totalContratosPages > 1 && ` · pág. ${currentPage}/${totalContratosPages}`}
               </CardDescription>
             </div>
             <div className="flex items-center gap-1 border rounded-lg p-0.5">
@@ -2226,6 +2240,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
 
           <div className="rounded-md border">
             {viewMode === "list" ? (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -2263,7 +2278,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredContratos.map((contrato) => {
+                  paginatedContratos.map((contrato) => {
                     const durationInfo = getDurationDisplay(contrato);
                     const expirationAlert = getExpirationAlert(contrato);
                     return (
@@ -2428,8 +2443,41 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                 )}
               </TableBody>
             </Table>
+            {/* Pagination */}
+            {totalContratosPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Exibindo {(currentPage - 1) * CONTRATOS_PER_PAGE + 1}–{Math.min(currentPage * CONTRATOS_PER_PAGE, filteredContratos.length)} de {filteredContratos.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: totalContratosPages }, (_, i) => i + 1)
+                    .filter(p => Math.abs(p - currentPage) <= 1 || p === 1 || p === totalContratosPages)
+                    .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("…");
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((item, idx) =>
+                      item === "…" ? (
+                        <span key={`e${idx}`} className="px-2 text-muted-foreground text-sm">…</span>
+                      ) : (
+                        <Button key={item} variant={currentPage === item ? "default" : "outline"} size="icon" className="h-8 w-8 text-xs" onClick={() => setCurrentPage(item as number)}>
+                          {item}
+                        </Button>
+                      )
+                    )}
+                  <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage === totalContratosPages} onClick={() => setCurrentPage(p => Math.min(totalContratosPages, p + 1))}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
             ) : (
-              /* Kanban View */
+            /* Kanban View */
               <div className="p-4">
                 {isLoading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">

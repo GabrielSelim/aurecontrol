@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Download, TrendingUp, CreditCard, Calendar, DollarSign } from "lucide-react";
+import { ArrowLeft, Download, TrendingUp, CreditCard, Calendar, DollarSign, Printer } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -121,6 +121,38 @@ const ColaboradorExtrato = () => {
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
 
+  const handleExportPDF = () => {
+    const rows = filtered
+      .sort((a, b) => b.reference_month.localeCompare(a.reference_month))
+      .map(p => {
+        const cfg = STATUS_MAP[p.status] ?? { label: p.status };
+        return `<tr>
+          <td>${format(new Date(p.reference_month), "MMM/yyyy", { locale: ptBR })}</td>
+          <td>${p.description || "—"}</td>
+          <td style="text-align:right">${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(p.amount)}</td>
+          <td>${cfg.label}</td>
+          <td>${p.payment_date ? format(new Date(p.payment_date), "dd/MM/yyyy") : "—"}</td>
+        </tr>`;
+      }).join("");
+
+    const totalPaid = filtered.filter(p => p.status === "paid").reduce((s, p) => s + p.amount, 0);
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Extrato</title>
+      <style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1{font-size:18px;margin-bottom:4px}p.sub{font-size:12px;color:#555;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px 8px;border:1px solid #ddd;text-align:left}th{background:#f3f4f6;font-weight:600}
+      .total{font-size:14px;font-weight:bold;margin-top:16px}@media print{body{padding:0}}</style></head><body>
+      <h1>Extrato Financeiro — ${profile?.full_name ?? ""}</h1>
+      <p class="sub">${profile?.email ?? ""} · Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
+      <table><thead><tr><th>Competência</th><th>Descrição</th><th>Valor</th><th>Status</th><th>Pago em</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="total">Total pago no período: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalPaid)}</p>
+      </body></html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) { toast.error("Permita pop-ups para gerar o PDF"); return; }
+    w.document.write(html);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
+  };
+
   const handleExportCSV = () => {
     const headers = ["Competência", "Descrição", "Valor", "Status", "Data de Pagamento"];
     const rows = filtered.map(p => [
@@ -173,6 +205,10 @@ const ColaboradorExtrato = () => {
           <Button variant="outline" onClick={handleExportCSV} disabled={filtered.length === 0}>
             <Download className="h-4 w-4 mr-2" />
             Exportar CSV
+          </Button>
+          <Button variant="outline" onClick={handleExportPDF} disabled={filtered.length === 0}>
+            <Printer className="h-4 w-4 mr-2" />
+            Exportar PDF
           </Button>
         </div>
       </div>

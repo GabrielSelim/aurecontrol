@@ -58,6 +58,7 @@ const PJDocumentos = lazy(() => import("./pages/pj/PJDocumentos"));
 const PJNotasFiscais = lazy(() => import("./pages/pj/PJNotasFiscais"));
 const ColaboradorExtrato = lazy(() => import("./pages/dashboard/ColaboradorExtrato"));
 const LGPD = lazy(() => import("./pages/dashboard/LGPD"));
+const DocumentosPJRevisao = lazy(() => import("./pages/dashboard/DocumentosPJRevisao"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -96,7 +97,12 @@ function DashboardRoutes() {
           <Route path="notificacoes" element={<Notificacoes />} />
           <Route path="perfil" element={<Perfil />} />
           <Route path="lgpd" element={<LGPD />} />
-          
+          <Route path="documentos-pj" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin"]}>
+              <DocumentosPJRevisao />
+            </ProtectedRoute>
+          } />
+
           {/* Rotas de colaboradores - admin, gestor, financeiro */}
           <Route path="colaboradores" element={
             <ProtectedRoute requiredRoles={["master_admin", "admin", "gestor", "financeiro"]}>

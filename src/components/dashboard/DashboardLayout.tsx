@@ -63,6 +63,7 @@ const navigationItems = {
   configuracoes: { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
   auditoria: { name: "Auditoria", href: "/dashboard/auditoria", icon: ShieldCheck },
   lgpd: { name: "LGPD / Privacidade", href: "/dashboard/lgpd", icon: Scale },
+  documentosPJ: { name: "Documentos PJ", href: "/dashboard/documentos-pj", icon: FileText },
   // PJ
   pjDashboard: { name: "Meu Painel", href: "/pj/dashboard", icon: LayoutDashboard },
   pjContratos: { name: "Meus Contratos", href: "/pj/contratos", icon: FileText },
@@ -159,6 +160,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         navigationItems.pagamentos,
         navigationItems.convites,
         navigationItems.empresa,
+        navigationItems.documentosPJ,
         navigationItems.lgpd
       );
       return nav;
