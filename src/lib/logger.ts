@@ -3,13 +3,12 @@
  *
  * In development, messages are forwarded to the browser console.
  * In production, `info` and `warn` are silenced while `error` still
- * logs — and can be extended to report to an external service
- * (e.g. Sentry, LogRocket) without touching call-sites.
+ * logs to Sentry (when VITE_SENTRY_DSN is configured).
  */
+import { Sentry } from "./sentry";
 
 const isDev = import.meta.env.DEV;
 
- 
 function noop(..._args: unknown[]) {
   // intentionally empty
 }
@@ -21,12 +20,22 @@ export const logger = {
   /** Warnings — silenced in production */
   warn: isDev ? console.warn.bind(console) : noop,
 
-  /** Errors — always logged; hook external reporting here */
+  /** Errors — logged to console in dev, reported to Sentry in production */
   error: (...args: unknown[]) => {
     if (isDev) {
       console.error(...args);
     }
-    // TODO: integrate with Sentry / LogRocket in production
-    // e.g. Sentry.captureException(args[0]);
+    // Report to Sentry (no-op when DSN is not configured)
+    const err = args[0];
+    if (err instanceof Error) {
+      Sentry.captureException(err, {
+        extra: args.length > 1 ? { context: args.slice(1) } : undefined,
+      });
+    } else {
+      Sentry.captureMessage(
+        typeof err === "string" ? err : JSON.stringify(err),
+        "error"
+      );
+    }
   },
 };
