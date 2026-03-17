@@ -29,6 +29,12 @@ export interface BillingWithCompany {
   paid_at: string | null;
   payment_method: string | null;
   created_at: string;
+  // Asaas payment gateway fields
+  asaas_charge_id: string | null;
+  asaas_payment_link: string | null;
+  asaas_pix_payload: string | null;
+  asaas_boleto_url: string | null;
+  asaas_boleto_barcode: string | null;
   company?: {
     name: string;
     cnpj: string;

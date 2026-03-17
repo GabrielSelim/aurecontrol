@@ -89,6 +89,7 @@ export type Database = {
           plan_name: string | null
           updated_at: string | null
           welcome_email_template: string | null
+          asaas_customer_id: string | null
         }
         Insert: {
           address?: string | null
@@ -125,6 +126,7 @@ export type Database = {
           plan_name?: string | null
           updated_at?: string | null
           welcome_email_template?: string | null
+          asaas_customer_id?: string | null
         }
         Update: {
           address?: string | null
@@ -161,6 +163,7 @@ export type Database = {
           plan_name?: string | null
           updated_at?: string | null
           welcome_email_template?: string | null
+          asaas_customer_id?: string | null
         }
         Relationships: [
           {
@@ -193,6 +196,11 @@ export type Database = {
           total: number
           unit_price: number
           updated_at: string | null
+          asaas_charge_id: string | null
+          asaas_payment_link: string | null
+          asaas_pix_payload: string | null
+          asaas_boleto_url: string | null
+          asaas_boleto_barcode: string | null
         }
         Insert: {
           company_id: string
@@ -214,6 +222,11 @@ export type Database = {
           total: number
           unit_price: number
           updated_at?: string | null
+          asaas_charge_id?: string | null
+          asaas_payment_link?: string | null
+          asaas_pix_payload?: string | null
+          asaas_boleto_url?: string | null
+          asaas_boleto_barcode?: string | null
         }
         Update: {
           company_id?: string
@@ -235,6 +248,11 @@ export type Database = {
           total?: number
           unit_price?: number
           updated_at?: string | null
+          asaas_charge_id?: string | null
+          asaas_payment_link?: string | null
+          asaas_pix_payload?: string | null
+          asaas_boleto_url?: string | null
+          asaas_boleto_barcode?: string | null
         }
         Relationships: [
           {

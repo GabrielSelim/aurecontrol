@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { billingGenerateSchema, type BillingGenerateFormData } from "@/schemas/forms";
+import { createAsaasCharge, type AsaasChargeResult } from "@/services/asaasService";
 import {
   useBillingsWithCompanies,
   useActiveCompaniesForBilling,
@@ -31,6 +32,10 @@ import {
   Download,
   Eye,
   DollarSign,
+  QrCode,
+  Copy,
+  ExternalLink,
+  Zap,
 } from "lucide-react";
 import {
   Dialog,
@@ -97,6 +102,46 @@ const Faturamento = () => {
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
   const [markPaidDialogOpen, setMarkPaidDialogOpen] = useState(false);
   const [selectedBilling, setSelectedBilling] = useState<Billing | null>(null);
+
+  // Asaas charge dialog
+  const [asaasDialogOpen, setAsaasDialogOpen] = useState(false);
+  const [asaasData, setAsaasData] = useState<AsaasChargeResult | null>(null);
+  const [asaasBilling, setAsaasBilling] = useState<Billing | null>(null);
+  const [isGeneratingCharge, setIsGeneratingCharge] = useState(false);
+
+  const handleGenerateAsaasCharge = async (billing: Billing) => {
+    // If charge already exists, open dialog with cached data
+    if (billing.asaas_charge_id) {
+      setAsaasBilling(billing);
+      setAsaasData({
+        charge_id: billing.asaas_charge_id,
+        payment_link: billing.asaas_payment_link,
+        pix_payload: billing.asaas_pix_payload,
+        boleto_url: billing.asaas_boleto_url,
+        boleto_barcode: billing.asaas_boleto_barcode,
+      });
+      setAsaasDialogOpen(true);
+      return;
+    }
+
+    setIsGeneratingCharge(true);
+    try {
+      const result = await createAsaasCharge(billing.id);
+      setAsaasBilling(billing);
+      setAsaasData(result);
+      setAsaasDialogOpen(true);
+      await billingsQuery.refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao gerar cobrança");
+    } finally {
+      setIsGeneratingCharge(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    void navigator.clipboard.writeText(text);
+    toast.success("Copiado!");
+  };
 
   // Generate billing form
   const billingForm = useForm<BillingGenerateFormData>({
@@ -360,6 +405,24 @@ const Faturamento = () => {
                             <Eye className="h-4 w-4 mr-2" />
                             Ver Detalhes
                           </DropdownMenuItem>
+                          {(billing.status === "pending" || billing.status === "overdue") && (
+                            <DropdownMenuItem
+                              onClick={() => void handleGenerateAsaasCharge(billing)}
+                              disabled={isGeneratingCharge}
+                            >
+                              {billing.asaas_charge_id ? (
+                                <>
+                                  <QrCode className="h-4 w-4 mr-2 text-green-600" />
+                                  Ver cobrança (Pix/Boleto)
+                                </>
+                              ) : (
+                                <>
+                                  <Zap className="h-4 w-4 mr-2 text-green-600" />
+                                  Gerar cobrança (Pix/Boleto)
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                          )}
                           {billing.status === "pending" && (
                             <DropdownMenuItem
                               onClick={() => {
@@ -453,6 +516,100 @@ const Faturamento = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Asaas Charge Dialog */}
+      <Dialog open={asaasDialogOpen} onOpenChange={setAsaasDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-green-600" />
+              Cobrança gerada
+            </DialogTitle>
+            <DialogDescription>
+              {asaasBilling?.company?.name} —{" "}
+              {asaasBilling && formatCurrency(asaasBilling.total)}{" "}
+              · vence {asaasBilling && formatDate(asaasBilling.due_date)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* PIX */}
+            {asaasData?.pix_payload && (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">PIX — copia e cola</p>
+                <div className="flex justify-center">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(asaasData.pix_payload)}&size=180x180`}
+                    alt="QR Code PIX"
+                    className="rounded-lg border"
+                    width={180}
+                    height={180}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-muted rounded px-3 py-2 break-all font-mono">
+                    {asaasData.pix_payload}
+                  </code>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => copyToClipboard(asaasData.pix_payload!)}
+                    aria-label="Copiar código PIX"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Boleto */}
+            {(asaasData?.boleto_url || asaasData?.boleto_barcode) && (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold">Boleto</p>
+                {asaasData.boleto_barcode && (
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-xs bg-muted rounded px-3 py-2 break-all font-mono">
+                      {asaasData.boleto_barcode}
+                    </code>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => copyToClipboard(asaasData.boleto_barcode!)}
+                      aria-label="Copiar código de barras"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                {asaasData.boleto_url && (
+                  <Button variant="outline" className="w-full" asChild>
+                    <a href={asaasData.boleto_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Abrir boleto
+                    </a>
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Link de pagamento */}
+            {asaasData?.payment_link && (
+              <Button variant="default" className="w-full" asChild>
+                <a href={asaasData.payment_link} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Abrir página de pagamento
+                </a>
+              </Button>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAsaasDialogOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
