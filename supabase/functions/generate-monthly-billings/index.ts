@@ -200,9 +200,13 @@ serve(async (req: Request) => {
     const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
     const dueDateStr = dueDate.toISOString().split("T")[0];
 
+    const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") ?? "";
+    const asaasEnabled = !!ASAAS_API_KEY;
+
     let generated = 0;
     let skipped = 0;
     let emailsSent = 0;
+    let chargesCreated = 0;
     const errors: string[] = [];
 
     for (const company of companies as Company[]) {
@@ -259,17 +263,21 @@ serve(async (req: Request) => {
         const total = subtotal;
 
         // Create billing record
-        const { error: insertError } = await supabase.from("company_billings").insert([{
-          company_id: company.id,
-          reference_month: referenceMonthFull,
-          pj_contracts_count: contractsCount,
-          unit_price: unitPrice,
-          subtotal,
-          total,
-          due_date: dueDateStr,
-          status: "pending",
-          notes: "Fatura gerada automaticamente",
-        }]);
+        const { data: newBilling, error: insertError } = await supabase
+          .from("company_billings")
+          .insert([{
+            company_id: company.id,
+            reference_month: referenceMonthFull,
+            pj_contracts_count: contractsCount,
+            unit_price: unitPrice,
+            subtotal,
+            total,
+            due_date: dueDateStr,
+            status: "pending",
+            notes: "Fatura gerada automaticamente",
+          }])
+          .select("id")
+          .single();
 
         if (insertError) {
           console.error(`Error creating billing for ${company.name}:`, insertError);
@@ -279,6 +287,33 @@ serve(async (req: Request) => {
 
         console.log(`Generated billing for ${company.name}: ${contractsCount} contracts, total: ${total}`);
         generated++;
+
+        // Create Asaas charge automatically if API key is configured
+        if (asaasEnabled && newBilling?.id) {
+          try {
+            const chargeResp = await fetch(
+              `${supabaseUrl}/functions/v1/asaas-create-charge`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({ billing_id: newBilling.id }),
+              }
+            );
+            if (chargeResp.ok) {
+              chargesCreated++;
+              console.log(`Asaas charge created for ${company.name}`);
+            } else {
+              const err = await chargeResp.text();
+              console.error(`Asaas charge failed for ${company.name}:`, err);
+              errors.push(`Asaas ${company.name}: ${err}`);
+            }
+          } catch (asaasErr) {
+            console.error(`Asaas request failed for ${company.name}:`, asaasErr);
+          }
+        }
 
         // Send email notifications
         {
@@ -340,6 +375,7 @@ serve(async (req: Request) => {
       generated,
       skipped,
       emailsSent,
+      chargesCreated,
       errors: errors.length > 0 ? errors : undefined,
     };
 
