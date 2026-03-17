@@ -55,6 +55,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          active_subscription_id: string | null
           address: string | null
           address_cep: string | null
           address_city: string | null
@@ -63,6 +64,7 @@ export type Database = {
           address_number: string | null
           address_state: string | null
           address_street: string | null
+          asaas_customer_id: string | null
           bank_account: string | null
           bank_account_type: string | null
           bank_agency: string | null
@@ -89,9 +91,9 @@ export type Database = {
           plan_name: string | null
           updated_at: string | null
           welcome_email_template: string | null
-          asaas_customer_id: string | null
         }
         Insert: {
+          active_subscription_id?: string | null
           address?: string | null
           address_cep?: string | null
           address_city?: string | null
@@ -100,6 +102,7 @@ export type Database = {
           address_number?: string | null
           address_state?: string | null
           address_street?: string | null
+          asaas_customer_id?: string | null
           bank_account?: string | null
           bank_account_type?: string | null
           bank_agency?: string | null
@@ -126,9 +129,9 @@ export type Database = {
           plan_name?: string | null
           updated_at?: string | null
           welcome_email_template?: string | null
-          asaas_customer_id?: string | null
         }
         Update: {
+          active_subscription_id?: string | null
           address?: string | null
           address_cep?: string | null
           address_city?: string | null
@@ -137,6 +140,7 @@ export type Database = {
           address_number?: string | null
           address_state?: string | null
           address_street?: string | null
+          asaas_customer_id?: string | null
           bank_account?: string | null
           bank_account_type?: string | null
           bank_agency?: string | null
@@ -163,9 +167,15 @@ export type Database = {
           plan_name?: string | null
           updated_at?: string | null
           welcome_email_template?: string | null
-          asaas_customer_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "companies_active_subscription_id_fkey"
+            columns: ["active_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "companies_default_template_id_fkey"
             columns: ["default_template_id"]
@@ -177,6 +187,11 @@ export type Database = {
       }
       company_billings: {
         Row: {
+          asaas_boleto_barcode: string | null
+          asaas_boleto_url: string | null
+          asaas_charge_id: string | null
+          asaas_payment_link: string | null
+          asaas_pix_payload: string | null
           company_id: string
           coupon_id: string | null
           created_at: string | null
@@ -196,13 +211,13 @@ export type Database = {
           total: number
           unit_price: number
           updated_at: string | null
-          asaas_charge_id: string | null
-          asaas_payment_link: string | null
-          asaas_pix_payload: string | null
-          asaas_boleto_url: string | null
-          asaas_boleto_barcode: string | null
         }
         Insert: {
+          asaas_boleto_barcode?: string | null
+          asaas_boleto_url?: string | null
+          asaas_charge_id?: string | null
+          asaas_payment_link?: string | null
+          asaas_pix_payload?: string | null
           company_id: string
           coupon_id?: string | null
           created_at?: string | null
@@ -222,13 +237,13 @@ export type Database = {
           total: number
           unit_price: number
           updated_at?: string | null
+        }
+        Update: {
+          asaas_boleto_barcode?: string | null
+          asaas_boleto_url?: string | null
           asaas_charge_id?: string | null
           asaas_payment_link?: string | null
           asaas_pix_payload?: string | null
-          asaas_boleto_url?: string | null
-          asaas_boleto_barcode?: string | null
-        }
-        Update: {
           company_id?: string
           coupon_id?: string | null
           created_at?: string | null
@@ -248,11 +263,6 @@ export type Database = {
           total?: number
           unit_price?: number
           updated_at?: string | null
-          asaas_charge_id?: string | null
-          asaas_payment_link?: string | null
-          asaas_pix_payload?: string | null
-          asaas_boleto_url?: string | null
-          asaas_boleto_barcode?: string | null
         }
         Relationships: [
           {
@@ -699,6 +709,8 @@ export type Database = {
           payment_frequency: string | null
           salary: number | null
           scope_description: string | null
+          search_vector: unknown
+          seniority: string | null
           start_date: string
           status: Database["public"]["Enums"]["contract_status"] | null
           updated_at: string | null
@@ -727,6 +739,8 @@ export type Database = {
           payment_frequency?: string | null
           salary?: number | null
           scope_description?: string | null
+          search_vector?: unknown
+          seniority?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["contract_status"] | null
           updated_at?: string | null
@@ -755,6 +769,8 @@ export type Database = {
           payment_frequency?: string | null
           salary?: number | null
           scope_description?: string | null
+          search_vector?: unknown
+          seniority?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["contract_status"] | null
           updated_at?: string | null
@@ -947,6 +963,77 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lgpd_deletion_requests: {
+        Row: {
+          anonymized_at: string | null
+          created_at: string
+          id: string
+          reason: string | null
+          rejection_reason: string | null
+          requester_email: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          anonymized_at?: string | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          requester_email: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          anonymized_at?: string | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          requester_email?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lgpd_deletion_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lgpd_deletion_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lgpd_deletion_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lgpd_deletion_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -1347,6 +1434,100 @@ export type Database = {
           },
         ]
       }
+      pj_documents: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          document_type: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          document_type: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          document_type?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pj_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pj_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pj_documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pj_documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pj_documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pj_documents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_tiers: {
         Row: {
           created_at: string | null
@@ -1356,6 +1537,7 @@ export type Database = {
           min_contracts: number
           name: string
           price_per_contract: number
+          subscription_monthly_price: number | null
           updated_at: string | null
         }
         Insert: {
@@ -1366,6 +1548,7 @@ export type Database = {
           min_contracts: number
           name: string
           price_per_contract: number
+          subscription_monthly_price?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -1376,6 +1559,7 @@ export type Database = {
           min_contracts?: number
           name?: string
           price_per_contract?: number
+          subscription_monthly_price?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -1554,6 +1738,30 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          call_count: number
+          created_at: string
+          id: string
+          key: string
+          window_start: string
+        }
+        Insert: {
+          call_count?: number
+          created_at?: string
+          id?: string
+          key: string
+          window_start: string
+        }
+        Update: {
+          call_count?: number
+          created_at?: string
+          id?: string
+          key?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       signature_provider_configs: {
         Row: {
           api_key_secret_name: string | null
@@ -1604,6 +1812,101 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          asaas_charge_id: string | null
+          asaas_payment_link: string | null
+          asaas_pix_payload: string | null
+          company_id: string
+          created_at: string | null
+          cycle: string
+          discount_percent: number
+          ends_at: string | null
+          id: string
+          is_upgrade: boolean
+          monthly_value: number
+          notes: string | null
+          plan_name: string
+          previous_subscription_id: string | null
+          pricing_tier_id: string | null
+          starts_at: string | null
+          status: string
+          total_charged: number
+          updated_at: string | null
+        }
+        Insert: {
+          asaas_charge_id?: string | null
+          asaas_payment_link?: string | null
+          asaas_pix_payload?: string | null
+          company_id: string
+          created_at?: string | null
+          cycle: string
+          discount_percent?: number
+          ends_at?: string | null
+          id?: string
+          is_upgrade?: boolean
+          monthly_value: number
+          notes?: string | null
+          plan_name: string
+          previous_subscription_id?: string | null
+          pricing_tier_id?: string | null
+          starts_at?: string | null
+          status?: string
+          total_charged: number
+          updated_at?: string | null
+        }
+        Update: {
+          asaas_charge_id?: string | null
+          asaas_payment_link?: string | null
+          asaas_pix_payload?: string | null
+          company_id?: string
+          created_at?: string | null
+          cycle?: string
+          discount_percent?: number
+          ends_at?: string | null
+          id?: string
+          is_upgrade?: boolean
+          monthly_value?: number
+          notes?: string | null
+          plan_name?: string
+          previous_subscription_id?: string | null
+          pricing_tier_id?: string | null
+          starts_at?: string | null
+          status?: string
+          total_charged?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_secure"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_previous_subscription_id_fkey"
+            columns: ["previous_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_pricing_tier_id_fkey"
+            columns: ["pricing_tier_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_tiers"
             referencedColumns: ["id"]
           },
         ]
@@ -1703,99 +2006,6 @@ export type Database = {
           key?: string
           updated_at?: string | null
           value?: Json
-        }
-        Relationships: []
-      }
-      lgpd_deletion_requests: {
-        Row: {
-          id: string
-          user_id: string
-          requester_email: string
-          reason: string | null
-          status: "pending" | "in_review" | "completed" | "rejected"
-          rejection_reason: string | null
-          anonymized_at: string | null
-          reviewed_by: string | null
-          reviewed_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          requester_email: string
-          reason?: string | null
-          status?: "pending" | "in_review" | "completed" | "rejected"
-          rejection_reason?: string | null
-          anonymized_at?: string | null
-          reviewed_by?: string | null
-          reviewed_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          requester_email?: string
-          reason?: string | null
-          status?: "pending" | "in_review" | "completed" | "rejected"
-          rejection_reason?: string | null
-          anonymized_at?: string | null
-          reviewed_by?: string | null
-          reviewed_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      pj_documents: {
-        Row: {
-          id: string
-          user_id: string
-          company_id: string | null
-          document_type: string
-          file_name: string
-          file_path: string
-          file_size: number | null
-          mime_type: string | null
-          status: "pending" | "approved" | "rejected"
-          rejection_reason: string | null
-          reviewed_by: string | null
-          reviewed_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          company_id?: string | null
-          document_type: string
-          file_name: string
-          file_path: string
-          file_size?: number | null
-          mime_type?: string | null
-          status?: "pending" | "approved" | "rejected"
-          rejection_reason?: string | null
-          reviewed_by?: string | null
-          reviewed_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          company_id?: string | null
-          document_type?: string
-          file_name?: string
-          file_path?: string
-          file_size?: number | null
-          mime_type?: string | null
-          status?: "pending" | "approved" | "rejected"
-          rejection_reason?: string | null
-          reviewed_by?: string | null
-          reviewed_at?: string | null
-          created_at?: string
-          updated_at?: string
         }
         Relationships: []
       }
@@ -2127,6 +2337,7 @@ export type Database = {
       }
     }
     Functions: {
+      anonymize_user_data: { Args: { p_user_id: string }; Returns: undefined }
       can_view_sensitive_profile_data: {
         Args: { _target_company_id: string; _user_id: string }
         Returns: boolean
@@ -2189,11 +2400,12 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
-      anonymize_user_data: {
-        Args: { p_user_id: string }
-        Returns: undefined
-      }
       is_master_admin: { Args: { _user_id: string }; Returns: boolean }
+      purge_old_logs: { Args: never; Returns: Json }
+      rate_limit_check: {
+        Args: { p_key: string; p_max_calls: number; p_window_seconds?: number }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:
@@ -2366,3 +2578,4 @@ export const Constants = {
     },
   },
 } as const
+

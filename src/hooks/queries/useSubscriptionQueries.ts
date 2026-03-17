@@ -46,9 +46,7 @@ export function useActiveSubscription() {
   const companyId = profile?.company_id;
 
   return useQuery({
-    queryKey: queryKeys.company?.subscription
-      ? queryKeys.company.subscription(companyId!)
-      : ["subscription", "active", companyId],
+    queryKey: ["subscription", "active", companyId],
     queryFn: async (): Promise<Subscription | null> => {
       if (!companyId) return null;
       const { data, error } = await supabase
