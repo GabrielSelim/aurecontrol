@@ -4,18 +4,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, FileText, Users, Percent, Gift, Clock, HelpCircle, ArrowRight } from "lucide-react";
+import { Check, FileText, Users, Percent, Gift, Clock, HelpCircle, ArrowRight, Copy, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { fetchActivePricingTiers } from "@/services/settingsService";
+import { createSubscriptionCheckout, SubscriptionCheckoutResult } from "@/services/asaasService";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { logger } from "@/lib/logger";
+import { toast } from "sonner";
 
 interface PricingTier {
   id: string;
@@ -23,6 +34,7 @@ interface PricingTier {
   min_contracts: number;
   max_contracts: number | null;
   price_per_contract: number;
+  subscription_monthly_price: number | null;
   is_active: boolean;
 }
 
@@ -87,8 +99,55 @@ const faqs = [
 export default function Precos() {
   useDocumentTitle("Preços");
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [pricingTiers, setPricingTiers] = useState<PricingTier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
+  const [checkoutTier, setCheckoutTier] = useState<PricingTier | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [paymentResult, setPaymentResult] = useState<SubscriptionCheckoutResult | null>(null);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+
+  const companyId = (profile as any)?.company_id as string | undefined;
+
+  const handleContratar = (tier: PricingTier) => {
+    if (!user) {
+      navigate(`/registro?plan=${encodeURIComponent(tier.name)}`);
+      return;
+    }
+    setCheckoutTier(tier);
+    setCheckoutOpen(true);
+  };
+
+  const handleConfirmCheckout = async () => {
+    if (!checkoutTier || !companyId) return;
+    setCheckoutLoading(true);
+    try {
+      const result = await createSubscriptionCheckout({
+        company_id: companyId,
+        tier_id: checkoutTier.id,
+        cycle,
+      });
+      setCheckoutOpen(false);
+      setPaymentResult(result);
+      if (result.activated_immediately) {
+        toast.success("Plano ativado com sucesso!");
+      } else {
+        setPaymentDialogOpen(true);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao processar checkout.");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  const getCheckoutPrice = (tier: PricingTier) => {
+    const base = tier.subscription_monthly_price ?? 0;
+    if (cycle === "annual") return base * 12 * 0.85;
+    return base;
+  };
 
   useEffect(() => {
     const fetchPricingTiers = async () => {
@@ -150,11 +209,37 @@ export default function Precos() {
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-                Pacotes por volume
+                Planos de assinatura
               </h2>
               <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-                Quanto mais contratos PJ você gerencia, menor o preço por contrato.
+                Escolha o plano ideal para o tamanho da sua empresa.
               </p>
+              {/* Cycle toggle */}
+              <div className="flex items-center justify-center gap-3 mt-8">
+                <button
+                  onClick={() => setCycle("monthly")}
+                  className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+                    cycle === "monthly"
+                      ? "bg-primary text-primary-foreground shadow"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  Mensal
+                </button>
+                <button
+                  onClick={() => setCycle("annual")}
+                  className={`px-5 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
+                    cycle === "annual"
+                      ? "bg-primary text-primary-foreground shadow"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  Anual
+                  <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                    -15%
+                  </Badge>
+                </button>
+              </div>
             </div>
 
             {isLoading ? (
@@ -199,12 +284,38 @@ export default function Precos() {
                         <CardDescription>
                           {formatContractRange(tier.min_contracts, tier.max_contracts)} contratos PJ
                         </CardDescription>
-                        <div className="pt-4">
-                          <span className="text-4xl font-bold text-foreground">
-                            R$ {tier.price_per_contract.toFixed(2).replace(".", ",")}
-                          </span>
-                          <span className="text-muted-foreground">/contrato/mês</span>
-                        </div>
+                        {tier.subscription_monthly_price ? (
+                          <div className="pt-4">
+                            {cycle === "annual" ? (
+                              <>
+                                <span className="text-4xl font-bold text-foreground">
+                                  R$ {(tier.subscription_monthly_price * 12 * 0.85).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                </span>
+                                <span className="text-muted-foreground">/ano</span>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  R$ {(tier.subscription_monthly_price * 0.85).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-4xl font-bold text-foreground">
+                                  R$ {tier.subscription_monthly_price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                </span>
+                                <span className="text-muted-foreground">/mês</span>
+                              </>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-2">
+                              + R$ {tier.price_per_contract.toFixed(2).replace(".", ",")}/contrato PJ assinado
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="pt-4">
+                            <span className="text-4xl font-bold text-foreground">
+                              R$ {tier.price_per_contract.toFixed(2).replace(".", ",")}
+                            </span>
+                            <span className="text-muted-foreground">/contrato/mês</span>
+                          </div>
+                        )}
                       </CardHeader>
                       <CardContent>
                         <ul className="space-y-3">
@@ -218,9 +329,10 @@ export default function Precos() {
                         <Button 
                           className="w-full mt-6" 
                           variant={isPopular ? "default" : "outline"}
-                          onClick={() => navigate("/registro")}
+                          onClick={() => handleContratar(tier)}
                         >
-                          Começar agora
+                          Contratar
+                          <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                       </CardContent>
                     </Card>
@@ -385,6 +497,105 @@ export default function Precos() {
       </main>
 
       <Footer />
+
+      {/* Checkout confirmation dialog */}
+      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar assinatura</DialogTitle>
+            <DialogDescription>
+              Você está prestes a assinar o plano {checkoutTier?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          {checkoutTier && (
+            <div className="space-y-3 py-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Plano</span>
+                <span className="font-medium">{checkoutTier.name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Ciclo</span>
+                <span className="font-medium">{cycle === "monthly" ? "Mensal" : "Anual (-15%)"}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Valor</span>
+                <span className="font-semibold text-foreground">
+                  R$ {getCheckoutPrice(checkoutTier).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  {cycle === "monthly" ? "/mês" : "/ano"}
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCheckoutOpen(false)} disabled={checkoutLoading}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirmCheckout} disabled={checkoutLoading}>
+              {checkoutLoading ? "Processando..." : "Confirmar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment result dialog */}
+      {paymentResult && (
+        <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Pagamento gerado</DialogTitle>
+              <DialogDescription>
+                Realize o pagamento para ativar seu plano {checkoutTier?.name}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {paymentResult.pix_payload && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">PIX copia e cola:</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 break-all text-xs bg-muted rounded p-2 select-all">
+                      {paymentResult.pix_payload}
+                    </code>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(paymentResult.pix_payload!);
+                        toast.success("PIX copiado!");
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {paymentResult.payment_link && (
+                <a
+                  href={paymentResult.payment_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-primary underline"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir link de pagamento
+                </a>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Valor: R$ {paymentResult.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} &bull; Plano ativo até {new Date(paymentResult.ends_at).toLocaleDateString("pt-BR")}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+                Já paguei
+              </Button>
+              {user && (
+                <Button onClick={() => { setPaymentDialogOpen(false); navigate("/dashboard/meu-plano"); }}>
+                  Ver meu plano
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

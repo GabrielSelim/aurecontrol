@@ -5,3 +5,4 @@ export * from "./useCompanyQueries";
 export * from "./useDashboardQueries";
 export * from "./useBillingQueries";
 export * from "./useInviteQueries";
+export * from "./useSubscriptionQueries";

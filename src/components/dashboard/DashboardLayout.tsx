@@ -64,6 +64,7 @@ const navigationItems = {
   auditoria: { name: "Auditoria", href: "/dashboard/auditoria", icon: ShieldCheck },
   lgpd: { name: "LGPD / Privacidade", href: "/dashboard/lgpd", icon: Scale },
   documentosPJ: { name: "Documentos PJ", href: "/dashboard/documentos-pj", icon: FileText },
+  meuPlano: { name: "Meu Plano", href: "/dashboard/meu-plano", icon: CreditCard },
   // PJ
   pjDashboard: { name: "Meu Painel", href: "/pj/dashboard", icon: LayoutDashboard },
   pjContratos: { name: "Meus Contratos", href: "/pj/contratos", icon: FileText },
@@ -160,6 +161,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         navigationItems.pagamentos,
         navigationItems.convites,
         navigationItems.empresa,
+        navigationItems.meuPlano,
         navigationItems.documentosPJ,
         navigationItems.lgpd
       );
@@ -179,6 +181,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     
     // Financeiro: only payments
     if (hasRole("financeiro")) {
+      nav.push(navigationItems.pagamentos, navigationItems.meuPlano);
       nav.push(navigationItems.pagamentos);
     }
 

@@ -12,38 +12,65 @@ export interface AsaasChargeResult {
   boleto_barcode: string | null;
 }
 
+export interface SubscriptionCheckoutResult {
+  subscription_id: string;
+  charge_id: string | null;
+  payment_link: string | null;
+  pix_payload: string | null;
+  amount: number;
+  cycle: "monthly" | "annual";
+  ends_at: string;
+  activated_immediately: boolean;
+  message?: string;
+}
+
+export interface SubscriptionCheckoutInput {
+  company_id: string;
+  tier_id: string;
+  cycle: "monthly" | "annual";
+  is_upgrade?: boolean;
+}
+
 /* ------------------------------------------------------------------ */
-/*  Service                                                            */
+/*  Billing charges                                                    */
 /* ------------------------------------------------------------------ */
 
 /**
- * Calls the `asaas-create-charge` edge function for a given billing.
- * Returns charge data (PIX payload, boleto URL, etc.) so the UI can
- * display payment instructions to the admin / forward to the client.
- *
- * Idempotent: if the billing already has a charge, returns existing data.
- *
- * @throws Error with a user-friendly message on failure
+ * Creates a PIX/Boleto charge for a billing record in Asaas.
+ * Idempotent — returns existing data if charge already exists.
  */
 export async function createAsaasCharge(
   billingId: string,
 ): Promise<AsaasChargeResult> {
   const { data, error } = await supabase.functions.invoke<AsaasChargeResult>(
     "asaas-create-charge",
-    {
-      body: { billing_id: billingId },
-    },
+    { body: { billing_id: billingId } },
   );
 
-  if (error) {
-    throw new Error(
-      error.message ?? "Erro ao criar cobrança no Asaas. Tente novamente.",
-    );
-  }
-
-  if (!data) {
-    throw new Error("Resposta inválida do servidor de pagamentos.");
-  }
-
+  if (error) throw new Error(error.message ?? "Erro ao criar cobrança no Asaas.");
+  if (!data) throw new Error("Resposta inválida do servidor de pagamentos.");
   return data;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Subscription checkout                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Starts a new subscription checkout or upgrade for a company.
+ * Returns payment link/PIX for the user to complete payment, or
+ * `activated_immediately: true` if no charge is needed (credit covers upgrade).
+ */
+export async function createSubscriptionCheckout(
+  input: SubscriptionCheckoutInput,
+): Promise<SubscriptionCheckoutResult> {
+  const { data, error } = await supabase.functions.invoke<SubscriptionCheckoutResult>(
+    "subscription-checkout",
+    { body: input },
+  );
+
+  if (error) throw new Error(error.message ?? "Erro ao iniciar assinatura.");
+  if (!data) throw new Error("Resposta inválida do servidor.");
+  return data;
+}
+

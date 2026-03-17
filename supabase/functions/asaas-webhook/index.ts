@@ -44,11 +44,43 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // PAID: mark billing as paid
+    // PAID: mark billing OR subscription as paid
     if (PAID_EVENTS.has(event)) {
       const billingId = externalRef || chargeId;
 
-      // Try by externalReference first (our billing UUID), fallback to charge ID
+      // 1. Try subscriptions first (externalReference = subscription UUID)
+      if (externalRef) {
+        const { data: sub } = await supabase
+          .from("subscriptions")
+          .select("id, company_id, previous_subscription_id, plan_name")
+          .eq("id", externalRef)
+          .eq("status", "pending")
+          .maybeSingle();
+
+        if (sub) {
+          // Cancel previous subscription if upgrade
+          if (sub.previous_subscription_id) {
+            await supabase
+              .from("subscriptions")
+              .update({ status: "cancelled", notes: "Substituído por upgrade." })
+              .eq("id", sub.previous_subscription_id);
+          }
+          // Activate subscription
+          await supabase
+            .from("subscriptions")
+            .update({ status: "active" })
+            .eq("id", sub.id);
+          // Update company
+          await supabase
+            .from("companies")
+            .update({ active_subscription_id: sub.id, plan_name: sub.plan_name })
+            .eq("id", sub.company_id);
+          console.log(`Subscription ${sub.id} activated (event: ${event})`);
+          return new Response("ok", { status: 200 });
+        }
+      }
+
+      // 2. Fallback: company_billings
       let query = supabase
         .from("company_billings")
         .update({
@@ -66,8 +98,7 @@ serve(async (req) => {
 
       const { error } = await query;
       if (error) {
-        console.error("Webhook update error:", error.message);
-        // Return 200 anyway so Asaas doesn't retry forever
+        console.error("Webhook billing update error:", error.message);
       } else {
         console.log(`Billing ${billingId} marked as paid (event: ${event})`);
       }

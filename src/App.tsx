@@ -46,6 +46,7 @@ const EmpresaDetalhes = lazy(() => import("./pages/dashboard/EmpresaDetalhes"));
 const Notificacoes = lazy(() => import("./pages/dashboard/Notificacoes"));
 const Perfil = lazy(() => import("./pages/dashboard/Perfil"));
 const Auditoria = lazy(() => import("./pages/dashboard/Auditoria"));
+const MeuPlano = lazy(() => import("./pages/dashboard/MeuPlano"));
 
 // PJ portal pages
 const BemVindo = lazy(() => import("./pages/BemVindo"));
@@ -174,6 +175,13 @@ function DashboardRoutes() {
           <Route path="empresa" element={
             <ProtectedRoute requiredRoles={["master_admin", "admin"]}>
               <Empresa />
+            </ProtectedRoute>
+          } />
+
+          {/* Meu Plano - admin, financeiro */}
+          <Route path="meu-plano" element={
+            <ProtectedRoute requiredRoles={["master_admin", "admin", "financeiro"]}>
+              <MeuPlano />
             </ProtectedRoute>
           } />
           
