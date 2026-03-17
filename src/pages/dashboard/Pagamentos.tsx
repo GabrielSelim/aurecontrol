@@ -40,6 +40,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  BellRing,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -141,6 +142,7 @@ const Pagamentos = () => {
   const [duplicateWarning, setDuplicateWarning] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBatchChecking, setIsBatchChecking] = useState(false);
+  const [isReminding, setIsReminding] = useState<Record<string, boolean>>({});
   const [batchApproveDialog, setBatchApproveDialog] = useState<{
     open: boolean;
     eligible: string[];
@@ -492,6 +494,111 @@ const Pagamentos = () => {
       });
     } catch (error) {
       logger.error("Error sending payment notification:", error);
+    }
+  };
+
+  const sendNfseReminder = async (
+    email: string,
+    userName: string,
+    amount: number,
+    referenceMonth: string
+  ) => {
+    try {
+      const formattedAmount = formatCurrency(amount);
+      const formattedMonth = format(new Date(referenceMonth), "MMMM/yyyy", { locale: ptBR });
+      const portalUrl = `${window.location.origin}/pj/notas-fiscais`;
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .info-box { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+    .info-row:last-child { border-bottom: none; }
+    .label { color: #666; }
+    .value { font-weight: bold; color: #333; }
+    .amount { font-size: 24px; color: #d97706; }
+    .cta { display: block; background: #d97706; color: white !important; text-decoration: none; padding: 14px 28px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; margin: 24px 0; }
+    .alert-box { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 16px; margin: 16px 0; }
+    .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📄 Lembrete: Emita sua NFS-e</h1>
+    </div>
+    <div class="content">
+      <p>Olá <strong>${userName}</strong>,</p>
+      <p>Seu pagamento referente a <strong>${formattedMonth}</strong> está aguardando liberação.</p>
+
+      <div class="alert-box">
+        ⚠️ <strong>Ação necessária:</strong> Para que o pagamento seja aprovado, você precisa emitir a <strong>Nota Fiscal de Serviço (NFS-e)</strong> no portal da sua prefeitura e fazer o upload no sistema.
+      </div>
+
+      <div class="info-box">
+        <div class="info-row">
+          <span class="label">Mês de Referência</span>
+          <span class="value">${formattedMonth}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Valor do Pagamento</span>
+          <span class="value amount">${formattedAmount}</span>
+        </div>
+      </div>
+
+      <p><strong>O que fazer:</strong></p>
+      <ol>
+        <li>Acesse o portal da sua prefeitura e emita a NFS-e referente a <strong>${formattedMonth}</strong></li>
+        <li>Baixe o PDF ou XML da nota emitida</li>
+        <li>Acesse o portal abaixo e faça o upload da nota</li>
+      </ol>
+
+      <a href="${portalUrl}" class="cta">Acessar Portal PJ → Notas Fiscais</a>
+
+      <div class="footer">
+        <p>Este é um email automático do Aure System.</p>
+        <p>Por favor, não responda a este email.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+      await sendEmail({
+        to: email,
+        subject: `📄 Lembrete: Emita sua NFS-e para liberar pagamento de ${formattedMonth}`,
+        html,
+        from_name: "Aure System",
+      });
+    } catch (error) {
+      logger.error("Error sending NFS-e reminder:", error);
+      throw error;
+    }
+  };
+
+  const handleSendNfseReminder = async (payment: Payment) => {
+    if (!payment.profile?.email) {
+      toast.error("E-mail do colaborador não encontrado");
+      return;
+    }
+    setIsReminding(prev => ({ ...prev, [payment.id]: true }));
+    try {
+      await sendNfseReminder(
+        payment.profile.email,
+        payment.profile.full_name,
+        Number(payment.amount),
+        payment.reference_month
+      );
+      toast.success(`Lembrete enviado para ${payment.profile.full_name}`);
+    } catch {
+      toast.error("Erro ao enviar lembrete");
+    } finally {
+      setIsReminding(prev => ({ ...prev, [payment.id]: false }));
     }
   };
 
@@ -887,6 +994,27 @@ const Pagamentos = () => {
       if (result.generated > 0) {
         toast.success(`${result.generated} obrigação(ões) gerada(s) para ${result.month}`);
         fetchPagamentos();
+        // Enviar lembrete de NFS-e para PJs com pagamento pendente no mês gerado
+        const monthStr = result.month; // "YYYY-MM"
+        try {
+          const allData = await fetchPaymentsByCompany(profile!.company_id!);
+          const pending = allData.filter(
+            (p) => p.status === "pending" && (p.reference_month ?? "").startsWith(monthStr)
+          );
+          let reminded = 0;
+          for (const p of pending) {
+            const contractType = contractsMap[p.contract_id]?.contract_type;
+            if (contractType !== "PJ") continue;
+            const prof = await fetchProfileByUserId(p.user_id).catch(() => null);
+            if (prof?.email) {
+              await sendNfseReminder(prof.email, prof.full_name, Number(p.amount), p.reference_month);
+              reminded++;
+            }
+          }
+          if (reminded > 0) toast.info(`${reminded} lembrete(s) de NFS-e enviado(s)`);
+        } catch (err) {
+          logger.error("NFS-e reminders batch error:", err);
+        }
       } else if (result.skipped > 0) {
         toast.info(`Nenhuma nova obrigação gerada para ${result.month} — ${result.skipped} já existia(m)`);
       } else {
@@ -1420,6 +1548,20 @@ const Pagamentos = () => {
                                   <XCircle className="mr-2 h-4 w-4" />
                                   Rejeitar
                                 </DropdownMenuItem>
+                                {contractsMap[pagamento.contract_id]?.contract_type === "PJ" &&
+                                  nfseStatusMap[pagamento.contract_id] !== "emitida" && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleSendNfseReminder(pagamento)}
+                                    disabled={isReminding[pagamento.id]}
+                                  >
+                                    {isReminding[pagamento.id] ? (
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <BellRing className="mr-2 h-4 w-4 text-amber-500" />
+                                    )}
+                                    Lembrar NFS-e
+                                  </DropdownMenuItem>
+                                )}
                               </>
                             )}
                           </DropdownMenuContent>
