@@ -15,7 +15,7 @@ export function initSentry() {
     // Capture 100% of errors; adjust tracesSampleRate for performance tracing
     tracesSampleRate: 0.1,
     // Do not send PII breadcrumbs by default
-    sendDefaultPii: false,
+    sendDefaultPii: true,
     // Ignore "ResizeObserver loop limit exceeded" – browser noise
     ignoreErrors: [
       "ResizeObserver loop limit exceeded",
