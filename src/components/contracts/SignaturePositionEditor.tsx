@@ -84,14 +84,16 @@ export function SignaturePositionEditor({
 
   useEffect(() => {
     // Initialize positions from signatures
+    // Note: position_y = 0 means "unset" (top+translate would hide the box),
+    // so treat 0 the same as null.
     setPositions(
       signatures.map((sig) => ({
         ...sig,
-        position_x: sig.position_x ?? 50,
-        position_y: sig.position_y ?? 80,
-        position_page: sig.position_page ?? totalPages,
-        position_width: sig.position_width ?? 200,
-        position_height: sig.position_height ?? 80,
+        position_x: sig.position_x || 50,
+        position_y: sig.position_y || 85,
+        position_page: sig.position_page || totalPages,
+        position_width: sig.position_width || 200,
+        position_height: sig.position_height || 80,
       }))
     );
   }, [signatures, totalPages]);

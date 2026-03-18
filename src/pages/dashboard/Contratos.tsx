@@ -752,6 +752,12 @@ const Contratos = () => {
           if (docData) {
             // Create signature entries
             const signatureEntries = [];
+            const witnessCountNum = parseInt(witnessCount);
+            const totalSigners = 2 + witnessCountNum; // contractor + representative + witnesses
+
+            // Helper: spread signers evenly across x-axis at y=85 (visible near bottom)
+            const xPosition = (index: number) =>
+              Math.round(((index + 1) / (totalSigners + 1)) * 100);
 
             // 1. Contractor signature (the PJ employee)
             signatureEntries.push({
@@ -762,6 +768,8 @@ const Contratos = () => {
               signer_name: collaboratorProfile.pj_razao_social || collaboratorProfile.full_name,
               signer_email: collaboratorProfile.email,
               signer_document: collaboratorProfile.pj_cnpj || collaboratorProfile.cpf || null,
+              position_x: xPosition(0),
+              position_y: 85,
             });
 
             // 2. Company representative signature (selected admin)
@@ -773,10 +781,11 @@ const Contratos = () => {
               signer_name: representativeProfile?.full_name || profile.full_name,
               signer_email: representativeProfile?.email || profile.email,
               signer_document: representativeProfile?.cpf || profile.cpf || null,
+              position_x: xPosition(1),
+              position_y: 85,
             });
 
             // 3. Witness signatures (if any)
-            const witnessCountNum = parseInt(witnessCount);
             for (let i = 0; i < witnessCountNum; i++) {
               signatureEntries.push({
                 document_id: docData.id,
@@ -786,6 +795,8 @@ const Contratos = () => {
                 signer_name: `Testemunha ${i + 1}`,
                 signer_email: "",
                 signer_document: null,
+                position_x: xPosition(2 + i),
+                position_y: 85,
               });
             }
 
