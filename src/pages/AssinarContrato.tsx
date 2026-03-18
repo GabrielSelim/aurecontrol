@@ -7,6 +7,7 @@ import {
   recordSignature,
   checkAllSignaturesCompleted,
   updateDocumentStatus,
+  updateContractStatus,
 } from "@/services/contractService";
 import { fetchProfileByUserIdMaybe } from "@/services/profileService";
 import { fetchCompanyName } from "@/services/companyService";
@@ -160,6 +161,10 @@ const AssinarContrato = () => {
           "completed",
           new Date().toISOString()
         );
+        // Update contract status to assinado
+        if (contractId) {
+          await updateContractStatus(contractId, "assinado");
+        }
       } else {
         // Update to partial
         await updateDocumentStatus(signature.document_id, "partial");
