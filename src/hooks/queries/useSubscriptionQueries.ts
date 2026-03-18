@@ -4,6 +4,22 @@ import { createSubscriptionCheckout, type SubscriptionCheckoutInput } from "@/se
 import { useAuth } from "@/contexts/AuthContext";
 import { queryKeys } from "./queryKeys";
 
+export interface SignatureQuota {
+  hasActiveSubscription: boolean;
+  subscription: Subscription | null;
+  /** PJ contracts currently counted against the quota (non-terminated) */
+  used: number;
+  /** Max PJ contracts allowed by the plan. null = unlimited */
+  limit: number | null;
+  /** 0–100 percentage of quota used */
+  percentUsed: number;
+  /** true when ≥ 80% used but not yet at limit */
+  nearLimit: boolean;
+  /** true when used >= limit */
+  atLimit: boolean;
+  isLoading: boolean;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -115,4 +131,48 @@ export function useSubscriptionCheckout() {
       qc.invalidateQueries({ queryKey: ["subscription"] });
     },
   });
+}
+
+/**
+ * Returns the current subscription quota for the logged-in company.
+ * Counts all non-terminated PJ contracts against the plan's max_contracts limit.
+ */
+export function useSignatureQuota(): SignatureQuota {
+  const { profile } = useAuth();
+  const companyId = profile?.company_id;
+
+  const subQuery = useActiveSubscription();
+
+  const countQuery = useQuery({
+    queryKey: ["pj-quota-count", companyId],
+    queryFn: async (): Promise<number> => {
+      if (!companyId) return 0;
+      const { count, error } = await supabase
+        .from("contracts")
+        .select("*", { count: "exact", head: true })
+        .eq("company_id", companyId)
+        .eq("contract_type", "PJ")
+        .neq("status", "terminated");
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!companyId,
+  });
+
+  const subscription = subQuery.data ?? null;
+  const used = countQuery.data ?? 0;
+  const limit = subscription?.pricing_tiers?.max_contracts ?? null;
+  const percentUsed =
+    limit !== null && limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+
+  return {
+    hasActiveSubscription: subscription?.status === "active",
+    subscription,
+    used,
+    limit,
+    percentUsed,
+    nearLimit: limit !== null && percentUsed >= 80 && used < limit,
+    atLimit: limit !== null && used >= limit,
+    isLoading: subQuery.isLoading || countQuery.isLoading,
+  };
 }

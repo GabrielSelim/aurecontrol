@@ -5,6 +5,7 @@ import {
   useActiveSubscription,
   useSubscriptionHistory,
   useSubscriptionCheckout,
+  useSignatureQuota,
   type Subscription,
 } from "@/hooks/queries/useSubscriptionQueries";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -85,6 +87,7 @@ export default function MeuPlano() {
   const subQuery = useActiveSubscription();
   const historyQuery = useSubscriptionHistory(companyId);
   const checkoutMutation = useSubscriptionCheckout();
+  const quota = useSignatureQuota();
 
   const subscription = subQuery.data;
   const history = historyQuery.data ?? [];
@@ -238,11 +241,43 @@ export default function MeuPlano() {
               </div>
             )}
 
-            {/* Active benefits */}
+            {/* Active benefits + usage */}
             {subscription.status === "active" && subscription.pricing_tiers && (
-              <div className="flex items-center gap-2 text-sm text-green-600">
-                <CheckCircle className="h-4 w-4" />
-                Até {subscription.pricing_tiers.max_contracts ?? "∞"} contratos PJ ativos incluídos
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  Até {subscription.pricing_tiers.max_contracts ?? "∞"} contratos PJ ativos incluídos
+                </div>
+                {subscription.pricing_tiers.max_contracts !== null && (
+                  <div className="rounded-lg border p-4 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Contratos PJ utilizados</span>
+                      <span className={quota.atLimit ? "text-destructive font-bold" : quota.nearLimit ? "text-amber-600 font-bold" : "text-muted-foreground"}>
+                        {quota.used} / {quota.limit}
+                      </span>
+                    </div>
+                    <Progress
+                      value={quota.percentUsed}
+                      className={`h-2 ${
+                        quota.atLimit
+                          ? "[&>div]:bg-destructive"
+                          : quota.nearLimit
+                          ? "[&>div]:bg-amber-500"
+                          : ""
+                      }`}
+                    />
+                    {quota.nearLimit && (
+                      <p className="text-xs text-amber-600">
+                        ⚠️ Você está usando {quota.percentUsed}% do seu limite. Considere fazer upgrade.
+                      </p>
+                    )}
+                    {quota.atLimit && (
+                      <p className="text-xs text-destructive">
+                        🚫 Limite atingido. Faça upgrade para criar novos contratos PJ.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

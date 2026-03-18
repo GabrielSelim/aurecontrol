@@ -27,6 +27,7 @@ import type {
   HealthData,
   NextAction,
 } from "@/hooks/queries";
+import { SignatureQuotaBanner } from "@/components/SignatureQuotaBanner";
 
 const DashboardOverview = () => {
   useDocumentTitle("Visão Geral");
@@ -325,6 +326,9 @@ const DashboardOverview = () => {
           {getRoleLabel()}
         </Badge>
       </div>
+
+      {/* Quota de assinaturas PJ (só para admins) */}
+      {hasAdminAccess && <SignatureQuotaBanner />}
 
       {/* Alertas Inteligentes */}
       {!isLoading && alerts.length > 0 && (

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   fetchContractsByCompany,
@@ -103,6 +104,8 @@ import { logger } from "@/lib/logger";
 import { handleApiError } from "@/lib/handleApiError";
 import { logAuditAction } from "@/lib/auditLog";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { useSignatureQuota } from "@/hooks/queries/useSubscriptionQueries";
+import { SignatureQuotaBanner, SignatureQuotaIndicator } from "@/components/SignatureQuotaBanner";
 
 interface Contract {
   id: string;
@@ -207,6 +210,8 @@ const Contratos = () => {
   useDocumentTitle("Contratos");
   const { profile, isAdmin, user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const quota = useSignatureQuota();
   const [contratos, setContratos] = useState<Contract[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [adminProfiles, setAdminProfiles] = useState<AdminProfile[]>([]);
@@ -662,6 +667,24 @@ const Contratos = () => {
       }
     }
 
+    // Block PJ contracts when no active plan or quota exceeded
+    if (contractType === "PJ") {
+      if (!quota.hasActiveSubscription) {
+        toast.error(
+          "É necessário ter um plano ativo para criar contratos PJ com assinatura digital. Acesse Meu Plano para assinar.",
+          { duration: 6000 }
+        );
+        return;
+      }
+      if (quota.atLimit) {
+        toast.error(
+          `Limite atingido: você já utiliza ${quota.used} de ${quota.limit} contratos PJ no plano "${quota.subscription?.plan_name}". Faça upgrade em Meu Plano para criar mais.`,
+          { duration: 8000 }
+        );
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -855,6 +878,7 @@ const Contratos = () => {
       }
 
       toast.success("Contrato criado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["pj-quota-count"] });
 
       // Mark old contract as renewed if this was a renewal
       if (renovandoContratoId) {
@@ -1022,6 +1046,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       });
 
       toast.success("Contrato encerrado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["pj-quota-count"] });
       setIsTerminateDialogOpen(false);
       setContractToTerminate(null);
       fetchContratos();
@@ -1297,6 +1322,9 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
 
   return (
     <div className="space-y-6">
+      {/* Subscription quota banner (no plan / near limit / at limit) */}
+      {isAdmin() && <SignatureQuotaBanner />}
+
       {/* Alert Banner */}
       {expiringContractsCount > 0 && (
         <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
@@ -1316,9 +1344,10 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Contratos</h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie os contratos dos colaboradores
-          </p>
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
+            <p className="text-muted-foreground">Gerencie os contratos dos colaboradores</p>
+            {isAdmin() && <SignatureQuotaIndicator />}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={exportToCSV} title="Exportar lista filtrada como CSV">
