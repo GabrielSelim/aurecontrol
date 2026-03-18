@@ -898,7 +898,11 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       resetForm();
       fetchContratos();
     } catch (error) {
-      toast.error(handleApiError(error, "Erro ao criar contrato"));
+      // Extract the real Supabase/Postgres error message when available
+      const supabaseMsg = (error as any)?.message || (error as any)?.error_description;
+      toast.error(supabaseMsg && supabaseMsg.length < 200
+        ? supabaseMsg
+        : handleApiError(error, "Erro ao criar contrato"));
     } finally {
       setIsSubmitting(false);
     }
