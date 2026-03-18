@@ -669,6 +669,10 @@ const Contratos = () => {
 
     // Block PJ contracts when no active plan or quota exceeded
     if (contractType === "PJ") {
+      if (quota.isLoading) {
+        toast.info("Aguarde, verificando dados do plano de assinaturas...");
+        return;
+      }
       if (!quota.hasActiveSubscription) {
         toast.error(
           "É necessário ter um plano ativo para criar contratos PJ com assinatura digital. Acesse Meu Plano para assinar.",
@@ -716,7 +720,8 @@ const Contratos = () => {
         salary: salary ? parseCurrency(salary) : null,
         start_date: startDate,
         end_date: endDate,
-        status: "active" as const,
+        // PJ contracts start as "enviado" (awaiting signatures); CLT/others start as "active"
+        status: (contractType === "PJ" ? "enviado" : "active") as "active" | "enviado",
         created_by: profile.user_id,
         duration_type: contractType === "PJ" ? durationType : null,
         duration_value: contractType === "PJ" && durationType === "time_based" && durationValue ? parseInt(durationValue) : null,
@@ -1163,6 +1168,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
       sent: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800",
       signed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800",
       pending_signature: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+      enviado: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800",
     };
     return classNames[status] || "";
   };
@@ -1171,7 +1177,9 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
     const labels: Record<string, string> = {
       active: "Vigente",
       draft: "Rascunho",
+      enviado: "Enviado p/ Assinatura",
       sent: "Enviado",
+      assinado: "Assinado",
       signed: "Assinado",
       suspended: "Suspenso",
       em_revisao: "Em Revisão",
@@ -2187,8 +2195,8 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                         <ChevronRight className="ml-1 h-4 w-4" />
                       </Button>
                     ) : (
-                      <Button onClick={handleCreateContract} disabled={isSubmitting}>
-                        {isSubmitting ? "Criando..." : "Criar Contrato"}
+                      <Button onClick={handleCreateContract} disabled={isSubmitting || (contractType === "PJ" && quota.isLoading)}>
+                        {isSubmitting ? "Criando..." : (contractType === "PJ" && quota.isLoading) ? "Verificando plano..." : "Criar Contrato"}
                       </Button>
                     )}
                   </div>
@@ -2277,6 +2285,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
               <SelectContent>
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="active">Vigente</SelectItem>
+                <SelectItem value="enviado">Enviado p/ Assinatura</SelectItem>
                 <SelectItem value="pending_signature">Aguardando assinatura</SelectItem>
                 <SelectItem value="em_revisao">Em Revisão</SelectItem>
                 <SelectItem value="suspended">Suspenso</SelectItem>
@@ -2588,7 +2597,7 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                     {[
-                      { key: "pending_signature", label: "Aguardando Assinatura", color: "border-yellow-500", bgHeader: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400" },
+                      { key: "enviado", label: "Enviado p/ Assinatura", color: "border-amber-500", bgHeader: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
                       { key: "active", label: "Vigente", color: "border-blue-500", bgHeader: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
                       { key: "em_revisao", label: "Em Revisão", color: "border-orange-500", bgHeader: "bg-orange-500/10 text-orange-700 dark:text-orange-400" },
                       { key: "suspended", label: "Suspenso", color: "border-slate-400", bgHeader: "bg-slate-500/10 text-slate-600 dark:text-slate-400" },
@@ -2602,6 +2611,10 @@ ${salaryFormatted ? `<p><strong>Valor:</strong> ${salaryFormatted}</p>` : ""}
                         }
                         if (column.key === "active") {
                           return c.status === "active" && !getExpirationAlert(c);
+                        }
+                        // Catch both new 'enviado' and legacy 'pending_signature' in the same column
+                        if (column.key === "enviado") {
+                          return c.status === "enviado" || c.status === "pending_signature";
                         }
                         return c.status === column.key;
                       });
