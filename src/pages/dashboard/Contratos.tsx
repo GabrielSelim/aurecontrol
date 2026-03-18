@@ -615,6 +615,20 @@ const Contratos = () => {
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       toast.error("Preencha todos os campos obrigatórios destacados em vermelho");
+      // Se campos do step 1 estiverem inválidos, volta para step 1
+      if (errors.colaborador || errors.tipoContrato || errors.dataInicio) {
+        setStep(1);
+      }
+      return;
+    }
+
+    // Guarda defensiva: contractType deve ser um valor válido do enum
+    const validContractTypes = ["CLT", "PJ", "estagio", "temporario"] as const;
+    type ValidContractType = typeof validContractTypes[number];
+    if (!validContractTypes.includes(contractType as ValidContractType)) {
+      toast.error("Tipo de contrato inválido. Selecione novamente.");
+      setStep(1);
+      setContractType("");
       return;
     }
 
