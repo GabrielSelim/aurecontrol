@@ -689,10 +689,17 @@ export type Database = {
         Row: {
           adjustment_date: string | null
           adjustment_index: string | null
+          clt_cbo_code: string | null
+          clt_ctps_number: string | null
+          clt_ctps_series: string | null
+          clt_employee_id: string | null
+          clt_work_regime: string | null
           company_id: string
+          compensation_type: string | null
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at: string | null
           created_by: string | null
+          data_admissao: string | null
           deliverable_description: string | null
           department: string | null
           document_url: string | null
@@ -700,6 +707,10 @@ export type Database = {
           duration_unit: string | null
           duration_value: number | null
           end_date: string | null
+          esocial_categoria: string | null
+          estado_civil: string | null
+          goal_description: string | null
+          grau_instrucao: string | null
           hourly_rate: number | null
           id: string
           job_title: string
@@ -707,6 +718,8 @@ export type Database = {
           notes: string | null
           payment_day: number | null
           payment_frequency: string | null
+          pis_pasep: string | null
+          raca_cor: string | null
           salary: number | null
           scope_description: string | null
           search_vector: unknown
@@ -715,14 +728,22 @@ export type Database = {
           status: Database["public"]["Enums"]["contract_status"] | null
           updated_at: string | null
           user_id: string
+          variable_component: number | null
         }
         Insert: {
           adjustment_date?: string | null
           adjustment_index?: string | null
+          clt_cbo_code?: string | null
+          clt_ctps_number?: string | null
+          clt_ctps_series?: string | null
+          clt_employee_id?: string | null
+          clt_work_regime?: string | null
           company_id: string
+          compensation_type?: string | null
           contract_type: Database["public"]["Enums"]["contract_type"]
           created_at?: string | null
           created_by?: string | null
+          data_admissao?: string | null
           deliverable_description?: string | null
           department?: string | null
           document_url?: string | null
@@ -730,6 +751,10 @@ export type Database = {
           duration_unit?: string | null
           duration_value?: number | null
           end_date?: string | null
+          esocial_categoria?: string | null
+          estado_civil?: string | null
+          goal_description?: string | null
+          grau_instrucao?: string | null
           hourly_rate?: number | null
           id?: string
           job_title: string
@@ -737,6 +762,8 @@ export type Database = {
           notes?: string | null
           payment_day?: number | null
           payment_frequency?: string | null
+          pis_pasep?: string | null
+          raca_cor?: string | null
           salary?: number | null
           scope_description?: string | null
           search_vector?: unknown
@@ -745,14 +772,22 @@ export type Database = {
           status?: Database["public"]["Enums"]["contract_status"] | null
           updated_at?: string | null
           user_id: string
+          variable_component?: number | null
         }
         Update: {
           adjustment_date?: string | null
           adjustment_index?: string | null
+          clt_cbo_code?: string | null
+          clt_ctps_number?: string | null
+          clt_ctps_series?: string | null
+          clt_employee_id?: string | null
+          clt_work_regime?: string | null
           company_id?: string
+          compensation_type?: string | null
           contract_type?: Database["public"]["Enums"]["contract_type"]
           created_at?: string | null
           created_by?: string | null
+          data_admissao?: string | null
           deliverable_description?: string | null
           department?: string | null
           document_url?: string | null
@@ -760,6 +795,10 @@ export type Database = {
           duration_unit?: string | null
           duration_value?: number | null
           end_date?: string | null
+          esocial_categoria?: string | null
+          estado_civil?: string | null
+          goal_description?: string | null
+          grau_instrucao?: string | null
           hourly_rate?: number | null
           id?: string
           job_title?: string
@@ -767,6 +806,8 @@ export type Database = {
           notes?: string | null
           payment_day?: number | null
           payment_frequency?: string | null
+          pis_pasep?: string | null
+          raca_cor?: string | null
           salary?: number | null
           scope_description?: string | null
           search_vector?: unknown
@@ -775,6 +816,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["contract_status"] | null
           updated_at?: string | null
           user_id?: string
+          variable_component?: number | null
         }
         Relationships: [
           {
