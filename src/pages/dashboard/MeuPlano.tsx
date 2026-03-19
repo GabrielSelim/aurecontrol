@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -37,10 +37,15 @@ import {
   XCircle,
   RefreshCw,
   AlertTriangle,
+  Tag,
+  ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { type SubscriptionCheckoutResult } from "@/services/asaasService";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label"; 
 
 interface PricingTier {
   id: string;
@@ -99,6 +104,51 @@ export default function MeuPlano() {
   const [paymentResult, setPaymentResult] = useState<SubscriptionCheckoutResult | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
 
+  // Coupon state
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponApplied, setCouponApplied] = useState<{
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    description: string | null;
+  } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  const resetCoupon = () => {
+    setCouponOpen(false);
+    setCouponInput("");
+    setCouponApplied(null);
+    setCouponError(null);
+    setCouponLoading(false);
+  };
+
+  const validateCoupon = useCallback(async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponError(null);
+    setCouponApplied(null);
+    try {
+      const { data, error } = await supabase
+        .from("discount_coupons")
+        .select("code, discount_type, discount_value, description")
+        .eq("code", code)
+        .single();
+      if (error || !data) {
+        setCouponError("Cupom inválido, expirado ou não encontrado.");
+      } else {
+        setCouponApplied(data as { code: string; discount_type: string; discount_value: number; description: string | null });
+        setCouponError(null);
+      }
+    } catch {
+      setCouponError("Erro ao validar cupom. Tente novamente.");
+    } finally {
+      setCouponLoading(false);
+    }
+  }, [couponInput]);
+
   // Fetch pricing tiers for upgrade
   const tiersQuery = useQuery({
     queryKey: ["pricing-tiers", "subscription"],
@@ -122,10 +172,15 @@ export default function MeuPlano() {
         tier_id: selectedTier.id,
         cycle: upgradeCycle,
         is_upgrade: !!subscription,
+        coupon_code: couponApplied?.code,
       });
       setUpgradeOpen(false);
+      resetCoupon();
       if (result.activated_immediately) {
-        toast.success("Plano atualizado com sucesso!");
+        const msg = result.coupon_discount
+          ? `Plano ativado! Desconto de ${formatCurrency(result.coupon_discount)} aplicado pelo cupom.`
+          : "Plano atualizado com sucesso!";
+        toast.success(msg);
         subQuery.refetch();
       } else {
         setPaymentResult(result);
@@ -341,7 +396,7 @@ export default function MeuPlano() {
       )}
 
       {/* Upgrade / New subscription dialog */}
-      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+      <Dialog open={upgradeOpen} onOpenChange={(open) => { setUpgradeOpen(open); if (!open) resetCoupon(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{subscription ? "Trocar plano" : "Escolher plano"}</DialogTitle>
@@ -420,15 +475,95 @@ export default function MeuPlano() {
             )}
           </div>
 
+          {/* Coupon code section */}
+          <div className="border-t pt-3">
+            <button
+              type="button"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => { setCouponOpen((v) => !v); setCouponError(null); }}
+            >
+              <Tag className="h-4 w-4" />
+              Tenho um cupom de desconto
+              <ChevronDown className={`h-4 w-4 transition-transform ${couponOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {couponOpen && (
+              <div className="mt-3 space-y-2">
+                {couponApplied ? (
+                  <div className="flex items-center justify-between rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2">
+                    <div className="flex items-center gap-2 text-green-700 dark:text-green-400 text-sm">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>
+                        <strong>{couponApplied.code}</strong> —{" "}
+                        {couponApplied.discount_type === "percentage"
+                          ? `${couponApplied.discount_value}% de desconto`
+                          : `${formatCurrency(couponApplied.discount_value)} de desconto`}
+                        {couponApplied.description && ` · ${couponApplied.description}`}
+                      </span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-red-500 hover:text-red-600"
+                      onClick={() => { setCouponApplied(null); setCouponInput(""); }}
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Label htmlFor="coupon-input" className="sr-only">Código do cupom</Label>
+                      <Input
+                        id="coupon-input"
+                        placeholder="Ex: PROMO30"
+                        value={couponInput}
+                        onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
+                        onKeyDown={(e) => e.key === "Enter" && validateCoupon()}
+                        className={couponError ? "border-destructive" : ""}
+                      />
+                      {couponError && <p className="text-xs text-destructive mt-1">{couponError}</p>}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!couponInput.trim() || couponLoading}
+                      onClick={validateCoupon}
+                      className="shrink-0"
+                    >
+                      {couponLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aplicar"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUpgradeOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setUpgradeOpen(false); resetCoupon(); }}>Cancelar</Button>
             <Button
               disabled={!selectedTier || checkoutMutation.isPending}
               onClick={handleUpgrade}
             >
               {checkoutMutation.isPending
                 ? "Processando..."
-                : subscription ? "Confirmar upgrade" : "Assinar"}
+                : (() => {
+                    if (!selectedTier) return subscription ? "Confirmar upgrade" : "Assinar";
+                    const basePrice = upgradeCycle === "annual"
+                      ? (selectedTier.subscription_monthly_price ?? 0) * 12 * (1 - ANNUAL_DISCOUNT)
+                      : (selectedTier.subscription_monthly_price ?? 0);
+                    if (couponApplied) {
+                      const disc = couponApplied.discount_type === "percentage"
+                        ? basePrice * couponApplied.discount_value / 100
+                        : couponApplied.discount_value;
+                      const final = Math.max(basePrice - disc, 0);
+                      return final === 0
+                        ? "Ativar gratuitamente"
+                        : `${subscription ? "Confirmar upgrade" : "Assinar"} · ${formatCurrency(final)}`;
+                    }
+                    return subscription ? "Confirmar upgrade" : "Assinar";
+                  })()
+              }
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -443,9 +578,16 @@ export default function MeuPlano() {
               Finalize o pagamento
             </DialogTitle>
             <DialogDescription>
-              {paymentResult && `${formatCurrency(paymentResult.amount)} — ${
-                paymentResult.cycle === "annual" ? "plano anual" : "plano mensal"
-              }`}
+              {paymentResult && (
+                <>
+                  {formatCurrency(paymentResult.amount)} — {paymentResult.cycle === "annual" ? "plano anual" : "plano mensal"}
+                  {paymentResult.coupon_discount && (
+                    <span className="ml-2 text-green-600 font-medium">
+                      (desconto de {formatCurrency(paymentResult.coupon_discount)} aplicado)
+                    </span>
+                  )}
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
 

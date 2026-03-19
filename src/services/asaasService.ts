@@ -21,6 +21,7 @@ export interface SubscriptionCheckoutResult {
   cycle: "monthly" | "annual";
   ends_at: string;
   activated_immediately: boolean;
+  coupon_discount: number | null;
   message?: string;
 }
 
@@ -29,6 +30,7 @@ export interface SubscriptionCheckoutInput {
   tier_id: string;
   cycle: "monthly" | "annual";
   is_upgrade?: boolean;
+  coupon_code?: string;
 }
 
 /* ------------------------------------------------------------------ */

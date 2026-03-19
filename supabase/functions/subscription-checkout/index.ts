@@ -61,11 +61,12 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { company_id, tier_id, cycle, is_upgrade = false } = await req.json() as {
+    const { company_id, tier_id, cycle, is_upgrade = false, coupon_code } = await req.json() as {
       company_id: string;
       tier_id: string;
       cycle: "monthly" | "annual";
       is_upgrade?: boolean;
+      coupon_code?: string;
     };
 
     if (!company_id || !tier_id || !cycle) {
@@ -124,6 +125,64 @@ serve(async (req) => {
         : monthlyValue;
     }
 
+    // ── Coupon validation & application ────────────────────────────────
+    let appliedCouponId: string | null = null;
+    let couponDiscountApplied = 0;
+    let couponNote = "";
+
+    if (coupon_code && coupon_code.trim() !== "") {
+      const { data: coupon, error: couponErr } = await supabase
+        .from("discount_coupons")
+        .select("id, code, discount_type, discount_value, max_uses, current_uses, valid_from, valid_until, is_active")
+        .eq("code", coupon_code.trim().toUpperCase())
+        .single();
+
+      if (couponErr || !coupon) {
+        return json({ error: "Cupom de desconto inválido ou não encontrado." }, 422);
+      }
+
+      // Server-side validity checks
+      const couponRec = coupon as {
+        id: string; code: string; discount_type: string; discount_value: number;
+        max_uses: number | null; current_uses: number; valid_from: string | null;
+        valid_until: string | null; is_active: boolean;
+      };
+
+      if (!couponRec.is_active) {
+        return json({ error: "Este cupom está inativo." }, 422);
+      }
+      if (couponRec.valid_from && new Date(couponRec.valid_from) > new Date()) {
+        return json({ error: "Este cupom ainda não está válido." }, 422);
+      }
+      if (couponRec.valid_until && new Date(couponRec.valid_until) < new Date()) {
+        return json({ error: "Este cupom expirou." }, 422);
+      }
+      if (couponRec.max_uses !== null && couponRec.current_uses >= couponRec.max_uses) {
+        return json({ error: "Este cupom atingiu o limite de usos." }, 422);
+      }
+
+      // Apply discount
+      const baseAmount = amountToCharge;
+      if (couponRec.discount_type === "percentage") {
+        const pct = Math.min(couponRec.discount_value, 100);
+        couponDiscountApplied = parseFloat((baseAmount * pct / 100).toFixed(2));
+      } else {
+        // fixed
+        couponDiscountApplied = Math.min(couponRec.discount_value, baseAmount);
+      }
+
+      amountToCharge = parseFloat(Math.max(baseAmount - couponDiscountApplied, 0).toFixed(2));
+      appliedCouponId = couponRec.id;
+      couponNote = `Cupom ${couponRec.code} aplicado — desconto de R$ ${couponDiscountApplied.toFixed(2)}.`;
+
+      // Increment uses immediately (decrement back if checkout fails — acceptable UX trade-off)
+      await supabase
+        .from("discount_coupons")
+        .update({ current_uses: couponRec.current_uses + 1 })
+        .eq("id", couponRec.id);
+    }
+    // ───────────────────────────────────────────────────────────────────
+
     // Calculate dates
     const now = new Date();
     const endsAt = cycle === "annual"
@@ -137,6 +196,8 @@ serve(async (req) => {
       cycle === "annual" ? monthlyValue * 12 * (1 - ANNUAL_DISCOUNT) : monthlyValue
     );
     const discountPct = cycle === "annual" ? ANNUAL_DISCOUNT * 100 : 0;
+
+    const allNotes = [upgradeNote, couponNote].filter(Boolean).join(" | ") || null;
 
     const { data: subscription, error: subErr } = await supabase
       .from("subscriptions")
@@ -153,7 +214,9 @@ serve(async (req) => {
         ends_at: endsAt.toISOString(),
         is_upgrade,
         previous_subscription_id: previousSubscription?.id ?? null,
-        notes: upgradeNote || null,
+        notes: allNotes,
+        coupon_code: appliedCouponId ? coupon_code!.trim().toUpperCase() : null,
+        coupon_discount_applied: couponDiscountApplied > 0 ? couponDiscountApplied : null,
       })
       .select("id")
       .single();
@@ -162,7 +225,7 @@ serve(async (req) => {
       return json({ error: "Erro ao criar assinatura." }, 500);
     }
 
-    // If no charge needed (upgrade covered by credit)
+    // If no charge needed (upgrade covered by credit OR 100% coupon)
     if (amountToCharge === 0) {
       // Activate immediately
       await activateSubscription(supabase, subscription.id, company_id, previousSubscription?.id as string | undefined);
@@ -171,8 +234,10 @@ serve(async (req) => {
         charge_id: null,
         payment_link: null,
         pix_payload: null,
+        amount: 0,
         activated_immediately: true,
-        message: upgradeNote,
+        coupon_discount: couponDiscountApplied > 0 ? couponDiscountApplied : null,
+        message: [upgradeNote, couponNote].filter(Boolean).join(" ") || "Assinatura ativada com sucesso.",
       });
     }
 
@@ -182,7 +247,9 @@ serve(async (req) => {
     const cycleLabel = cycle === "annual" ? "Anual" : "Mensal";
     const description = is_upgrade
       ? `Upgrade ${cycleLabel} para ${tier.name as string} — ${upgradeNote}`
-      : `Assinatura ${cycleLabel} — Plano ${tier.name as string}`;
+      : couponNote
+        ? `Assinatura ${cycleLabel} — Plano ${tier.name as string} (${couponNote})`
+        : `Assinatura ${cycleLabel} — Plano ${tier.name as string}`;
 
     const charge = await asaasRequest("/payments", "POST", {
       customer: customerId,
@@ -216,6 +283,7 @@ serve(async (req) => {
       cycle,
       ends_at: endsAt.toISOString(),
       activated_immediately: false,
+      coupon_discount: couponDiscountApplied > 0 ? couponDiscountApplied : null,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Erro interno";
