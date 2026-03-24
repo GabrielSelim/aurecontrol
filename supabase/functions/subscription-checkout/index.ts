@@ -91,6 +91,14 @@ serve(async (req) => {
     let amountToCharge: number;
     let upgradeNote = "";
 
+    // First, expire any stale pending subscriptions for this company
+    await supabase
+      .from("subscriptions")
+      .update({ status: "expired", notes: "Expirado: pagamento não realizado." })
+      .eq("company_id", company_id)
+      .eq("status", "pending")
+      .lt("created_at", new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString());
+
     if (is_upgrade) {
       const { data: activeSub } = await supabase
         .from("subscriptions")
@@ -101,23 +109,29 @@ serve(async (req) => {
         .limit(1)
         .maybeSingle();
 
-      if (!activeSub) return json({ error: "Nenhuma assinatura ativa encontrada para upgrade." }, 404);
-      previousSubscription = activeSub;
-
-      amountToCharge = calculateProRata(
-        activeSub.total_charged as number,
-        activeSub.starts_at as string,
-        activeSub.ends_at as string,
-        monthlyValue,
-        cycle,
-      );
-
-      if (amountToCharge < 5) {
-        // Below minimum charge — just switch plan without charging
-        amountToCharge = 0;
-        upgradeNote = "Upgrade sem cobrança adicional (crédito cobre o custo).";
+      if (!activeSub) {
+        // No active subscription found — treat as new subscription instead of failing
+        upgradeNote = "";
+        amountToCharge = cycle === "annual"
+          ? monthlyValue * 12 * (1 - ANNUAL_DISCOUNT)
+          : monthlyValue;
       } else {
-        upgradeNote = `Upgrade proporcional de ${activeSub.plan_name as string} para ${tier.name as string}.`;
+        previousSubscription = activeSub;
+
+        amountToCharge = calculateProRata(
+          activeSub.total_charged as number,
+          activeSub.starts_at as string,
+          activeSub.ends_at as string,
+          monthlyValue,
+          cycle,
+        );
+
+        if (amountToCharge < 5) {
+          amountToCharge = 0;
+          upgradeNote = "Upgrade sem cobrança adicional (crédito cobre o custo).";
+        } else {
+          upgradeNote = `Upgrade proporcional de ${activeSub.plan_name as string} para ${tier.name as string}.`;
+        }
       }
     } else {
       amountToCharge = cycle === "annual"

@@ -171,7 +171,7 @@ export default function MeuPlano() {
         company_id: companyId,
         tier_id: selectedTier.id,
         cycle: upgradeCycle,
-        is_upgrade: !!subscription,
+        is_upgrade: subscription?.status === "active",
         coupon_code: couponApplied?.code,
       });
       setUpgradeOpen(false);
@@ -399,9 +399,9 @@ export default function MeuPlano() {
       <Dialog open={upgradeOpen} onOpenChange={(open) => { setUpgradeOpen(open); if (!open) resetCoupon(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{subscription ? "Trocar plano" : "Escolher plano"}</DialogTitle>
+            <DialogTitle>{subscription?.status === "active" ? "Trocar plano" : "Escolher plano"}</DialogTitle>
             <DialogDescription>
-              {subscription
+              {subscription?.status === "active"
                 ? "Ao fazer upgrade você paga apenas o valor proporcional ao tempo restante."
                 : "Escolha o plano que melhor atende sua empresa."}
             </DialogDescription>
@@ -548,7 +548,8 @@ export default function MeuPlano() {
               {checkoutMutation.isPending
                 ? "Processando..."
                 : (() => {
-                    if (!selectedTier) return subscription ? "Confirmar upgrade" : "Assinar";
+                    const isActive = subscription?.status === "active";
+                    if (!selectedTier) return isActive ? "Confirmar upgrade" : "Assinar";
                     const basePrice = upgradeCycle === "annual"
                       ? (selectedTier.subscription_monthly_price ?? 0) * 12 * (1 - ANNUAL_DISCOUNT)
                       : (selectedTier.subscription_monthly_price ?? 0);
@@ -559,9 +560,9 @@ export default function MeuPlano() {
                       const final = Math.max(basePrice - disc, 0);
                       return final === 0
                         ? "Ativar gratuitamente"
-                        : `${subscription ? "Confirmar upgrade" : "Assinar"} · ${formatCurrency(final)}`;
+                        : `${isActive ? "Confirmar upgrade" : "Assinar"} · ${formatCurrency(final)}`;
                     }
-                    return subscription ? "Confirmar upgrade" : "Assinar";
+                    return isActive ? "Confirmar upgrade" : "Assinar";
                   })()
               }
             </Button>
